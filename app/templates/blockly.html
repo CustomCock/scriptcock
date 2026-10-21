@@ -1,14 +1,22 @@
 {% extends "base.html" %}
-{% block titel %}Blockly-Modus{% endblock %}
+{% import "_icons.html" as i %}
+{% block titel %}Blockly{% endblock %}
+{% block breit %} inhalt-breit{% endblock %}
 {% block kopf %}
 <script src="{{ basis }}/static/vendor/blockly/blockly_compressed.js" defer></script>
 <script src="{{ basis }}/static/vendor/blockly/msg/de.js" defer></script>
 <script src="{{ basis }}/static/js/blockly-modus.js" defer></script>
 {% endblock %}
 {% block inhalt %}
-<h1>Blockly-Modus</h1>
-<p class="einleitung">Bausteine aus dem Menü links in den schwarzen Block „Script“ stecken. Unter <strong>Ablauf</strong>
-findest du „Versuche … wenn das fehlschlägt …“ und „Wiederhole N-mal“. Die Vorschau aktualisiert sich automatisch.</p>
+<div class="seitenkopf">
+  <div>
+    <h1>Blockly</h1>
+    <p class="untertitel">Bausteine aus dem Menü in den roten Block „Script“ stecken. Unter <strong>Ablauf</strong>: „Versuche … wenn das fehlschlägt“ und „Wiederhole N-mal“.</p>
+  </div>
+  <div class="seitenkopf-aktionen">
+    <button type="button" class="knopf" id="bl-neu">Neu beginnen</button>
+  </div>
+</div>
 
 {% if vorbelegung %}
 <div class="hinweis" role="status">
@@ -17,38 +25,38 @@ findest du „Versuche … wenn das fehlschlägt …“ und „Wiederhole N-mal�
 </div>
 {% endif %}
 
-<div class="formular bl-steuerung">
+<div class="bl-steuerung">
   <fieldset id="bl-ziel" class="ziel-wahl">
     <legend>Zielsystem</legend>
     {% for z in ziele %}
     <label class="ziel-option"><input type="radio" name="ziel" value="{{ z.value }}" {% if z == ziel %}checked{% endif %}><span>{{ ziel_anzeige[z] }}</span></label>
     {% endfor %}
   </fieldset>
-  <div class="bl-optionen">
-    <div class="feld">
-      <label for="bl-titel">Titel des Scripts</label>
-      <input id="bl-titel" type="text" maxlength="120" placeholder="Mein Script" value="{{ vorbelegung.titel if vorbelegung else '' }}">
-    </div>
-    <div class="feld">
-      <label class="schalter"><input id="bl-dry" type="checkbox"{% if vorbelegung and vorbelegung.dry_run %} checked{% endif %}> <strong>Nur simulieren</strong></label>
-      <label class="schalter bestaetigung" id="bl-rot" hidden><input id="bl-rot-ok" type="checkbox"> Ich weiß, was dieses Script tut.</label>
-      <button type="button" class="knopf" id="bl-neu">Neu beginnen</button>
-    </div>
+  <div class="feld">
+    <label for="bl-titel">Titel</label>
+    <input id="bl-titel" type="text" maxlength="120" placeholder="Mein Script" value="{{ vorbelegung.titel if vorbelegung else '' }}">
   </div>
+  <div class="feld">
+    <label class="schalter"><input id="bl-dry" type="checkbox"{% if vorbelegung and vorbelegung.dry_run %} checked{% endif %}> <strong>Nur simulieren</strong></label>
+  </div>
+  <label class="schalter bestaetigung" id="bl-rot" hidden><input id="bl-rot-ok" type="checkbox"> Ich weiß, was dieses Script tut.</label>
 </div>
 
-<div id="bl-arbeitsflaeche" class="bl-arbeitsflaeche" aria-label="Blockly-Arbeitsfläche"></div>
-<noscript><p class="fehlerbox">Der Blockly-Modus braucht JavaScript.</p></noscript>
-
-<section id="bl-vorschau" class="vorschau" aria-live="polite">
-  <div id="bl-fehler"></div>
-  <div class="aktionen">
-    <button type="button" class="knopf-primaer" id="bl-erzeugen" disabled>Script erzeugen &amp; herunterladen</button>
-    <span id="bl-status" class="feldhilfe"></span>
-  </div>
-  <pre class="code" id="bl-code-rahmen" hidden><code id="bl-code"></code></pre>
-</section>
-<div id="bl-ergebnis" aria-live="polite"></div>
+<div class="bl-layout">
+  <div id="bl-arbeitsflaeche" class="bl-arbeitsflaeche" aria-label="Blockly-Arbeitsfläche"></div>
+  <section class="bl-ausgabe" aria-label="Vorschau">
+    <noscript><p class="fehlerbox">Der Blockly-Modus braucht JavaScript.</p></noscript>
+    <div id="bl-vorschau" class="vorschau" aria-live="polite">
+      <div id="bl-fehler"></div>
+      <div class="aktionen">
+        <button type="button" class="knopf-primaer" id="bl-erzeugen" disabled>{{ i.icon("download") }} Script erzeugen &amp; herunterladen</button>
+      </div>
+      <p id="bl-status" class="feldhilfe"></p>
+      <pre class="code" id="bl-code-rahmen" hidden><code id="bl-code"></code></pre>
+    </div>
+    <div id="bl-ergebnis" aria-live="polite"></div>
+  </section>
+</div>
 
 <script type="application/json" id="bl-daten">{{ daten | tojson }}</script>
 {% endblock %}

@@ -6,10 +6,10 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.auth import aktueller_benutzer
-from app.db import GespeichertesScript
+from app.db import GespeichertesRezept, GespeichertesScript
 from app.escaping import Ziel
 from app.generators.base import ZIEL_ANZEIGE
 from app.models.block import ParamTyp, Risiko
@@ -78,8 +78,35 @@ def _sitzung(request: Request) -> Any:
 
 
 @router.get("/", name="startseite", response_class=HTMLResponse)
-async def startseite(request: Request, benutzer: Benutzer = Depends(aktueller_benutzer)) -> Response:
-    return _render(request, "index.html", benutzer, kacheln=ZIEL_KACHELN)
+async def startseite(
+    request: Request, benutzer: Benutzer = Depends(aktueller_benutzer), sitzung: Any = Depends(_sitzung)
+) -> Response:
+    """Einstieg: die drei Modi, zuletzt erstellte Scripte, Bibliothek (und offene Vorschläge für Admins)."""
+    zuletzt = list(
+        sitzung.scalars(
+            select(GespeichertesScript)
+            .where(GespeichertesScript.autor == benutzer.name)
+            .order_by(GespeichertesScript.erstellt_am.desc(), GespeichertesScript.id.desc())
+            .limit(6)
+        )
+    )
+    bibliothek_anzahl = sitzung.scalar(
+        select(func.count()).select_from(GespeichertesScript).where(GespeichertesScript.in_bibliothek)
+    )
+    vorschlaege = 0
+    if benutzer.ist_admin:
+        vorschlaege = sitzung.scalar(
+            select(func.count()).select_from(GespeichertesRezept).where(GespeichertesRezept.freigegeben.is_(False))
+        )
+    return _render(
+        request,
+        "index.html",
+        benutzer,
+        zuletzt=zuletzt,
+        bibliothek_anzahl=bibliothek_anzahl or 0,
+        vorschlaege=vorschlaege or 0,
+        anzahl_rezepte=sum(1 for r in _registry(request).rezepte.values() if r.freigegeben),
+    )
 
 
 def _rezepte_fuer(reg: Registry, ziel: Ziel, q: str, kategorie: str) -> list[RezeptDef]:
@@ -106,7 +133,8 @@ async def rezepte(
 ) -> Response:
     z = _ziel(ziel)
     if z is None:
-        return RedirectResponse(request.app.state.einstellungen.root_path + "/")
+        # Schritt 1 des Rezept-Ablaufs: Betriebssystem wählen
+        return _render(request, "betriebssystem.html", benutzer, kacheln=ZIEL_KACHELN)
     reg = _registry(request)
     liste = _rezepte_fuer(reg, z, q[:100], kategorie[:100])
     if request.headers.get("HX-Request") and request.headers.get("HX-Target") == "rezeptliste":
@@ -133,7 +161,7 @@ async def rezept_formular(
     reg = _registry(request)
     z = _ziel(ziel)
     if z is None or z not in reg.rezept_ziele(rezept):
-        return RedirectResponse(request.app.state.einstellungen.root_path + "/")
+        return RedirectResponse(request.app.state.einstellungen.root_path + "/rezepte")
     bloecke = rezept_bloecke(reg, rezept, z)
     return _render(
         request,

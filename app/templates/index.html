@@ -1,18 +1,62 @@
 {% extends "base.html" %}
+{% import "_icons.html" as i %}
 {% block inhalt %}
-{% set aktiv = 1 %}{% include "_schritte.html" %}
-<h1>Für welches System brauchst du ein Script?</h1>
-<p class="einleitung">Wähle das Betriebssystem des Rechners, auf dem das Script später laufen soll.
-Danach suchst du dir eine fertige Aufgabe („Rezept“) aus und füllst ein kurzes Formular aus.</p>
-<div class="kacheln">
-  {% for ziel, titel, untertitel, symbol in kacheln %}
-  <a class="kachel kachel-{{ symbol }}" href="{{ basis }}/rezepte?ziel={{ ziel.value }}">
-    <span class="kachel-symbol" aria-hidden="true">{% if symbol == "ps" %}PS&gt;{% elif symbol == "cmd" %}C:\&gt;{% elif symbol == "linux" %}$_{% else %}%_{% endif %}</span>
-    <span class="kachel-titel">{{ titel }}</span>
-    <span class="kachel-text">{{ untertitel }}</span>
+<section class="willkommen">
+  <h1>Welches Script brauchst du?</h1>
+  <p>Wähle einen Weg – alle drei erzeugen geprüfte Scripte für Windows, Linux und macOS. Ausgeführt wird nichts automatisch.</p>
+</section>
+
+<div class="modus-karten">
+  <a class="modus-karte" href="{{ basis }}/rezepte">
+    <span class="marke">Empfohlen</span>
+    {{ i.icon("rezepte") }}
+    <h2>Rezepte</h2>
+    <p>{{ anzahl_rezepte }} fertige Aufgaben mit kurzem Formular – z. B. Drucker einrichten oder Netzwerk prüfen.</p>
+    <span class="weiter">Rezept wählen {{ i.icon("weiter") }}</span>
   </a>
-  {% endfor %}
+  <a class="modus-karte" href="{{ basis }}/baukasten">
+    {{ i.icon("baukasten") }}
+    <h2>Freier Baukasten</h2>
+    <p>Bausteine in eine Liste ziehen, Werte eintragen, fertig. Mit Live-Vorschau.</p>
+    <span class="weiter">Zusammenstellen {{ i.icon("weiter") }}</span>
+  </a>
+  <a class="modus-karte" href="{{ basis }}/blockly">
+    {{ i.icon("blockly") }}
+    <h2>Blockly</h2>
+    <p>Grafisch stecken – mit „Versuche … wenn das fehlschlägt“ und „Wiederhole N-mal“.</p>
+    <span class="weiter">Öffnen {{ i.icon("weiter") }}</span>
+  </a>
 </div>
-<p class="einleitung">Du kennst dich schon aus? Im <a href="{{ basis }}/baukasten">freien Baukasten</a> stellst du
-dir ein Script aus einzelnen Bausteinen selbst zusammen.</p>
+
+<div class="raster-zwei">
+  <section class="panel">
+    <div class="panel-kopf">
+      <h2>Zuletzt von dir erstellt</h2>
+      <a class="klein" href="{{ basis }}/bibliothek?meine=true">Alle anzeigen</a>
+    </div>
+    {% if zuletzt %}
+    <ul class="liste-kompakt">
+      {% for e in zuletzt %}
+      <li>
+        <a href="{{ basis }}/skripte/{{ e.id }}">{{ e.titel }}</a>
+        <span class="marke marke-leise">{{ ziel_anzeige[e.ziel] if e.ziel in ziel_anzeige else e.ziel }}</span>
+        <span class="leise klein">{{ e.erstellt_am.strftime("%d.%m. %H:%M") }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="leer">Noch keine Scripte – starte oben mit einem Rezept.</p>
+    {% endif %}
+  </section>
+  <section class="panel">
+    <div class="panel-kopf">
+      <h2>Bibliothek</h2>
+      <a class="klein" href="{{ basis }}/bibliothek">Durchsuchen</a>
+    </div>
+    <p><span class="zahl-gross">{{ bibliothek_anzahl }}</span> <span class="leise">geteilte Scripte von Kolleginnen und Kollegen</span></p>
+    {% if benutzer.ist_admin and vorschlaege %}
+    <p class="hinweis"><a href="{{ basis }}/verwaltung">{{ vorschlaege }} Rezept-Vorschl{{ "ag wartet" if vorschlaege == 1 else "äge warten" }} auf Freigabe</a></p>
+    {% endif %}
+  </section>
+</div>
 {% endblock %}

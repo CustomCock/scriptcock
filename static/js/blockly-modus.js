@@ -9,8 +9,8 @@
 
   var SPEICHER_SCHLUESSEL = "okm-blockly-v1";
   var FARBEN = { gruen: "#2e7d32", gelb: "#b7791f", rot: "#c4161c" };
-  var FARBE_ABLAUF = "#4a4a4a";
-  var FARBE_START = "#141414";
+  var FARBE_ABLAUF = "#8c7440"; // Sandgelb (dunkel) – gut lesbar auf dunklem Grund
+  var FARBE_START = "#e3262e";
 
   function init() {
     var datenEl = document.getElementById("bl-daten");
@@ -139,13 +139,35 @@
       };
     }
 
+    // Dunkles Theme passend zur Oberfläche
+    var thema = Blockly.Theme.defineTheme("okmDunkel", {
+      name: "okmDunkel",
+      base: Blockly.Themes.Classic,
+      componentStyles: {
+        workspaceBackgroundColour: "#111114",
+        toolboxBackgroundColour: "#16161a",
+        toolboxForegroundColour: "#d8d8dc",
+        flyoutBackgroundColour: "#1d1d22",
+        flyoutForegroundColour: "#d8d8dc",
+        flyoutOpacity: 0.97,
+        scrollbarColour: "#3d3d45",
+        scrollbarOpacity: 0.8,
+        insertionMarkerColour: "#e6d3a3",
+        insertionMarkerOpacity: 0.4,
+        markerColour: "#e6d3a3",
+        cursorColour: "#e6d3a3"
+      },
+      fontStyle: { family: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif", size: 11 }
+    });
+
     var ws = Blockly.inject("bl-arbeitsflaeche", {
+      theme: thema,
       toolbox: toolbox(),
       media: daten.basis + "/static/vendor/blockly/media/",
       trashcan: true,
       sounds: false,
       zoom: { controls: true, wheel: true, startScale: 0.85 },
-      grid: { spacing: 24, length: 3, colour: "#e6d3a3", snap: true },
+      grid: { spacing: 24, length: 2, colour: "#2b2b31", snap: true },
       move: { scrollbars: true, drag: true, wheel: false }
     });
     window.addEventListener("resize", function () { Blockly.svgResize(ws); });

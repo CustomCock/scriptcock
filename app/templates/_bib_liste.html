@@ -1,11 +1,12 @@
-<p class="feldhilfe">{{ ergebnis.gesamt }} Script{% if ergebnis.gesamt != 1 %}e{% endif %} gefunden.</p>
+{% import "_icons.html" as i %}
+<p class="feldhilfe">{{ ergebnis.gesamt }} Script{% if ergebnis.gesamt != 1 %}e{% endif %}</p>
 {% if ergebnis.eintraege %}
 <ul class="bib-liste">
   {% for e in ergebnis.eintraege %}
   <li class="bib-eintrag">
     <div class="bib-kopf">
       <a class="bib-titel" href="{{ basis }}/skripte/{{ e.id }}">{{ e.titel }}</a>
-      <span class="marke">{{ ziel_anzeige[e.ziel] if e.ziel in ziel_anzeige else e.ziel }}</span>
+      <span class="marke marke-leise">{{ ziel_anzeige[e.ziel] if e.ziel in ziel_anzeige else e.ziel }}</span>
       {% if meine and not e.in_bibliothek %}<span class="marke marke-leise">privat</span>{% endif %}
     </div>
     {% if e.beschreibung %}<p class="bib-text">{{ e.beschreibung }}</p>{% endif %}
@@ -15,8 +16,8 @@
       · <span title="So oft als funktionierend bestätigt">✓ {{ e.funktioniert }}{% if e.id in ergebnis.meine_stimmen %} (auch von dir){% endif %}</span>
     </p>
     <div class="bib-aktionen">
-      <a class="knopf" href="{{ basis }}/skripte/{{ e.id }}/download" download>⬇ Herunterladen</a>
-      <a class="knopf" href="{{ basis }}/{{ 'blockly' if e.quelle == 'blockly' else 'baukasten' }}?aus={{ e.id }}">Erneut öffnen und anpassen</a>
+      <a class="knopf" href="{{ basis }}/skripte/{{ e.id }}/download" download title="Herunterladen">{{ i.icon("download") }}<span class="sr-only">Herunterladen</span></a>
+      <a class="knopf" href="{{ basis }}/{{ 'blockly' if e.quelle == 'blockly' else 'baukasten' }}?aus={{ e.id }}">{{ i.icon("oeffnen") }} Erneut öffnen und anpassen</a>
       <a class="knopf" href="{{ basis }}/skripte/{{ e.id }}">Details</a>
     </div>
   </li>
@@ -29,5 +30,5 @@
 </nav>
 {% endif %}
 {% else %}
-<p class="leer">{% if meine %}Du hast noch keine Scripte erzeugt.{% else %}Noch keine passenden Scripte in der Bibliothek. Nach dem Erzeugen kannst du ein Script mit „In Bibliothek speichern“ hier ablegen.{% endif %}</p>
+<p class="leer">{% if meine %}Du hast noch keine Scripte erzeugt.{% else %}Noch keine passenden Scripte. Nach dem Erzeugen kannst du ein Script hier ablegen.{% endif %}</p>
 {% endif %}

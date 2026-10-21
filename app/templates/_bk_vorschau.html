@@ -1,7 +1,8 @@
 {% set nummer = {} %}{% for s in schritte %}{% set _ = nummer.update({s.uid: (loop.index, s.block.name)}) %}{% endfor %}
 {% set gesperrt = nicht_verfuegbar or allgemein or pro_feld or pro_schritt %}
+{% import "_icons.html" as i %}
 {% if not formular.uids %}
-  <p class="leer">Die Vorschau erscheint, sobald die Liste einen Schritt enthält.</p>
+  <div class="platzhalter-ausgabe"><div>{{ i.icon("terminal") }}<br>Die Vorschau erscheint, sobald die Liste einen Schritt enthält.</div></div>
 {% else %}
   {% if nicht_verfuegbar %}
   <div class="fehlerbox" role="alert">
@@ -21,11 +22,11 @@
   {% endif %}
   <div class="aktionen">
     <button type="button" class="knopf-primaer" hx-post="{{ basis }}/baukasten/erzeugen" hx-include="#baukasten"
-            hx-target="#bk-ergebnis" {% if gesperrt %}disabled aria-disabled="true"{% endif %}>Script erzeugen &amp; herunterladen</button>
+            hx-target="#bk-ergebnis" {% if gesperrt %}disabled aria-disabled="true"{% endif %}>{{ i.icon("download") }} Script erzeugen &amp; herunterladen</button>
     {% if bestaetigung_noetig and not formular.rot_bestaetigt %}<span class="feldhilfe">Enthält rote (destruktive) Schritte – bitte oben „Ich weiß, was dieses Script tut“ bestätigen.</span>{% endif %}
   </div>
   {% if script %}
-  <p class="feldhilfe">Live-Vorschau ({{ ziel_anzeige_aktuell }}) – gespeichert wird erst beim Erzeugen.</p>
+  <p class="feldhilfe">Live-Vorschau · {{ ziel_anzeige_aktuell }} · gespeichert wird erst beim Erzeugen</p>
   <pre class="code"><code class="language-{{ sprache }}">{{ script.text.replace("\r\n", "\n") }}</code></pre>
   {% endif %}
 {% endif %}

@@ -21,7 +21,7 @@
     {% endif %}
     {% if v.e.freigegeben %}<a class="knopf" href="{{ basis }}/rezepte/{{ v.e.rezept_id }}?ziel={{ v.ziele[0].value if v.ziele else 'powershell' }}">Ansehen</a>{% endif %}
     <a class="knopf" href="{{ basis }}/verwaltung/rezepte/{{ v.e.id }}/yaml" download>YAML</a>
-    <button type="button" class="knopf knopf-gefahr" hx-post="{{ basis }}/verwaltung/rezepte/{{ v.e.id }}/loeschen"
+    <button type="button" class="knopf-gefahr" hx-post="{{ basis }}/verwaltung/rezepte/{{ v.e.id }}/loeschen"
             hx-confirm="Rezept „{{ v.e.name }}“ wirklich löschen?">{% if v.e.freigegeben %}Löschen{% else %}Ablehnen{% endif %}</button>
   </div>
   <div id="status-rezept-{{ v.e.id }}" aria-live="polite"></div>

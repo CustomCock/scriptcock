@@ -1,6 +1,6 @@
 {# erwartet: ziel, dateiname, braucht_admin #}
-<section class="anleitung">
-  <h3>So führst du das Script aus</h3>
+<details class="hilfe anleitung" open>
+  <summary>So führst du das Script aus</summary>
   {% if ziel.value == "powershell" %}
   <ol>
     <li>Script herunterladen (landet meist im Ordner <em>Downloads</em>).</li>
@@ -28,4 +28,4 @@
   </ol>
   {% endif %}
   <p class="feldhilfe">Am Ende zeigt das Script, wo das Protokoll liegt. Bei Problemen dieses Protokoll an den Support schicken.</p>
-</section>
+</details>

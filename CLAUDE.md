@@ -99,6 +99,14 @@ sonst wird `tests/test_browser.py` übersprungen.
 
 Rezeptfelder heißen im HTML-Formular `f.<feld_id>` (Kollisionsschutz mit `ziel`, `titel` …).
 
+## Oberfläche
+
+- Nur dunkles Design. Farben/Abstände ausschließlich über die Tokens in `:root` von
+  `static/css/app.css`; Komponenten-Klassen sind deutsch (`knopf`, `knopf-primaer`, `panel`,
+  `hinweis`, `fehlerbox`, `marke`, `risiko-*`, `seitenkopf`, `raster-zwei`, `raster-arbeit`).
+- Icons: `{% import "_icons.html" as i %}` und `{{ i.icon("download") }}` (Inline-SVG, CSP-konform).
+- Aktiver Menüpunkt wird in `base.html` aus dem URL-Pfad bestimmt.
+
 ## Sicherheit (Kurzfassung, Details in `docs/sicherheit.md`)
 
 - PowerShell `'…'` (alle Unicode-Single-Quotes verdoppelt), bash/zsh `'…'` mit `'\''`,

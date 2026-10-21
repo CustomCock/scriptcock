@@ -138,7 +138,7 @@ def test_zielwechsel_markiert_und_sperrt(reg: Registry, tmp_path: Path) -> None:
         (f"p.{uid2}.ziel", "10.0.0.1"),
     ]
     liste = post(c, "/baukasten/liste", daten).text
-    assert 'class="schritt schritt-gesperrt" id="schritt-' + uid in liste
+    assert re.search(rf'class="schritt schritt-\w+ schritt-gesperrt" id="schritt-{uid}"', liste)
     assert "Unter Linux (Bash 4+) nicht verfügbar" in liste
     # Werte bleiben beim Umschalten erhalten
     assert 'value="10.0.0.1"' in liste

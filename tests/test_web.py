@@ -26,9 +26,26 @@ def test_startseite_mit_warnbanner(client: TestClient) -> None:
     r = client.get("/")
     assert r.status_code == 200
     assert "AUTH_DISABLED=true" in r.text
-    for text in ["Windows PowerShell", "Windows CMD", "Linux", "macOS"]:
+    # Einstieg in die drei Modi + Bibliothek
+    for text in ['href="/rezepte"', 'href="/baukasten"', 'href="/blockly"', 'href="/bibliothek"']:
         assert text in r.text
     assert "Content-Security-Policy" in r.headers
+    assert 'class="aktiv" aria-current="page"' not in r.text.split("Hauptnavigation")[1].split("</nav>")[0]
+
+
+def test_betriebssystem_wahl(client: TestClient) -> None:
+    r = client.get("/rezepte")
+    for text in ["Windows PowerShell", "Windows CMD", "Linux", "macOS"]:
+        assert text in r.text
+    assert 'href="/rezepte" class="aktiv"' in r.text
+    # Unbekanntes Ziel → wieder die Auswahl
+    assert "Für welches System?" in client.get("/rezepte?ziel=amiga").text
+
+
+def test_startseite_zeigt_letzte_scripte(client: TestClient) -> None:
+    client.post("/rezepte/diagnosepaket_support/erzeugen", data={"ziel": "zsh"}, headers=HX)
+    seite = client.get("/").text
+    assert "Diagnosepaket für den Support erstellen" in seite and 'href="/skripte/1"' in seite
 
 
 def test_rezeptliste_und_suche(client: TestClient) -> None:
@@ -38,7 +55,6 @@ def test_rezeptliste_und_suche(client: TestClient) -> None:
     r = client.get("/rezepte?ziel=bash&q=drucker", headers={**HX, "HX-Target": "rezeptliste"})
     assert "Drucker einrichten" in r.text and "<html" not in r.text
     assert "Windows Update" not in client.get("/rezepte?ziel=bash").text
-    assert client.get("/rezepte?ziel=amiga", follow_redirects=False).status_code == 307
 
 
 def test_formular_zeigt_nur_relevante_felder(client: TestClient) -> None:

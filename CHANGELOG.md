@@ -1,5 +1,21 @@
 # Changelog
 
+## UI-Überarbeitung – Dark Theme & Übersicht
+
+- **Komplett dunkles Design** in okm-Farben (Schwarz, Rot, Sandgelb) mit neuem Design-System
+  (`static/css/app.css`): Farb-Tokens, einheitliche Knöpfe, Panels, Hinweise, Badges, Formulare,
+  Tabellen; `color-scheme: dark` für native Bedienelemente; dunkles Blockly-Theme.
+- **Navigation:** Icons (eigene Inline-SVGs, `_icons.html`), aktiver Menüpunkt markiert,
+  kompakte Kopfzeile, auf dem Handy horizontal scrollbar.
+- **Startseite als Einstieg:** die drei Wege (Rezepte, Baukasten, Blockly), zuletzt erstellte
+  Scripte, Bibliothek – Admins sehen offene Rezept-Vorschläge. Die Betriebssystem-Wahl liegt
+  jetzt unter `/rezepte`.
+- **Weniger Text:** einheitliche Seitenköpfe (Titel + eine Zeile); Ausführungsanleitung,
+  Bibliothek-Speichern und Optionen einklappbar.
+- **Kompakter:** breiterer Inhaltsbereich; auf großen Bildschirmen Rezept-Formular und Vorschau
+  nebeneinander, Baukasten dreispaltig (Bausteine | Schritte | Vorschau), Blockly mit Vorschau
+  rechts; Schritt-Karten mit Rand in Risikofarbe.
+
 ## Phase 4 – Blockly-Modus + Ablauf-Bausteine
 
 - **IR-Erweiterung** ohne Umbau: neue Knotentypen `wenn_fehler` („Versuche … / Wenn das

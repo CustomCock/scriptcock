@@ -18,6 +18,8 @@ Die Anwendung **erzeugt** Scripte, sie führt sie **nicht** selbst aus.
 
 ## Funktionen
 
+- Dunkle, kompakte Oberfläche in okm-Farben; Startseite als Einstieg in alle Wege.
+
 - **Rezept-Modus:** Betriebssystem wählen → Rezept suchen → Formular ausfüllen (Live-Prüfung,
   Hilfetexte, Beispielwerte) → Vorschau mit Syntax-Highlighting → Download / Zwischenablage,
   dazu eine Anleitung „So führst du das Script aus“.

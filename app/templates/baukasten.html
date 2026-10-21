@@ -1,19 +1,23 @@
 {% extends "base.html" %}
+{% import "_icons.html" as i %}
 {% block titel %}Freier Baukasten{% endblock %}
+{% block breit %} inhalt-breit{% endblock %}
 {% block kopf %}<script src="{{ basis }}/static/vendor/sortable/Sortable.min.js" defer></script>{% endblock %}
 {% block inhalt %}
-<h1>Freier Baukasten</h1>
-<p class="einleitung">Stell dir dein Script selbst zusammen: Bausteine aus der Liste in die Schrittliste ziehen
-(oder auf <strong>+</strong> klicken), Reihenfolge per Ziehen am <span aria-hidden="true">⠿</span>-Griff oder mit ↑ ↓ ändern,
-Werte ausfüllen. Die Vorschau aktualisiert sich automatisch.</p>
+<div class="seitenkopf">
+  <div>
+    <h1>Freier Baukasten</h1>
+    <p class="untertitel">Bausteine in die Schrittliste ziehen oder mit <strong>+</strong> hinzufügen – die Vorschau rechts aktualisiert sich automatisch.</p>
+  </div>
+</div>
 
 {% if vorbelegung %}
 <div class="hinweis" role="status">
-  <p><strong>Gespeichertes Script geöffnet:</strong> „{{ vorbelegung.titel }}“. Änderungen ergeben ein neues Script –
-  das gespeicherte bleibt unverändert.</p>
+  <p><strong>Gespeichertes Script geöffnet:</strong> „{{ vorbelegung.titel }}“. Änderungen ergeben ein neues Script.</p>
   {% if vorbelegung.hinweise %}<ul>{% for h in vorbelegung.hinweise %}<li>{{ h }}</li>{% endfor %}</ul>{% endif %}
 </div>
 {% endif %}
+
 <div class="bk-layout">
   <aside class="bk-palette" aria-label="Bausteine">
     <label class="sr-only" for="bk-suche">Baustein suchen</label>
@@ -28,7 +32,7 @@ Werte ausfüllen. Die Vorschau aktualisiert sich automatisch.</p>
             data-suche="{{ (b.name ~ ' ' ~ b.beschreibung ~ ' ' ~ b.kategorie) | lower }}"
             data-beschreibung="{{ b.beschreibung }}"
             title="{% if b.verfuegbar(ziel) %}{{ b.beschreibung }}{% else %}Unter {{ ziel_anzeige[ziel] }} nicht verfügbar{% endif %}">
-          <span class="risiko risiko-{{ b.risiko.value }}" title="{{ b.risiko.anzeige }}">{{ b.risiko.value }}</span>
+          <span class="risiko risiko-{{ b.risiko.value }}" title="Risiko: {{ b.risiko.anzeige }}">{{ b.risiko.value }}</span>
           <span class="palette-name">{{ b.name }}</span>
           <button type="button" class="hinzufuegen" data-hinzufuegen="{{ b.id }}" aria-label="{{ b.name }} hinzufügen"
                   {% if not b.verfuegbar(ziel) %}disabled{% endif %}>+</button>
@@ -53,36 +57,31 @@ Werte ausfüllen. Die Vorschau aktualisiert sich automatisch.</p>
         {% endfor %}
       </fieldset>
 
+      <ol id="schrittliste" class="schrittliste" aria-label="Schritte des Scripts">{% include "_bk_liste.html" %}</ol>
+      <p class="leerhinweis">Noch leer – Bausteine links hierher ziehen oder auf „+“ klicken.</p>
+
       <details class="optionen"{% if vorbelegung %} open{% endif %}>
-        <summary>Titel und Beschreibung</summary>
+        <summary>Titel, Beschreibung und Simulation</summary>
         <div class="feld">
           <label for="bk-titel">Titel des Scripts</label>
           <input id="bk-titel" name="titel" type="text" maxlength="120" placeholder="Mein Script" value="{{ vorbelegung.titel if vorbelegung else '' }}">
         </div>
         <div class="feld">
-          <label for="bk-beschreibung">Beschreibung (erscheint im Kopfkommentar)</label>
+          <label for="bk-beschreibung">Beschreibung (für den Kopfkommentar)</label>
           <input id="bk-beschreibung" name="beschreibung" type="text" maxlength="300" value="{{ vorbelegung.beschreibung if vorbelegung else '' }}">
         </div>
+        <div class="feld">
+          <input type="hidden" name="dry_run" value="false">
+          <label class="schalter"><input type="checkbox" name="dry_run" value="true"{% if vorbelegung and vorbelegung.dry_run %} checked{% endif %}> <span><strong>Nur simulieren</strong> – zeigt nur an, was passieren würde</span></label>
+        </div>
       </details>
-
-      <ol id="schrittliste" class="schrittliste" aria-label="Schritte des Scripts">{% include "_bk_liste.html" %}</ol>
-      <p class="leerhinweis">Noch keine Schritte. Zieh Bausteine aus der Liste hierher oder klicke dort auf „+“.</p>
-
-      <div class="feld">
-        <input type="hidden" name="dry_run" value="false">
-        <label class="schalter"><input type="checkbox" name="dry_run" value="true"{% if vorbelegung and vorbelegung.dry_run %} checked{% endif %}> <strong>Nur simulieren</strong> – das Script zeigt nur an, was es tun würde.</label>
-      </div>
       <div id="bk-bestaetigung"></div>
     </form>
-
-    <div id="bk-vorschau" aria-live="polite"></div>
-    <div id="bk-ergebnis" aria-live="polite"></div>
 
     <details class="optionen rezept-speichern">
       <summary>{% if benutzer.ist_admin %}Als Rezept speichern{% else %}Als Rezept vorschlagen{% endif %}</summary>
       <div id="rezept-speichern">
-        <p class="feldhilfe">Ausgefüllte Werte werden fest ins Rezept übernommen. Leere Pflichtfelder fragt das
-          Rezept-Formular später ab.{% if not benutzer.ist_admin %} Ein Admin prüft den Vorschlag, bevor er für alle sichtbar wird.{% endif %}</p>
+        <p class="feldhilfe">Ausgefüllte Werte werden fest übernommen, leere Pflichtfelder fragt das Rezept-Formular ab.{% if not benutzer.ist_admin %} Ein Admin gibt den Vorschlag frei.{% endif %}</p>
         <div class="feld"><label for="rz-name">Name des Rezepts</label>
           <input id="rz-name" name="rezept_name" type="text" maxlength="100" placeholder="z. B. Drucker Empfang einrichten"></div>
         <div class="feld"><label for="rz-kategorie">Kategorie</label>
@@ -94,6 +93,13 @@ Werte ausfüllen. Die Vorschau aktualisiert sich automatisch.</p>
       </div>
       <div id="rezept-ergebnis" aria-live="polite"></div>
     </details>
+  </section>
+
+  <section class="bk-ausgabe" aria-label="Vorschau">
+    <div id="bk-vorschau" aria-live="polite">
+      <div class="platzhalter-ausgabe"><div>{{ i.icon("terminal") }}<br>Die Vorschau erscheint, sobald die Liste einen Schritt enthält.</div></div>
+    </div>
+    <div id="bk-ergebnis" aria-live="polite"></div>
   </section>
 </div>
 {% endblock %}

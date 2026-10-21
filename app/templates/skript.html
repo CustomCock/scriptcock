@@ -1,45 +1,60 @@
 {% extends "base.html" %}
+{% import "_icons.html" as i %}
 {% block titel %}{{ e.titel }}{% endblock %}
 {% block inhalt %}
-<p class="zurueck"><a href="{{ basis }}/bibliothek">← zur Bibliothek</a></p>
-<h1>{{ e.titel }}</h1>
-{% if e.beschreibung %}<p class="einleitung">{{ e.beschreibung }}</p>{% endif %}
-<dl class="eckdaten">
-  <dt>Zielsystem</dt><dd>{{ ziel_anzeige[ziel] }}</dd>
-  <dt>Erstellt</dt><dd>{{ e.erstellt_am.strftime("%d.%m.%Y %H:%M") }} von {{ e.autor }}</dd>
-  <dt>Quelle</dt><dd>{{ quelle }}</dd>
-  <dt>Status</dt><dd>{% if e.in_bibliothek %}in der Bibliothek{% else %}privat (nur für dich sichtbar){% endif %}</dd>
-  {% if tags %}<dt>Tags</dt><dd>{% for t in tags %}<a href="{{ basis }}/bibliothek?tag={{ t }}">#{{ t }}</a> {% endfor %}</dd>{% endif %}
-  <dt>SHA-256</dt><dd class="hash"><code>{{ e.sha256 }}</code></dd>
-</dl>
-<div class="aktionen">
-  <a class="knopf-primaer" href="{{ basis }}/skripte/{{ e.id }}/download" download>⬇ {{ e.dateiname }} herunterladen</a>
-  <a class="knopf" href="{{ basis }}/{{ 'blockly' if e.quelle == 'blockly' else 'baukasten' }}?aus={{ e.id }}">Erneut öffnen und anpassen</a>
-  <span id="funktioniert-{{ e.id }}">{% include "_funktioniert.html" %}</span>
-  {% if darf_aendern and e.in_bibliothek %}
-  <button type="button" class="knopf" hx-post="{{ basis }}/skripte/{{ e.id }}/entfernen"
-          hx-confirm="Script aus der Bibliothek entfernen? Es bleibt unter „Meine Scripte“ erhalten.">Aus Bibliothek entfernen</button>
-  {% endif %}
+<a class="zurueck" href="{{ basis }}/bibliothek">{{ i.icon("zurueck") }} Bibliothek</a>
+<div class="seitenkopf">
+  <div>
+    <h1>{{ e.titel }}</h1>
+    {% if e.beschreibung %}<p class="untertitel">{{ e.beschreibung }}</p>{% endif %}
+  </div>
+  <div class="seitenkopf-aktionen">
+    <a class="knopf-primaer" href="{{ basis }}/skripte/{{ e.id }}/download" download>{{ i.icon("download") }} {{ e.dateiname }}</a>
+    <a class="knopf" href="{{ basis }}/{{ 'blockly' if e.quelle == 'blockly' else 'baukasten' }}?aus={{ e.id }}">{{ i.icon("oeffnen") }} Erneut öffnen und anpassen</a>
+    <span id="funktioniert-{{ e.id }}">{% include "_funktioniert.html" %}</span>
+  </div>
 </div>
 
-{% if darf_aendern and not e.in_bibliothek %}
-{% with eintrag_id=e.id, titel=e.titel, beschreibung=e.beschreibung %}{% include "_bib_speichern.html" %}{% endwith %}
-{% endif %}
+<div class="raster-zwei">
+  <section class="panel">
+    <h2>Eckdaten</h2>
+    <dl class="eckdaten">
+      <dt>Zielsystem</dt><dd>{{ ziel_anzeige[ziel] }}</dd>
+      <dt>Erstellt</dt><dd>{{ e.erstellt_am.strftime("%d.%m.%Y %H:%M") }} von {{ e.autor }}</dd>
+      <dt>Quelle</dt><dd>{{ quelle }}</dd>
+      <dt>Status</dt><dd>{% if e.in_bibliothek %}in der Bibliothek{% else %}privat (nur für dich sichtbar){% endif %}</dd>
+      {% if tags %}<dt>Tags</dt><dd>{% for t in tags %}<a href="{{ basis }}/bibliothek?tag={{ t }}">#{{ t }}</a> {% endfor %}</dd>{% endif %}
+      <dt>SHA-256</dt><dd class="hash"><code>{{ e.sha256 }}</code></dd>
+    </dl>
+    {% if darf_aendern and e.in_bibliothek %}
+    <div class="aktionen">
+      <button type="button" class="knopf-gefahr" hx-post="{{ basis }}/skripte/{{ e.id }}/entfernen"
+              hx-confirm="Script aus der Bibliothek entfernen? Es bleibt unter „Meine Scripte“ erhalten.">Aus Bibliothek entfernen</button>
+    </div>
+    {% endif %}
+    {% if darf_aendern and not e.in_bibliothek %}
+    {% with eintrag_id=e.id, titel=e.titel, beschreibung=e.beschreibung %}{% include "_bib_speichern.html" %}{% endwith %}
+    {% endif %}
+  </section>
+  <section class="panel">
+    <h2>Enthaltene Bausteine</h2>
+    <table class="tabelle">
+      <thead><tr><th>#</th><th>Baustein</th><th>Risiko</th><th>Version</th></tr></thead>
+      <tbody>
+      {% for v in versionen %}
+      <tr{% if v.aktuell != v.gespeichert %} class="geaendert"{% endif %}>
+        <td>{{ loop.index }}</td><td>{{ v.name }}</td>
+        <td>{% if v.risiko %}<span class="risiko risiko-{{ v.risiko }}">{{ v.risiko }}</span>{% endif %}</td>
+        <td>{{ v.gespeichert }}{% if v.aktuell is none %} → <span class="fehlertext">entfernt</span>{% elif v.aktuell != v.gespeichert %} → <strong>{{ v.aktuell }} (geändert)</strong>{% endif %}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
 
-<h2>Enthaltene Bausteine</h2>
-<table class="tabelle">
-  <thead><tr><th>#</th><th>Baustein</th><th>Risiko</th><th>Version beim Speichern</th><th>Aktuelle Version</th></tr></thead>
-  <tbody>
-  {% for v in versionen %}
-  <tr{% if v.aktuell != v.gespeichert %} class="geaendert"{% endif %}>
-    <td>{{ loop.index }}</td><td>{{ v.name }}</td>
-    <td>{% if v.risiko %}<span class="risiko risiko-{{ v.risiko }}">{{ v.risiko }}</span>{% endif %}</td>
-    <td>{{ v.gespeichert }}</td>
-    <td>{% if v.aktuell is none %}<span class="fehlertext">entfernt</span>{% elif v.aktuell != v.gespeichert %}<strong>{{ v.aktuell }} (geändert)</strong>{% else %}{{ v.aktuell }}{% endif %}</td>
-  </tr>
-  {% endfor %}
-  </tbody>
-</table>
-<h2>Script</h2>
-<pre class="code"><code class="language-{{ sprache }}">{{ text }}</code></pre>
+<section class="abschnitt">
+  <h2>Script</h2>
+  <pre class="code"><code class="language-{{ sprache }}">{{ text }}</code></pre>
+</section>
 {% endblock %}

@@ -1,4 +1,4 @@
-<li class="schritt{% if not verfuegbar %} schritt-gesperrt{% endif %}" id="schritt-{{ uid }}" data-uid="{{ uid }}" data-block="{{ block.id }}">
+<li class="schritt schritt-{{ block.risiko.value }}{% if not verfuegbar %} schritt-gesperrt{% endif %}" id="schritt-{{ uid }}" data-uid="{{ uid }}" data-block="{{ block.id }}">
   <input type="hidden" name="schritt" value="{{ uid }}:{{ block.id }}">
   <div class="schritt-kopf">
     <span class="griff" title="Ziehen zum Verschieben" aria-hidden="true">⠿</span>

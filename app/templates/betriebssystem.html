@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block titel %}Rezepte{% endblock %}
+{% block inhalt %}
+{% set aktiv_schritt = 1 %}{% include "_schritte.html" %}
+<div class="seitenkopf">
+  <div>
+    <h1>Für welches System?</h1>
+    <p class="untertitel">Das Betriebssystem des Rechners, auf dem das Script später laufen soll.</p>
+  </div>
+</div>
+<div class="kacheln">
+  {% for ziel, titel, untertitel, symbol in kacheln %}
+  <a class="kachel kachel-{{ symbol }}" href="{{ basis }}/rezepte?ziel={{ ziel.value }}">
+    <span class="kachel-symbol" aria-hidden="true">{% if symbol == "ps" %}PS&gt;{% elif symbol == "cmd" %}C:\&gt;{% elif symbol == "linux" %}$_{% else %}%_{% endif %}</span>
+    <span class="kachel-titel">{{ titel }}</span>
+    <span class="kachel-text">{{ untertitel }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

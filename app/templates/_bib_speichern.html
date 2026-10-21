@@ -1,14 +1,13 @@
 {# erwartet: eintrag_id, titel, beschreibung #}
-<section class="bib-speichern" id="bib-speichern-{{ eintrag_id }}">
-  <h3>In Bibliothek speichern</h3>
-  <p class="feldhilfe">Dann finden auch Kolleginnen und Kollegen das Script und können es erneut öffnen und anpassen.</p>
+<details class="hilfe bib-speichern" id="bib-speichern-{{ eintrag_id }}">
+  <summary>In Bibliothek speichern – für Kolleginnen und Kollegen auffindbar</summary>
   <div class="feld"><label for="bib-titel-{{ eintrag_id }}">Titel</label>
     <input id="bib-titel-{{ eintrag_id }}" name="titel" type="text" maxlength="100" value="{{ titel }}"></div>
   <div class="feld"><label for="bib-beschreibung-{{ eintrag_id }}">Beschreibung</label>
     <input id="bib-beschreibung-{{ eintrag_id }}" name="beschreibung" type="text" maxlength="300" value="{{ beschreibung }}"></div>
-  <div class="feld"><label for="bib-tags-{{ eintrag_id }}">Tags (durch Komma oder Leerzeichen getrennt)</label>
+  <div class="feld"><label for="bib-tags-{{ eintrag_id }}">Tags</label>
     <input id="bib-tags-{{ eintrag_id }}" name="tags" type="text" maxlength="300" placeholder="z. B. drucker, empfang"></div>
   <button type="button" class="knopf" hx-post="{{ basis }}/skripte/{{ eintrag_id }}/bibliothek"
           hx-include="#bib-speichern-{{ eintrag_id }}" hx-target="#bib-speichern-{{ eintrag_id }} .bib-status">In Bibliothek speichern</button>
   <div class="bib-status" aria-live="polite"></div>
-</section>
+</details>

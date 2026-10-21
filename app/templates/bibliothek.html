@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% block titel %}Bibliothek{% endblock %}
 {% block inhalt %}
-<h1>{% if meine %}Meine Scripte{% else %}Bibliothek{% endif %}</h1>
-<p class="einleitung">{% if meine %}Alle Scripte, die du erzeugt hast – auch die, die nicht in der Bibliothek veröffentlicht sind.
-{% else %}Scripte, die Kolleginnen und Kollegen gespeichert haben. Mit „Hat funktioniert ✓“ zeigst du anderen, dass ein Script hilft.{% endif %}</p>
+<div class="seitenkopf">
+  <div>
+    <h1>{% if meine %}Meine Scripte{% else %}Bibliothek{% endif %}</h1>
+    <p class="untertitel">{% if meine %}Alles, was du erzeugt hast – auch private Scripte.{% else %}Geteilte Scripte. „Hat funktioniert ✓“ hilft anderen bei der Auswahl.{% endif %}</p>
+  </div>
+</div>
 <nav class="reiter" aria-label="Ansicht">
   <a href="{{ basis }}/bibliothek" {% if not meine %}aria-current="page"{% endif %}>Bibliothek</a>
   <a href="{{ basis }}/bibliothek?meine=true" {% if meine %}aria-current="page"{% endif %}>Meine Scripte</a>
@@ -24,7 +27,7 @@
     <option value="">Alle Tags</option>
     {% for t in ergebnis.alle_tags %}<option value="{{ t }}" {% if t == tag %}selected{% endif %}>#{{ t }}</option>{% endfor %}
   </select>
-  <noscript><button type="submit">Suchen</button></noscript>
+  <noscript><button type="submit" class="knopf">Suchen</button></noscript>
 </form>
 <div id="bibliotheksliste">{% include "_bib_liste.html" %}</div>
 {% endblock %}

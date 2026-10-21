@@ -1,10 +1,15 @@
+{%- import "_icons.html" as i -%}
+{%- set pfad = request.url.path[basis | length:] or "/" -%}
+{%- set aktiv = "start" if pfad == "/" else ("rezepte" if pfad.startswith("/rezepte") else ("baukasten" if pfad.startswith("/baukasten") else ("blockly" if pfad.startswith("/blockly") else ("bibliothek" if pfad.startswith("/bibliothek") or pfad.startswith("/skripte") else ("verwaltung" if pfad.startswith("/verwaltung") else ""))))) -%}
 <!doctype html>
 <html lang="de">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#08080a">
   <meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "allowScriptTags": false}'>
-  <title>{% block titel %}Script-Baukasten{% endblock %} · okm</title>
+  <title>{% block titel %}Start{% endblock %} · okm Script-Baukasten</title>
   <link rel="icon" href="{{ basis }}/static/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="{{ basis }}/static/css/app.css">
   <link rel="stylesheet" href="{{ basis }}/static/vendor/highlight/github-dark.min.css">
@@ -17,32 +22,35 @@
 </head>
 <body>
   {% if auth_disabled %}
-  <div class="warnbanner" role="alert">
-    ⚠ Anmeldung ist abgeschaltet (AUTH_DISABLED=true). Nur für die Entwicklung – so niemals produktiv betreiben!
-  </div>
+  <div class="warnbanner" role="alert">⚠ Anmeldung abgeschaltet (AUTH_DISABLED=true) – nur für die Entwicklung, niemals produktiv betreiben!</div>
   {% endif %}
   <header class="kopfzeile">
-    <a class="logo" href="{{ basis }}/"><span class="logo-okm">okm</span> Script-Baukasten</a>
-    <nav class="hauptnav" aria-label="Hauptnavigation">
-      <a href="{{ basis }}/">Rezepte</a>
-      <a href="{{ basis }}/baukasten">Freier Baukasten</a>
-      <a href="{{ basis }}/blockly">Blockly</a>
-      <a href="{{ basis }}/bibliothek">Bibliothek</a>
-      {% if benutzer and benutzer.ist_admin %}<a href="{{ basis }}/verwaltung">Verwaltung</a>{% endif %}
-      {% block nav_extra %}{% endblock %}
-    </nav>
-    {% if benutzer %}
-    <div class="benutzer">
-      <span title="Angemeldet als {{ benutzer.name }}">{{ benutzer.anzeige }}{% if benutzer.ist_admin %} <span class="rolle">Admin</span>{% endif %}</span>
-      {% if not auth_disabled %}<a href="{{ basis }}/logout">Abmelden</a>{% endif %}
+    <div class="kopfzeile-innen">
+      <a class="logo" href="{{ basis }}/"><span class="logo-okm">okm</span> Script-Baukasten</a>
+      <nav class="hauptnav" aria-label="Hauptnavigation">
+        {% for schluessel, ziel_pfad, text in [
+          ("rezepte", "/rezepte", "Rezepte"),
+          ("baukasten", "/baukasten", "Baukasten"),
+          ("blockly", "/blockly", "Blockly"),
+          ("bibliothek", "/bibliothek", "Bibliothek"),
+        ] %}
+        <a href="{{ basis }}{{ ziel_pfad }}"{% if aktiv == schluessel %} class="aktiv" aria-current="page"{% endif %}>{{ i.icon(schluessel) }}<span>{{ text }}</span></a>
+        {% endfor %}
+        {% if benutzer and benutzer.ist_admin %}
+        <a href="{{ basis }}/verwaltung"{% if aktiv == "verwaltung" %} class="aktiv" aria-current="page"{% endif %}>{{ i.icon("verwaltung") }}<span>Verwaltung</span></a>
+        {% endif %}
+      </nav>
+      {% if benutzer %}
+      <div class="benutzer">
+        <span title="Angemeldet als {{ benutzer.name }}">{{ benutzer.anzeige }}{% if benutzer.ist_admin %} <span class="rolle">Admin</span>{% endif %}</span>
+        {% if not auth_disabled %}<a href="{{ basis }}/logout" title="Abmelden">{{ i.icon("abmelden") }}<span class="sr-only">Abmelden</span></a>{% endif %}
+      </div>
+      {% endif %}
     </div>
-    {% endif %}
   </header>
-  <main class="inhalt">
+  <main class="inhalt{% block breit %}{% endblock %}">
     {% block inhalt %}{% endblock %}
   </main>
-  <footer class="fusszeile">
-    okm Script-Baukasten {{ version }} · Die Anwendung erzeugt Scripte, sie führt nichts selbst aus.
-  </footer>
+  <footer class="fusszeile">okm Script-Baukasten {{ version }} · erzeugt Scripte, führt aber nichts selbst aus.</footer>
 </body>
 </html>

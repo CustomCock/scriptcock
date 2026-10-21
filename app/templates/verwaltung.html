@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block titel %}Verwaltung{% endblock %}
 {% block inhalt %}
-<h1>Verwaltung</h1>
+<div class="seitenkopf">
+  <div>
+    <h1>Verwaltung</h1>
+    <p class="untertitel">Rezept-Vorschläge prüfen und freigeben.</p>
+  </div>
+</div>
 <ul class="statistik">
   <li><strong>{{ statistik.scripte }}</strong> erzeugte Scripte</li>
   <li><strong>{{ statistik.bibliothek }}</strong> in der Bibliothek</li>
@@ -13,9 +18,10 @@
 {% if not vorschlaege %}<p class="leer">Keine offenen Vorschläge.</p>{% endif %}
 {% for v in vorschlaege %}{% include "_verwaltung_rezept.html" %}{% endfor %}
 
-<h2>Im Baukasten erstellte Rezepte ({{ freigegeben | length }})</h2>
-<p class="feldhilfe">Diese Rezepte liegen in der Datenbank. Zum dauerhaften Übernehmen den YAML-Export unter
-<code>recipes/</code> ins Repository legen und das Rezept hier löschen.</p>
-{% if not freigegeben %}<p class="leer">Noch keine.</p>{% endif %}
-{% for v in freigegeben %}{% include "_verwaltung_rezept.html" %}{% endfor %}
+<section class="abschnitt">
+  <h2>Im Baukasten erstellte Rezepte ({{ freigegeben | length }})</h2>
+  <p class="feldhilfe">Liegen in der Datenbank. Dauerhaft übernehmen: YAML-Export unter <code>recipes/</code> ablegen, dann hier löschen.</p>
+  {% if not freigegeben %}<p class="leer">Noch keine.</p>{% endif %}
+  {% for v in freigegeben %}{% include "_verwaltung_rezept.html" %}{% endfor %}
+</section>
 {% endblock %}
