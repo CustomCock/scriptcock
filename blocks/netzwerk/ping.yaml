@@ -1,0 +1,57 @@
+id: ping
+version: 1
+name: Ping auf Ziel
+kategorie: Netzwerk
+beschreibung: Prüft, ob ein Rechner oder Gerät im Netzwerk antwortet.
+hilfe: |
+  Als Ziel eine IP-Adresse (z. B. 192.168.1.10) oder einen Rechnernamen (z. B. drucker01.okm.local) angeben.
+  Manche Geräte beantworten Pings absichtlich nicht – dann ist "keine Antwort" nicht unbedingt ein Fehler.
+risiko: gruen
+fortschritt: "Ping auf {{ ziel }} ({{ anzahl }}x)"
+parameter:
+  - id: ziel
+    label: Ziel (IP-Adresse oder Rechnername)
+    typ: ip_oder_hostname
+    beispiel: 192.168.1.10
+  - id: anzahl
+    label: Anzahl Pings
+    typ: zahl
+    min: 1
+    max: 100
+    standard: 4
+  - id: abbrechen
+    label: Script abbrechen, wenn das Ziel nicht antwortet
+    typ: ja_nein
+    pflicht: false
+    standard: false
+ziele:
+  powershell: |
+    ping.exe -n {{ anzahl }} {{ ziel }}
+    if ($LASTEXITCODE -ne 0) {
+    {% if abbrechen %}
+        throw 'Das Ziel antwortet nicht.'
+    {% else %}
+        Write-Host 'Hinweis: Das Ziel hat nicht (vollständig) geantwortet.' -ForegroundColor Yellow
+        $global:LASTEXITCODE = 0
+    {% endif %}
+    }
+  cmd: |
+    ping -n {{ anzahl }} {{ ziel }}
+    {% if not abbrechen %}
+    if errorlevel 1 (
+      echo Hinweis: Das Ziel hat nicht vollständig geantwortet.
+      cmd /c exit 0
+    )
+    {% endif %}
+  bash: |
+    {% if abbrechen %}
+    ping -c {{ anzahl }} {{ ziel }}
+    {% else %}
+    ping -c {{ anzahl }} {{ ziel }} || printf '%s\n' 'Hinweis: Das Ziel hat nicht (vollständig) geantwortet.'
+    {% endif %}
+  zsh: |
+    {% if abbrechen %}
+    ping -c {{ anzahl }} {{ ziel }}
+    {% else %}
+    ping -c {{ anzahl }} {{ ziel }} || printf '%s\n' 'Hinweis: Das Ziel hat nicht (vollständig) geantwortet.'
+    {% endif %}

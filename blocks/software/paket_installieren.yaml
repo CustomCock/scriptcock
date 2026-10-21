@@ -1,0 +1,48 @@
+id: paket_installieren
+version: 1
+name: Paket/Software installieren
+kategorie: Software
+beschreibung: Installiert ein Programm über den Paketmanager des Systems (Windows winget, Linux apt/dnf, macOS Homebrew).
+hilfe: |
+  Windows: die winget-ID angeben, z. B. Mozilla.Firefox (Suche: "winget search firefox").
+  Linux: Paketname, z. B. firefox-esr. macOS: Homebrew-Name, z. B. firefox.
+risiko: gelb
+admin_noetig:
+  bash: true
+fortschritt: "{{ paket }} wird installiert"
+parameter:
+  - id: paket
+    label: Paketname bzw. Paket-ID
+    typ: paketname
+    beispiel: Mozilla.Firefox
+  - id: paketmanager
+    label: Paketmanager (nur Linux)
+    typ: auswahl
+    standard: apt
+    optionen:
+      - wert: apt
+        label: apt (Debian, Ubuntu)
+      - wert: dnf
+        label: dnf (Fedora, RHEL, Rocky)
+ziele:
+  powershell: |
+    winget.exe install --id {{ paket }} --exact --silent --accept-source-agreements --accept-package-agreements
+  cmd: |
+    winget install --id {{ paket }} --exact --silent --accept-source-agreements --accept-package-agreements
+  bash: |
+    {% if paketmanager.wert == 'dnf' %}
+    dnf install -y {{ paket }}
+    {% else %}
+    apt-get update
+    apt-get install -y {{ paket }}
+    {% endif %}
+  zsh: |
+    if ! command -v brew >/dev/null 2>&1; then
+      printf '%s\n' 'Homebrew ist nicht installiert (siehe https://brew.sh). Bitte an die IT wenden.'
+      false
+    fi
+    brew install {{ paket }}
+hinweise:
+  powershell: Benötigt winget (App-Installer, ab Windows 10 1809 enthalten).
+  cmd: Benötigt winget (App-Installer, ab Windows 10 1809 enthalten).
+  zsh: Benötigt Homebrew. Das Script NICHT mit sudo starten – Homebrew verweigert root.

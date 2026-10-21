@@ -1,0 +1,17 @@
+id: setupdiag
+version: 1
+name: SetupDiag herunterladen und ausführen
+kategorie: Windows Update
+beschreibung: Lädt das Microsoft-Werkzeug SetupDiag nach C:\temp, analysiert fehlgeschlagene Windows-Upgrades und zeigt das Ergebnis an.
+hilfe: |
+  Braucht Internetzugang zu go.microsoft.com. Das Ergebnis steht danach auch in C:\temp\setupdiag.log.
+risiko: gelb
+admin_noetig: true
+fortschritt: SetupDiag wird heruntergeladen und ausgeführt
+ziele:
+  powershell: |
+    New-Item -ItemType Directory -Path C:\temp -Force | Out-Null
+    Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/?linkid=870142' -OutFile C:\temp\SetupDiag.exe -UseBasicParsing
+    cd C:\temp
+    .\SetupDiag.exe /Output:C:\temp\setupdiag.log
+    Get-Content C:\temp\setupdiag.log

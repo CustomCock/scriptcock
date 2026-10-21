@@ -1,0 +1,53 @@
+id: benutzer_anlegen
+version: 1
+name: Lokalen Benutzer anlegen
+kategorie: Benutzer
+beschreibung: Legt ein lokales Benutzerkonto auf diesem Rechner an. Das Passwort wird beim Ausführen abgefragt und steht nie im Script.
+hilfe: |
+  Nur für lokale Konten – Domänen- bzw. Keycloak-Konten werden zentral verwaltet.
+  Wird "Administrator" gewählt, bekommt der Benutzer volle Rechte auf diesem Rechner.
+risiko: rot
+admin_noetig: true
+interaktiv: true
+fortschritt: "Benutzer {{ benutzer }} wird angelegt"
+parameter:
+  - id: benutzer
+    label: Benutzername
+    typ: benutzername
+    beispiel: max.mustermann
+  - id: vollname
+    label: Vollständiger Name
+    typ: text_kurz
+    pflicht: false
+    beispiel: Max Mustermann
+  - id: administrator
+    label: Benutzer wird Administrator
+    typ: ja_nein
+    pflicht: false
+    standard: false
+ziele:
+  powershell: |
+    $okmPasswort = Read-Host -AsSecureString 'Passwort für den neuen Benutzer'
+    New-LocalUser -Name {{ benutzer }} -Password $okmPasswort{% if vollname %} -FullName {{ vollname }}{% endif %}{{ whatif }} | Out-Null
+    Add-LocalGroupMember -SID 'S-1-5-32-545' -Member {{ benutzer }}{{ whatif }}
+    {% if administrator %}
+    Add-LocalGroupMember -SID 'S-1-5-32-544' -Member {{ benutzer }}{{ whatif }}
+    {% endif %}
+    Write-Host 'Benutzer angelegt.'
+  cmd: |
+    echo Bitte das Passwort für den neuen Benutzer zweimal eingeben:
+    net user {{ benutzer }} * /add{% if vollname %} /fullname:{{ vollname }}{% endif %}
+    {% if administrator %}
+    net localgroup Administratoren {{ benutzer }} /add 2>nul || net localgroup Administrators {{ benutzer }} /add
+    {% endif %}
+  bash: |
+    useradd -m -s /bin/bash{% if vollname %} -c {{ vollname }}{% endif %} {{ benutzer }}
+    printf '%s\n' 'Bitte das Passwort für den neuen Benutzer festlegen:'
+    passwd {{ benutzer }}
+    {% if administrator %}
+    if getent group sudo >/dev/null; then usermod -aG sudo {{ benutzer }}; else usermod -aG wheel {{ benutzer }}; fi
+    {% endif %}
+  zsh: |
+    printf '%s\n' 'Bitte das Passwort für den neuen Benutzer festlegen:'
+    sysadminctl -addUser {{ benutzer }}{% if vollname %} -fullName {{ vollname }}{% endif %} -password -{% if administrator %} -admin{% endif %}
+    id {{ benutzer }}

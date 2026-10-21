@@ -1,0 +1,24 @@
+id: netzwerkproblem_diagnostizieren
+name: Netzwerkproblem diagnostizieren
+kategorie: Netzwerk
+beschreibung: Zeigt die Netzwerkeinstellungen und prüft Schritt für Schritt, ob ein Server erreichbar ist (Ping, Traceroute, Port).
+hilfe: Das Script ändert nichts am Rechner. Die Ausgabe kann an den Support weitergegeben werden.
+schlagworte: [internet, netzwerk, verbindung, ping, langsam, keine verbindung, wlan, lan]
+felder:
+  - id: ziel
+    label: Welcher Server ist nicht erreichbar?
+    typ: ip_oder_hostname
+    beispiel: intranet.okm.local
+  - id: port
+    label: Port des Dienstes (443 = Webseite)
+    typ: port
+    standard: 443
+schritte:
+  - block: ip_konfiguration
+  - block: ping
+    parameter: {ziel: $ziel, anzahl: 4}
+  - block: traceroute
+    parameter: {ziel: $ziel}
+  - block: port_pruefen
+    parameter: {ziel: $ziel, port: $port}
+    nur_fuer: [powershell, bash, zsh]

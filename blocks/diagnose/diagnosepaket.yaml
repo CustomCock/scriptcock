@@ -1,0 +1,50 @@
+id: diagnosepaket
+version: 1
+name: Diagnosepaket erstellen
+kategorie: Diagnose
+beschreibung: Sammelt Systeminfo, Netzwerkeinstellungen und Protokolle in einer Archivdatei, die an den Support geschickt werden kann.
+hilfe: |
+  Windows: ZIP-Datei auf dem Desktop. Linux: tar.gz-Datei im Home-Verzeichnis. macOS: ZIP-Datei auf dem Schreibtisch.
+  Das Sammeln dauert je nach Rechner ein bis zwei Minuten. Das Paket enthält Rechner- und Netzwerkdetails – nur an den Support weitergeben.
+risiko: gelb
+fortschritt: Diagnosepaket wird erstellt (das kann etwas dauern)
+ziele:
+  powershell: |
+    $okmStempel = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $okmArbeit = Join-Path $env:TEMP ('okm-diagnose-' + $okmStempel)
+    New-Item -ItemType Directory -Path $okmArbeit -Force | Out-Null
+    Get-ComputerInfo | Out-File -FilePath (Join-Path $okmArbeit 'systeminfo.txt') -Encoding UTF8
+    ipconfig.exe /all | Out-File -FilePath (Join-Path $okmArbeit 'ipconfig.txt') -Encoding UTF8
+    Get-NetIPConfiguration -Detailed | Out-File -FilePath (Join-Path $okmArbeit 'netzwerk.txt') -Encoding UTF8
+    route.exe print | Out-File -FilePath (Join-Path $okmArbeit 'routen.txt') -Encoding UTF8
+    Get-Process | Sort-Object CPU -Descending | Out-File -FilePath (Join-Path $okmArbeit 'prozesse.txt') -Encoding UTF8
+    Get-WinEvent -FilterHashtable @{ LogName = 'System', 'Application'; Level = 1, 2, 3 } -MaxEvents 500 -ErrorAction SilentlyContinue |
+        Select-Object TimeCreated, LogName, ProviderName, Id, LevelDisplayName, Message |
+        Export-Csv -LiteralPath (Join-Path $okmArbeit 'ereignisse.csv') -NoTypeInformation -Encoding UTF8 -Delimiter ';'
+    $okmZip = Join-Path ([Environment]::GetFolderPath('Desktop')) ('okm-diagnose-' + $env:COMPUTERNAME + '-' + $okmStempel + '.zip')
+    Compress-Archive -Path (Join-Path $okmArbeit '*') -DestinationPath $okmZip -Force
+    Remove-Item -LiteralPath $okmArbeit -Recurse -Force
+    Write-Host ('Diagnosepaket erstellt: ' + $okmZip) -ForegroundColor Green
+  bash: |
+    okm_stempel="$(date +%Y%m%d-%H%M%S)"
+    okm_arbeit="$(mktemp -d)"
+    { uname -a; cat /etc/os-release; uptime; free -h; df -h; } > "$okm_arbeit/system.txt" 2>&1 || true
+    { ip address; ip route; cat /etc/resolv.conf; } > "$okm_arbeit/netzwerk.txt" 2>&1 || true
+    journalctl --no-pager -p warning -n 1000 > "$okm_arbeit/journal.txt" 2>&1 || true
+    ps aux > "$okm_arbeit/prozesse.txt" 2>&1 || true
+    okm_paket="$HOME/okm-diagnose-$(hostname)-$okm_stempel.tar.gz"
+    tar -czf "$okm_paket" -C "$okm_arbeit" .
+    rm -rf -- "$okm_arbeit"
+    printf 'Diagnosepaket erstellt: %s\n' "$okm_paket"
+  zsh: |
+    okm_stempel="$(date +%Y%m%d-%H%M%S)"
+    okm_arbeit="$(mktemp -d)"
+    { sw_vers; uname -a; uptime; df -h; } > "$okm_arbeit/system.txt" 2>&1 || true
+    system_profiler SPHardwareDataType SPSoftwareDataType >> "$okm_arbeit/system.txt" 2>&1 || true
+    { ifconfig; netstat -rn; scutil --dns; } > "$okm_arbeit/netzwerk.txt" 2>&1 || true
+    log show --last 24h --predicate 'messageType == error' --style compact > "$okm_arbeit/log.txt" 2>&1 || true
+    ps aux > "$okm_arbeit/prozesse.txt" 2>&1 || true
+    okm_paket="$HOME/Desktop/okm-diagnose-$(hostname -s)-$okm_stempel.zip"
+    ditto -c -k "$okm_arbeit" "$okm_paket"
+    rm -rf -- "$okm_arbeit"
+    printf 'Diagnosepaket erstellt: %s\n' "$okm_paket"

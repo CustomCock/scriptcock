@@ -1,0 +1,22 @@
+id: systemlog_fehler
+version: 1
+name: "Systemlog: letzte Fehler anzeigen"
+kategorie: Diagnose
+beschreibung: Zeigt Fehlermeldungen aus dem Systemprotokoll der letzten Stunden (Linux journalctl, macOS log show).
+hilfe: |
+  Linux: Ohne Administratorrechte sieht man nur die eigenen Meldungen, außer man ist in der Gruppe "adm" oder "systemd-journal".
+  macOS: Die Abfrage kann bei vielen Stunden einige Minuten dauern.
+risiko: gruen
+fortschritt: "Fehler der letzten {{ stunden }} Stunden werden gelesen"
+parameter:
+  - id: stunden
+    label: Zeitraum (Stunden)
+    typ: zahl
+    min: 1
+    max: 720
+    standard: 24
+ziele:
+  bash: |
+    journalctl --no-pager -p err -n 200 --since=-{{ stunden }}h
+  zsh: |
+    log show --last {{ stunden }}h --predicate 'messageType == error' --style compact | tail -n 200

@@ -1,0 +1,18 @@
+id: speicherplatz_freigeben
+name: Speicherplatz freigeben
+kategorie: System
+beschreibung: Zeigt die Festplattenbelegung, löscht alte temporäre Dateien und zeigt danach, wie viel Platz frei ist.
+hilfe: Es werden nur temporäre Dateien des angemeldeten Benutzers gelöscht, die älter als die angegebene Anzahl Tage sind.
+schlagworte: [festplatte voll, speicher, platz, aufräumen, temp, langsam]
+felder:
+  - id: tage
+    label: Temporäre Dateien löschen, die älter sind als (Tage)
+    typ: zahl
+    min: 0
+    max: 365
+    standard: 7
+schritte:
+  - block: festplattenbelegung
+  - block: temp_aufraeumen
+    parameter: {tage: $tage}
+  - block: festplattenbelegung

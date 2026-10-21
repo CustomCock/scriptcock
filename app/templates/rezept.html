@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block titel %}{{ rezept.name }}{% endblock %}
+{% block inhalt %}
+{% set aktiv = 3 %}{% include "_schritte.html" %}
+<p class="zurueck"><a href="{{ basis }}/rezepte?ziel={{ ziel.value }}">← anderes Rezept wählen</a> · Zielsystem: <strong>{{ ziel_anzeige[ziel] }}</strong></p>
+<h1>{{ rezept.name }}</h1>
+<p class="einleitung">{{ rezept.beschreibung }}</p>
+{% if rezept.hilfe %}<p class="hinweis">{{ rezept.hilfe }}</p>{% endif %}
+
+<section class="ablauf" aria-label="Enthaltene Schritte">
+  <h2>Das Script macht Folgendes</h2>
+  <ol>
+    {% for b in bloecke %}
+    <li><span class="risiko risiko-{{ b.risiko.value }}" title="{{ b.risiko.anzeige }}">{{ b.risiko.value }}</span>
+      <strong>{{ b.name }}</strong>{% if b.braucht_admin(ziel) %} <span class="marke">Admin</span>{% endif %}
+      <span class="schritt-text">{{ b.beschreibung }}</span></li>
+    {% endfor %}
+  </ol>
+  {% if risiko == Risiko.GELB %}
+  <p class="hinweis hinweis-gelb">Dieses Script <strong>verändert</strong> etwas an deinem Rechner. Lies dir die Schritte oben kurz durch.</p>
+  {% elif risiko == Risiko.ROT %}
+  <p class="hinweis hinweis-rot"><strong>Achtung:</strong> Dieses Script enthält Schritte, die Daten löschen oder Programme beenden können.
+  Vor diesen Schritten fragt das Script noch einmal nach – du musst dann „JA“ eintippen.</p>
+  {% endif %}
+  {% if admin %}<p class="hinweis">Für dieses Script brauchst du <strong>Administratorrechte</strong> auf dem Zielrechner.</p>{% endif %}
+  {% for name, text in hinweise %}<p class="hinweis"><strong>{{ name }}:</strong> {{ text }}</p>{% endfor %}
+</section>
+
+<form class="formular" hx-post="{{ basis }}/rezepte/{{ rezept.id }}/erzeugen" hx-target="#ergebnis" hx-swap="innerHTML" hx-indicator="#laedt">
+  <input type="hidden" name="ziel" value="{{ ziel.value }}">
+  {% set aktion = basis ~ "/rezepte/" ~ rezept.id ~ "/feld" %}
+  {% for f in felder %}{% include "_feld.html" %}{% endfor %}
+  {% if not felder %}<p class="leer">Für dieses Rezept musst du nichts ausfüllen.</p>{% endif %}
+
+  <details class="optionen">
+    <summary>Weitere Optionen</summary>
+    <div class="feld">
+      <label for="f-titel">Titel des Scripts (optional)</label>
+      <input id="f-titel" name="titel" type="text" maxlength="120" placeholder="{{ rezept.name }}">
+    </div>
+  </details>
+  <div class="feld">
+    <input type="hidden" name="dry_run" value="false">
+    <label class="schalter"><input type="checkbox" name="dry_run" value="true"> <strong>Nur simulieren</strong> – das Script zeigt nur an, was es tun würde, und verändert nichts.</label>
+  </div>
+  {% if risiko == Risiko.ROT and not benutzer.ist_admin %}
+  <div class="feld bestaetigung">
+    <input type="hidden" name="rot_bestaetigt" value="false">
+    <label class="schalter"><input type="checkbox" name="rot_bestaetigt" value="true"> Ich weiß, was dieses Script tut.</label>
+  </div>
+  {% endif %}
+  <button type="submit" class="knopf-primaer">Script erzeugen</button>
+  <span id="laedt" class="laedt" aria-hidden="true">wird erzeugt …</span>
+</form>
+<div id="ergebnis" aria-live="polite"></div>
+{% endblock %}

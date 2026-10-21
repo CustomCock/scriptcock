@@ -1,0 +1,16 @@
+services:
+  baukasten:
+    build: .
+    image: okm/script-baukasten:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: sqlite:////app/data/baukasten.db
+    volumes:
+      - baukasten-daten:/app/data
+    ports:
+      # Nur lokal veröffentlichen – davor sitzt nginx mit TLS
+      - "127.0.0.1:8000:8000"
+
+volumes:
+  baukasten-daten:

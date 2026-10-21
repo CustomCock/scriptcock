@@ -1,0 +1,33 @@
+id: temp_aufraeumen
+version: 1
+name: Temp-Ordner aufräumen
+kategorie: Dateien
+beschreibung: Löscht alte temporäre Dateien des angemeldeten Benutzers. Gelöschte Dateien landen NICHT im Papierkorb.
+hilfe: |
+  Windows: %TEMP% des Benutzers. Linux: eigene Dateien in /tmp. macOS: der Benutzer-Temp-Ordner ($TMPDIR).
+  Dateien, die gerade benutzt werden, werden übersprungen.
+risiko: rot
+fortschritt: "Temporäre Dateien älter als {{ tage }} Tage werden gelöscht"
+parameter:
+  - id: tage
+    label: Nur Dateien löschen, die älter sind als (Tage)
+    typ: zahl
+    min: 0
+    max: 365
+    standard: 7
+ziele:
+  powershell: |
+    $okmGrenze = (Get-Date).AddDays(-{{ tage }})
+    Get-ChildItem -LiteralPath $env:TEMP -Recurse -Force -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -lt $okmGrenze } |
+        Remove-Item -Force -ErrorAction SilentlyContinue{{ whatif }}
+    Write-Host 'Aufräumen abgeschlossen.'
+  cmd: |
+    forfiles /P "%TEMP%" /S /D -{{ tage }} /C "cmd /c if @isdir==FALSE del /F /Q @path" 2>nul
+    cmd /c exit 0
+  bash: |
+    find /tmp -xdev -mindepth 1 -type f -mtime +{{ tage }} -user "$(id -un)" -delete 2>/dev/null || true
+    printf '%s\n' 'Aufräumen abgeschlossen.'
+  zsh: |
+    find "${TMPDIR:-/tmp}" -mindepth 1 -type f -mtime +{{ tage }} -delete 2>/dev/null || true
+    printf '%s\n' 'Aufräumen abgeschlossen.'

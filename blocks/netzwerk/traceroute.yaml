@@ -1,0 +1,32 @@
+id: traceroute
+version: 1
+name: Traceroute
+kategorie: Netzwerk
+beschreibung: Zeigt den Weg der Datenpakete zu einem Ziel – hilfreich, um zu sehen, wo eine Verbindung hängt.
+hilfe: |
+  Die Ausgabe kann bis zu einer Minute dauern. Sternchen (*) bedeuten, dass ein Zwischenpunkt nicht antwortet –
+  das ist oft normal.
+risiko: gruen
+fortschritt: "Traceroute zu {{ ziel }}"
+parameter:
+  - id: ziel
+    label: Ziel (IP-Adresse oder Rechnername)
+    typ: ip_oder_hostname
+    beispiel: intranet.okm.local
+ziele:
+  powershell: |
+    tracert.exe -d -h 30 {{ ziel }}
+    $global:LASTEXITCODE = 0
+  cmd: |
+    tracert -d -h 30 {{ ziel }}
+    cmd /c exit 0
+  bash: |
+    if command -v traceroute >/dev/null 2>&1; then
+      traceroute -n {{ ziel }} || true
+    elif command -v tracepath >/dev/null 2>&1; then
+      tracepath -n {{ ziel }} || true
+    else
+      printf '%s\n' 'Weder traceroute noch tracepath ist installiert (Debian/Ubuntu: apt install traceroute).'
+    fi
+  zsh: |
+    traceroute -n {{ ziel }} || true

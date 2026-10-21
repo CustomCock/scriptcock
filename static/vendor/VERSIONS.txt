@@ -1,0 +1,2 @@
+htmx 2.0.4 (BSD-2-Clause)
+highlight.js 11.10.0 (BSD-3-Clause)

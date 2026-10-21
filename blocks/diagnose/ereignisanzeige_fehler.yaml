@@ -1,0 +1,28 @@
+id: ereignisanzeige_fehler
+version: 1
+name: "Ereignisanzeige: letzte Fehler exportieren"
+kategorie: Diagnose
+beschreibung: Exportiert die letzten Fehler und kritischen Ereignisse aus den Protokollen "System" und "Anwendung" in eine CSV-Datei.
+hilfe: |
+  Die CSV-Datei lässt sich mit Excel öffnen (Trennzeichen Semikolon). Die zehn neuesten Einträge werden zusätzlich angezeigt.
+risiko: gelb
+fortschritt: "Die letzten {{ anzahl }} Fehlerereignisse werden nach {{ datei }} exportiert"
+parameter:
+  - id: anzahl
+    label: Anzahl Ereignisse
+    typ: zahl
+    min: 1
+    max: 1000
+    standard: 50
+  - id: datei
+    label: Zieldatei (CSV)
+    typ: pfad_windows
+    standard: C:\temp\ereignisse.csv
+ziele:
+  powershell: |
+    New-Item -ItemType Directory -Path (Split-Path -Parent {{ datei }}) -Force | Out-Null
+    $okmEreignisse = Get-WinEvent -FilterHashtable @{ LogName = 'System', 'Application'; Level = 1, 2 } -MaxEvents {{ anzahl }} -ErrorAction SilentlyContinue
+    $okmEreignisse | Select-Object TimeCreated, LogName, ProviderName, Id, LevelDisplayName, Message |
+        Export-Csv -LiteralPath {{ datei }} -NoTypeInformation -Encoding UTF8 -Delimiter ';'
+    $okmEreignisse | Select-Object -First 10 TimeCreated, ProviderName, Id, Message | Format-Table -AutoSize -Wrap
+    Write-Host ('Exportiert nach: ' + {{ datei }})

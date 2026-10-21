@@ -1,0 +1,12 @@
+id: diagnosepaket_support
+name: Diagnosepaket für den Support erstellen
+kategorie: Diagnose
+beschreibung: Sammelt Systeminformationen, Netzwerkeinstellungen und Protokolle in einer Datei, die du an den Support schicken kannst.
+schlagworte: [support, ticket, fehler, logs, protokoll, diagnose]
+schritte:
+  - block: systeminfo
+  - block: diagnosepaket
+  - block: meldung
+    parameter:
+      text: "Fertig! Bitte die erstellte Datei an den Support schicken (Pfad siehe oben)."
+      pause: true

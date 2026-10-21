@@ -1,0 +1,57 @@
+id: port_pruefen
+version: 1
+name: Port erreichbar prüfen
+kategorie: Netzwerk
+beschreibung: Prüft, ob auf einem Rechner ein bestimmter Netzwerk-Port (z. B. 443 für HTTPS) erreichbar ist.
+hilfe: |
+  Typische Ports: 80 (HTTP), 443 (HTTPS), 445 (Windows-Freigaben), 3389 (Remotedesktop), 22 (SSH).
+risiko: gruen
+fortschritt: "Port {{ port }} auf {{ ziel }} wird geprüft"
+parameter:
+  - id: ziel
+    label: Ziel (IP-Adresse oder Rechnername)
+    typ: ip_oder_hostname
+    beispiel: intranet.okm.local
+  - id: port
+    label: Port
+    typ: port
+    beispiel: 443
+  - id: abbrechen
+    label: Script abbrechen, wenn der Port nicht erreichbar ist
+    typ: ja_nein
+    pflicht: false
+    standard: false
+ziele:
+  powershell: |
+    $okmTest = Test-NetConnection -ComputerName {{ ziel }} -Port {{ port }} -WarningAction SilentlyContinue
+    if ($okmTest.TcpTestSucceeded) {
+        Write-Host 'Der Port ist erreichbar.' -ForegroundColor Green
+    } else {
+    {% if abbrechen %}
+        throw 'Der Port ist nicht erreichbar.'
+    {% else %}
+        Write-Host 'Der Port ist NICHT erreichbar.' -ForegroundColor Yellow
+    {% endif %}
+    }
+  bash: |
+    if timeout 5 bash -c 'exec 3<>"/dev/tcp/$1/$2"' okm {{ ziel }} {{ port }} 2>/dev/null; then
+      printf '%s\n' 'Der Port ist erreichbar.'
+    else
+    {% if abbrechen %}
+      printf '%s\n' 'Der Port ist nicht erreichbar.'
+      false
+    {% else %}
+      printf '%s\n' 'Der Port ist NICHT erreichbar.'
+    {% endif %}
+    fi
+  zsh: |
+    if nc -z -G 5 {{ ziel }} {{ port }} 2>/dev/null; then
+      printf '%s\n' 'Der Port ist erreichbar.'
+    else
+    {% if abbrechen %}
+      printf '%s\n' 'Der Port ist nicht erreichbar.'
+      false
+    {% else %}
+      printf '%s\n' 'Der Port ist NICHT erreichbar.'
+    {% endif %}
+    fi

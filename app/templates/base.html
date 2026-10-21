@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "allowScriptTags": false}'>
+  <title>{% block titel %}Script-Baukasten{% endblock %} · okm</title>
+  <link rel="icon" href="{{ basis }}/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ basis }}/static/css/app.css">
+  <link rel="stylesheet" href="{{ basis }}/static/vendor/highlight/github-dark.min.css">
+  <script src="{{ basis }}/static/vendor/htmx/htmx.min.js" defer></script>
+  <script src="{{ basis }}/static/vendor/highlight/highlight.min.js" defer></script>
+  <script src="{{ basis }}/static/vendor/highlight/languages/powershell.min.js" defer></script>
+  <script src="{{ basis }}/static/vendor/highlight/languages/dos.min.js" defer></script>
+  <script src="{{ basis }}/static/js/app.js" defer></script>
+  {% block kopf %}{% endblock %}
+</head>
+<body>
+  {% if auth_disabled %}
+  <div class="warnbanner" role="alert">
+    ⚠ Anmeldung ist abgeschaltet (AUTH_DISABLED=true). Nur für die Entwicklung – so niemals produktiv betreiben!
+  </div>
+  {% endif %}
+  <header class="kopfzeile">
+    <a class="logo" href="{{ basis }}/"><span class="logo-okm">okm</span> Script-Baukasten</a>
+    <nav class="hauptnav" aria-label="Hauptnavigation">
+      <a href="{{ basis }}/">Rezepte</a>
+      {% block nav_extra %}{% endblock %}
+    </nav>
+    {% if benutzer %}
+    <div class="benutzer">
+      <span title="Angemeldet als {{ benutzer.name }}">{{ benutzer.anzeige }}{% if benutzer.ist_admin %} <span class="rolle">Admin</span>{% endif %}</span>
+      {% if not auth_disabled %}<a href="{{ basis }}/logout">Abmelden</a>{% endif %}
+    </div>
+    {% endif %}
+  </header>
+  <main class="inhalt">
+    {% block inhalt %}{% endblock %}
+  </main>
+  <footer class="fusszeile">
+    okm Script-Baukasten {{ version }} · Die Anwendung erzeugt Scripte, sie führt nichts selbst aus.
+  </footer>
+</body>
+</html>

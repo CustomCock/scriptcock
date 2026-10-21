@@ -1,0 +1,28 @@
+id: ip_konfiguration
+version: 1
+name: IP-Konfiguration anzeigen
+kategorie: Netzwerk
+beschreibung: Zeigt IP-Adressen, Standard-Gateway und DNS-Server aller Netzwerkkarten.
+risiko: gruen
+fortschritt: IP-Konfiguration wird angezeigt
+ziele:
+  powershell: |
+    Get-NetIPConfiguration | Format-List InterfaceAlias, IPv4Address, IPv4DefaultGateway, DNSServer
+  cmd: |
+    ipconfig /all
+  bash: |
+    ip -brief address
+    printf '\nStandard-Gateway:\n'
+    ip route show default
+    printf '\nDNS-Server:\n'
+    if command -v resolvectl >/dev/null 2>&1 && systemctl is-active --quiet systemd-resolved; then
+      resolvectl dns
+    else
+      grep '^nameserver' /etc/resolv.conf || true
+    fi
+  zsh: |
+    ifconfig | grep -E '^[a-z0-9]+:|inet ' || true
+    printf '\nStandard-Gateway:\n'
+    route -n get default 2>/dev/null | grep -E 'gateway|interface' || true
+    printf '\nDNS-Server:\n'
+    scutil --dns | grep 'nameserver\[' | sort -u || true

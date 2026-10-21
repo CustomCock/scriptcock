@@ -1,0 +1,37 @@
+id: systeminfo
+version: 1
+name: Systeminfo anzeigen
+kategorie: System
+beschreibung: Zeigt Betriebssystem, Rechnername, Arbeitsspeicher und Laufzeit seit dem letzten Start.
+hilfe: |
+  Nützlich, um dem Support schnell die wichtigsten Eckdaten eines Rechners zu nennen.
+risiko: gruen
+fortschritt: Systeminformationen werden gesammelt
+ziele:
+  powershell: |
+    $okmOs = Get-CimInstance -ClassName Win32_OperatingSystem
+    $okmCs = Get-CimInstance -ClassName Win32_ComputerSystem
+    $okmLaufzeit = (Get-Date) - $okmOs.LastBootUpTime
+    [PSCustomObject]@{
+        Rechnername       = $env:COMPUTERNAME
+        Betriebssystem    = $okmOs.Caption
+        Version           = $okmOs.Version
+        'RAM gesamt (GB)' = [math]::Round($okmCs.TotalPhysicalMemory / 1GB, 1)
+        'RAM frei (GB)'   = [math]::Round($okmOs.FreePhysicalMemory / 1MB, 1)
+        Laufzeit          = '{0} Tage {1} Std. {2} Min.' -f $okmLaufzeit.Days, $okmLaufzeit.Hours, $okmLaufzeit.Minutes
+    } | Format-List
+  cmd: |
+    echo Rechnername: %COMPUTERNAME%
+    ver
+    systeminfo | findstr /B /I /C:"Betriebssystemname" /C:"OS Name" /C:"Gesamter physischer Speicher" /C:"Total Physical Memory" /C:"Verf" /C:"Available Physical Memory" /C:"Systemstartzeit" /C:"System Boot Time"
+  bash: |
+    printf 'Rechnername:    %s\n' "$(hostname)"
+    printf 'Betriebssystem: %s\n' "$(grep -m1 '^PRETTY_NAME=' /etc/os-release | cut -d= -f2- | tr -d '"')"
+    printf 'Kernel:         %s\n' "$(uname -r)"
+    printf 'Laufzeit:       %s\n' "$(uptime -p)"
+    free -h
+  zsh: |
+    printf 'Rechnername:    %s\n' "$(scutil --get ComputerName 2>/dev/null || hostname)"
+    sw_vers
+    printf 'RAM gesamt:     %s GB\n' "$(( $(sysctl -n hw.memsize) / 1073741824 ))"
+    printf 'Laufzeit:      %s\n' "$(uptime)"

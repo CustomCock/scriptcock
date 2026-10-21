@@ -1,0 +1,39 @@
+id: meldung
+version: 1
+name: Meldung/Pause für den Benutzer
+kategorie: Allgemein
+beschreibung: Zeigt einen Hinweis an und wartet auf Wunsch, bis der Benutzer Enter drückt.
+risiko: gruen
+interaktiv: true
+fortschritt: Hinweis für den Benutzer
+parameter:
+  - id: text
+    label: Text der Meldung
+    typ: text
+    beispiel: Bitte jetzt den Drucker einschalten.
+  - id: pause
+    label: Auf Enter warten
+    typ: ja_nein
+    pflicht: false
+    standard: true
+ziele:
+  powershell: |
+    Write-Host {{ text }} -ForegroundColor Cyan
+    {% if pause %}
+    [void](Read-Host 'Weiter mit Enter')
+    {% endif %}
+  cmd: |
+    for /f "delims=" %%M in ({{ text }}) do echo(%%M
+    {% if pause %}
+    pause
+    {% endif %}
+  bash: |
+    printf '%s\n' {{ text }}
+    {% if pause %}
+    read -r -p 'Weiter mit Enter ... ' _ || true
+    {% endif %}
+  zsh: |
+    printf '%s\n' {{ text }}
+    {% if pause %}
+    read -r 'okm_weiter?Weiter mit Enter ... ' || true
+    {% endif %}

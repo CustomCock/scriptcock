@@ -1,0 +1,18 @@
+id: netzlaufwerk_verbinden
+name: Netzlaufwerk verbinden
+kategorie: Dateien
+beschreibung: Verbindet eine Netzwerkfreigabe als Laufwerk (Windows) bzw. bindet sie im Finder ein (macOS).
+hilfe: Das Script unter Windows NICHT als Administrator starten – sonst ist das Laufwerk im Explorer unsichtbar.
+schlagworte: [laufwerk, freigabe, share, netzlaufwerk, smb, server]
+felder:
+  - id: laufwerk
+    label: Laufwerksbuchstabe
+    typ: laufwerksbuchstabe
+    beispiel: Z
+  - id: pfad
+    label: Netzwerkpfad
+    typ: unc_pfad
+    beispiel: \\fileserver\abteilung
+schritte:
+  - block: netzlaufwerk_verbinden
+    parameter: {laufwerk: $laufwerk, pfad: $pfad, dauerhaft: true}

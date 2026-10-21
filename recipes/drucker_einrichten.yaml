@@ -1,0 +1,20 @@
+id: drucker_einrichten
+name: Drucker einrichten
+kategorie: Drucker
+beschreibung: Prüft, ob der Drucker im Netzwerk erreichbar ist, und richtet ihn anschließend über seine IP-Adresse ein.
+hilfe: Die IP-Adresse steht meist auf einem Aufkleber am Drucker oder im Druckermenü unter "Netzwerk".
+schlagworte: [drucker, printer, netzwerkdrucker, ip]
+felder:
+  - id: druckername
+    label: Name, unter dem der Drucker erscheinen soll
+    typ: druckername
+    beispiel: Drucker-Empfang
+  - id: drucker_ip
+    label: IP-Adresse des Druckers
+    typ: ip_oder_hostname
+    beispiel: 192.168.1.50
+schritte:
+  - block: ping
+    parameter: {ziel: $drucker_ip, anzahl: 2, abbrechen: true}
+  - block: drucker_ip
+    parameter: {name: $druckername, ip: $drucker_ip}

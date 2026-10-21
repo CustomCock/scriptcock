@@ -1,0 +1,22 @@
+id: ordner_anlegen
+version: 1
+name: Ordner anlegen
+kategorie: Dateien
+beschreibung: Legt einen Ordner an (inklusive fehlender übergeordneter Ordner). Existiert er schon, passiert nichts.
+risiko: gelb
+fortschritt: "Ordner {{ pfad }} wird angelegt"
+parameter:
+  - id: pfad
+    label: Ordner
+    typ: pfad
+    beispiel: C:\temp\okm
+    hilfe: "Windows: z. B. C:\\temp\\okm – Linux/macOS: z. B. /tmp/okm"
+ziele:
+  powershell: |
+    New-Item -ItemType Directory -Path {{ pfad }} -Force{{ whatif }} | Out-Null
+  cmd: |
+    if not exist {{ pfad }} mkdir {{ pfad }}
+  bash: |
+    mkdir -p -- {{ pfad }}
+  zsh: |
+    mkdir -p -- {{ pfad }}

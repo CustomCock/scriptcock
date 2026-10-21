@@ -1,0 +1,24 @@
+id: dienst_status
+version: 1
+name: Dienst-Status prüfen
+kategorie: Dienste
+beschreibung: Zeigt, ob ein Systemdienst läuft.
+hilfe: |
+  Windows: Den Dienstnamen findest du in services.msc (Doppelklick auf den Dienst, Feld "Dienstname" – nicht der Anzeigename).
+  Linux: Name der systemd-Unit, z. B. cups oder ssh. macOS: launchd-Label, z. B. org.cups.cupsd.
+risiko: gruen
+fortschritt: "Status von Dienst {{ dienst }} wird abgefragt"
+parameter:
+  - id: dienst
+    label: Dienstname
+    typ: dienstname
+    beispiel: Spooler
+ziele:
+  powershell: |
+    Get-Service -Name {{ dienst }} | Format-Table Name, DisplayName, Status, StartType -AutoSize
+  cmd: |
+    sc query {{ dienst }}
+  bash: |
+    systemctl --no-pager status {{ dienst }} || [ $? -eq 3 ]
+  zsh: |
+    launchctl print system/{{ dienst }} | grep -E '^\s*(state|pid|path) =' || true

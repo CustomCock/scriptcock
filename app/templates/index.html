@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block inhalt %}
+{% set aktiv = 1 %}{% include "_schritte.html" %}
+<h1>Für welches System brauchst du ein Script?</h1>
+<p class="einleitung">Wähle das Betriebssystem des Rechners, auf dem das Script später laufen soll.
+Danach suchst du dir eine fertige Aufgabe („Rezept“) aus und füllst ein kurzes Formular aus.</p>
+<div class="kacheln">
+  {% for ziel, titel, untertitel, symbol in kacheln %}
+  <a class="kachel kachel-{{ symbol }}" href="{{ basis }}/rezepte?ziel={{ ziel.value }}">
+    <span class="kachel-symbol" aria-hidden="true">{% if symbol == "ps" %}PS&gt;{% elif symbol == "cmd" %}C:\&gt;{% elif symbol == "linux" %}$_{% else %}%_{% endif %}</span>
+    <span class="kachel-titel">{{ titel }}</span>
+    <span class="kachel-text">{{ untertitel }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

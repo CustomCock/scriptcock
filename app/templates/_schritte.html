@@ -1,0 +1,5 @@
+<ol class="fortschritt" aria-label="Ablauf">
+  {% for nr, text in [(1, "Betriebssystem"), (2, "Rezept"), (3, "Angaben"), (4, "Vorschau & Download")] %}
+  <li class="{% if nr == aktiv %}aktiv{% elif nr < aktiv %}erledigt{% endif %}"><span>{{ nr }}</span> {{ text }}</li>
+  {% endfor %}
+</ol>

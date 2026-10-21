@@ -1,0 +1,35 @@
+id: dienst_neustarten
+version: 1
+name: Dienst neu starten
+kategorie: Dienste
+beschreibung: Stoppt einen Systemdienst und startet ihn wieder.
+hilfe: |
+  Windows: Den Dienstnamen findest du in services.msc (Spalte "Name" bzw. Feld "Dienstname", nicht der Anzeigename).
+  Linux: Name der systemd-Unit, z. B. cups. macOS: launchd-Label, z. B. org.cups.cupsd.
+risiko: gelb
+admin_noetig: true
+fortschritt: "Dienst {{ dienst }} wird neu gestartet"
+parameter:
+  - id: dienst
+    label: Dienstname
+    typ: dienstname
+    beispiel: Spooler
+ziele:
+  powershell: |
+    Restart-Service -Name {{ dienst }} -Force{{ whatif }}
+  cmd: |
+    net stop {{ dienst }}
+    net start {{ dienst }}
+  bash: |
+    systemctl restart {{ dienst }}
+  zsh: |
+    launchctl kickstart -k system/{{ dienst }}
+pruefung:
+  powershell: |
+    $okmDienst = Get-Service -Name {{ dienst }}
+    if ($okmDienst.Status -ne 'Running') { throw 'Der Dienst läuft nach dem Neustart nicht.' }
+    Write-Host 'Der Dienst läuft.' -ForegroundColor Green
+  cmd: |
+    sc query {{ dienst }} | findstr /C:"RUNNING"
+  bash: |
+    systemctl is-active {{ dienst }}

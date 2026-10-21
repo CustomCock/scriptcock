@@ -1,0 +1,32 @@
+id: prozess_suchen
+version: 1
+name: Laufende Prozesse nach Name suchen
+kategorie: Prozesse
+beschreibung: Listet laufende Programme auf, deren Name den Suchbegriff enthält bzw. ihm entspricht.
+hilfe: |
+  Den Programmnamen ohne ".exe" angeben, z. B. "notepad" oder "chrome".
+risiko: gruen
+fortschritt: "Prozesse mit Namen {{ name }} werden gesucht"
+parameter:
+  - id: name
+    label: Programmname
+    typ: prozessname
+    beispiel: notepad
+ziele:
+  powershell: |
+    $okmProzesse = Get-Process -Name {{ name }} -ErrorAction SilentlyContinue
+    if ($okmProzesse) {
+        $okmProzesse | Format-Table Id, ProcessName, CPU, @{ Name = 'Speicher (MB)'; Expression = { [math]::Round($_.WorkingSet64 / 1MB, 1) } } -AutoSize
+    } else {
+        Write-Host 'Kein passender Prozess gefunden.'
+    }
+  cmd: |
+    tasklist | findstr /I /C:{{ name }}
+    if errorlevel 1 (
+      echo Kein passender Prozess gefunden.
+      cmd /c exit 0
+    )
+  bash: |
+    pgrep -a -i -f -- {{ name }} || printf '%s\n' 'Kein passender Prozess gefunden.'
+  zsh: |
+    pgrep -i -l -f {{ name }} || printf '%s\n' 'Kein passender Prozess gefunden.'

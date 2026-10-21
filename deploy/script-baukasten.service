@@ -1,0 +1,35 @@
+# systemd-Unit für den okm Script-Baukasten
+# Installation: siehe README.md, Abschnitt "Betrieb mit systemd + nginx"
+[Unit]
+Description=okm Script-Baukasten
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=baukasten
+Group=baukasten
+WorkingDirectory=/opt/script-baukasten
+EnvironmentFile=/opt/script-baukasten/.env
+ExecStart=/opt/script-baukasten/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --proxy-headers --forwarded-allow-ips 127.0.0.1
+Restart=on-failure
+RestartSec=5
+
+# Härtung
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/script-baukasten/data
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

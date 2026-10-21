@@ -1,0 +1,57 @@
+id: kopieren
+version: 1
+name: Datei/Ordner kopieren
+kategorie: Dateien
+beschreibung: Kopiert eine Datei oder den Inhalt eines Ordners an einen anderen Ort. Vorhandene Dateien werden überschrieben.
+hilfe: |
+  Datei: Die Datei wird an den Zielort kopiert (Ziel = Ordner oder neuer Dateiname).
+  Ordner: Der INHALT des Quellordners wird in den Zielordner kopiert; der Zielordner wird bei Bedarf angelegt.
+risiko: gelb
+fortschritt: "{{ quelle }} wird nach {{ ziel }} kopiert"
+parameter:
+  - id: art
+    label: Was soll kopiert werden?
+    typ: auswahl
+    standard: datei
+    optionen:
+      - wert: datei
+        label: Eine Datei
+      - wert: ordner
+        label: Inhalt eines Ordners
+  - id: quelle
+    label: Quelle
+    typ: pfad
+    beispiel: C:\Daten\bericht.docx
+  - id: ziel
+    label: Ziel
+    typ: pfad
+    beispiel: D:\Sicherung
+ziele:
+  powershell: |
+    {% if art.wert == 'ordner' %}
+    New-Item -ItemType Directory -Path {{ ziel }} -Force{{ whatif }} | Out-Null
+    Get-ChildItem -LiteralPath {{ quelle }} -Force | Copy-Item -Destination {{ ziel }} -Recurse -Force{{ whatif }}
+    {% else %}
+    Copy-Item -LiteralPath {{ quelle }} -Destination {{ ziel }} -Force{{ whatif }}
+    {% endif %}
+  cmd: |
+    {% if art.wert == 'ordner' %}
+    robocopy {{ quelle }} {{ ziel }} /E /R:1 /W:1 /NP
+    if errorlevel 8 (cmd /c exit 1) else (cmd /c exit 0)
+    {% else %}
+    copy /Y {{ quelle }} {{ ziel }}
+    {% endif %}
+  bash: |
+    {% if art.wert == 'ordner' %}
+    mkdir -p -- {{ ziel }}
+    cp -a -- {{ quelle }}/. {{ ziel }}/
+    {% else %}
+    cp -a -- {{ quelle }} {{ ziel }}
+    {% endif %}
+  zsh: |
+    {% if art.wert == 'ordner' %}
+    mkdir -p -- {{ ziel }}
+    cp -a {{ quelle }}/. {{ ziel }}/
+    {% else %}
+    cp -a {{ quelle }} {{ ziel }}
+    {% endif %}

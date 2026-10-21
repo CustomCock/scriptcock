@@ -1,0 +1,33 @@
+id: windows_update_reset
+version: 1
+name: Windows-Update-Komponenten zurücksetzen
+kategorie: Windows Update
+beschreibung: Stoppt die Update-Dienste, benennt die Update-Zwischenspeicher (SoftwareDistribution, catroot2) um und startet die Dienste neu.
+hilfe: |
+  Hilft, wenn Windows Update dauerhaft hängt oder Fehler meldet. Die alten Ordner bleiben als *.old erhalten
+  und können nach erfolgreichem Update gelöscht werden. Danach den Rechner neu starten und Windows Update erneut ausführen.
+risiko: rot
+admin_noetig: true
+fortschritt: Windows-Update-Komponenten werden zurückgesetzt
+ziele:
+  powershell: |
+    $okmDienste = 'wuauserv', 'cryptSvc', 'bits', 'msiserver'
+    foreach ($okmD in $okmDienste) { Stop-Service -Name $okmD -Force -ErrorAction SilentlyContinue{{ whatif }} }
+    $okmStempel = Get-Date -Format 'yyyyMMdd-HHmmss'
+    Rename-Item -LiteralPath (Join-Path $env:SystemRoot 'SoftwareDistribution') -NewName ('SoftwareDistribution.' + $okmStempel + '.old'){{ whatif }}
+    Rename-Item -LiteralPath (Join-Path $env:SystemRoot 'System32\catroot2') -NewName ('catroot2.' + $okmStempel + '.old'){{ whatif }}
+    foreach ($okmD in $okmDienste) { Start-Service -Name $okmD{{ whatif }} }
+    Write-Host 'Fertig. Bitte den Rechner neu starten und Windows Update erneut ausführen.'
+  cmd: |
+    net stop wuauserv
+    net stop cryptSvc
+    net stop bits
+    net stop msiserver
+    ren "%SystemRoot%\SoftwareDistribution" "SoftwareDistribution.%OKM_TS%.old"
+    ren "%SystemRoot%\System32\catroot2" "catroot2.%OKM_TS%.old"
+    net start wuauserv
+    net start cryptSvc
+    net start bits
+    net start msiserver
+    echo Bitte den Rechner neu starten und Windows Update erneut ausführen.
+    if exist "%SystemRoot%\SoftwareDistribution.%OKM_TS%.old" (cmd /c exit 0) else (cmd /c exit 1)

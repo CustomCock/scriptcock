@@ -1,0 +1,23 @@
+id: software_installieren
+name: Software installieren
+kategorie: Software
+beschreibung: Installiert ein Programm über den Paketmanager des Betriebssystems.
+hilfe: Nur freigegebene Software installieren. Unter Windows wird winget verwendet, unter macOS Homebrew.
+schlagworte: [installieren, programm, software, winget, apt, brew]
+felder:
+  - id: paket
+    label: Paketname bzw. winget-ID
+    typ: paketname
+    beispiel: Mozilla.Firefox
+  - id: paketmanager
+    label: Paketmanager (nur Linux)
+    typ: auswahl
+    standard: apt
+    optionen:
+      - wert: apt
+        label: apt (Debian, Ubuntu)
+      - wert: dnf
+        label: dnf (Fedora, RHEL, Rocky)
+schritte:
+  - block: paket_installieren
+    parameter: {paket: $paket, paketmanager: $paketmanager}

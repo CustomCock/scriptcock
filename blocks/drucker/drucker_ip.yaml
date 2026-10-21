@@ -1,0 +1,44 @@
+id: drucker_ip
+version: 1
+name: Drucker per IP hinzufügen
+kategorie: Drucker
+beschreibung: Richtet einen Netzwerkdrucker über seine IP-Adresse ein.
+hilfe: |
+  Die IP-Adresse steht meist auf einem Aufkleber am Drucker oder im Druckermenü unter "Netzwerk".
+  Windows: Der Treiber muss bereits installiert sein; ohne Angabe wird der Windows-Standardtreiber "Microsoft IPP Class Driver" verwendet.
+  Linux/macOS: Es wird "IPP Everywhere" (treiberlos) genutzt – das unterstützen fast alle aktuellen Netzwerkdrucker.
+risiko: gelb
+admin_noetig: true
+fortschritt: "Drucker {{ name }} ({{ ip }}) wird eingerichtet"
+parameter:
+  - id: name
+    label: Druckername
+    typ: druckername
+    beispiel: Drucker-Empfang
+  - id: ip
+    label: IP-Adresse oder Rechnername des Druckers
+    typ: ip_oder_hostname
+    beispiel: 192.168.1.50
+  - id: treiber
+    label: Treibername (nur Windows)
+    typ: text
+    pflicht: false
+    standard: Microsoft IPP Class Driver
+ziele:
+  powershell: |
+    $okmPort = 'IP_' + {{ ip }}
+    if (-not (Get-PrinterPort -Name $okmPort -ErrorAction SilentlyContinue)) {
+        Add-PrinterPort -Name $okmPort -PrinterHostAddress {{ ip }}{{ whatif }}
+    }
+    Add-Printer -Name {{ name }} -PortName $okmPort -DriverName {{ treiber }}{{ whatif }}
+  bash: |
+    lpadmin -p {{ name }} -E -v ipp://{{ ip }}/ipp/print -m everywhere
+  zsh: |
+    lpadmin -p {{ name }} -E -v ipp://{{ ip }}/ipp/print -m everywhere
+pruefung:
+  powershell: |
+    Get-Printer -Name {{ name }} | Format-Table Name, PortName, DriverName -AutoSize
+  bash: |
+    lpstat -p {{ name }}
+  zsh: |
+    lpstat -p {{ name }}

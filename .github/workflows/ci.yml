@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Shells und Prüfwerkzeuge installieren
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zsh shellcheck
+
+      - name: PowerShell + PSScriptAnalyzer
+        shell: bash
+        run: |
+          pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+          pwsh -NoProfile -Command 'Set-PSRepository PSGallery -InstallationPolicy Trusted; Install-Module PSScriptAnalyzer -Scope CurrentUser -Force'
+
+      - name: Python-Abhängigkeiten
+        run: pip install -e ".[dev]"
+
+      - name: ruff
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: mypy
+        run: mypy app
+
+      - name: pytest (inkl. bash -n, shellcheck, zsh -n, pwsh-Parser, PSScriptAnalyzer)
+        run: pytest -q -rs

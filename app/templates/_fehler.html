@@ -1,0 +1,7 @@
+<div class="fehlerbox" role="alert">
+  <h2>Bitte noch korrigieren</h2>
+  <ul>{% for f in fehler %}<li>{{ f.meldung }}</li>{% endfor %}</ul>
+</div>
+{% for f in fehler %}{% if f.feld and f.schritt is none %}
+<div id="status-{{ f.feld }}" hx-swap-oob="innerHTML"><span class="fehlertext">{{ f.meldung }}</span></div>
+{% endif %}{% endfor %}

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block titel %}Rezept wählen{% endblock %}
+{% block inhalt %}
+{% set aktiv = 2 %}{% include "_schritte.html" %}
+<p class="zurueck"><a href="{{ basis }}/">← anderes System wählen</a> · Zielsystem: <strong>{{ ziel_anzeige[ziel] }}</strong></p>
+<h1>Was möchtest du tun?</h1>
+<form class="suche" role="search" action="{{ basis }}/rezepte" method="get"
+      hx-get="{{ basis }}/rezepte" hx-target="#rezeptliste" hx-trigger="input changed delay:300ms from:#suchfeld, change from:#kategorie, submit"
+      hx-push-url="true">
+  <input type="hidden" name="ziel" value="{{ ziel.value }}">
+  <label class="sr-only" for="suchfeld">Suche</label>
+  <input id="suchfeld" type="search" name="q" value="{{ q }}" placeholder="z. B. Drucker, Netzwerk, Update …" autocomplete="off">
+  <label class="sr-only" for="kategorie">Kategorie</label>
+  <select id="kategorie" name="kategorie">
+    <option value="">Alle Kategorien</option>
+    {% for k in kategorien %}<option value="{{ k }}" {% if k == kategorie %}selected{% endif %}>{{ k }}</option>{% endfor %}
+  </select>
+  <noscript><button type="submit">Suchen</button></noscript>
+</form>
+<div id="rezeptliste">{% include "_rezeptliste.html" %}</div>
+{% endblock %}

@@ -1,0 +1,15 @@
+id: druckwarteschlange_neustarten
+name: Druckwarteschlange neu starten
+kategorie: Drucker
+beschreibung: Startet den Druckdienst neu, wenn Druckaufträge hängen bleiben.
+schlagworte: [drucker, druckt nicht, warteschlange, spooler, cups, hängt]
+schritte:
+  - block: dienst_neustarten
+    parameter: {dienst: Spooler}
+    nur_fuer: [powershell, cmd]
+  - block: dienst_neustarten
+    parameter: {dienst: cups}
+    nur_fuer: [bash]
+  - block: dienst_neustarten
+    parameter: {dienst: org.cups.cupsd}
+    nur_fuer: [zsh]

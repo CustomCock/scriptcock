@@ -1,0 +1,41 @@
+id: prozess_beenden
+version: 1
+name: Prozess beenden
+kategorie: Prozesse
+beschreibung: Beendet ein Programm sofort (ohne Nachfrage). Nicht gespeicherte Daten in diesem Programm gehen verloren!
+hilfe: |
+  Den Programmnamen ohne ".exe" angeben, z. B. "notepad". Unter Linux/macOS muss der Name exakt stimmen
+  (unter Linux höchstens 15 Zeichen, so wie ihn "ps" anzeigt).
+risiko: rot
+fortschritt: "Prozess {{ name }} wird beendet"
+parameter:
+  - id: name
+    label: Programmname
+    typ: prozessname
+    beispiel: notepad
+ziele:
+  powershell: |
+    $okmProzesse = Get-Process -Name {{ name }} -ErrorAction SilentlyContinue
+    if (-not $okmProzesse) {
+        Write-Host 'Kein passender Prozess gefunden - nichts zu tun.'
+    } else {
+        $okmProzesse | Stop-Process -Force{{ whatif }}
+    }
+  cmd: |
+    taskkill /F /IM {{ name }}.exe
+    if errorlevel 128 (
+      echo Kein passender Prozess gefunden - nichts zu tun.
+      cmd /c exit 0
+    )
+  bash: |
+    if pkill -x -- {{ name }}; then
+      printf '%s\n' 'Prozess beendet.'
+    else
+      printf '%s\n' 'Kein passender Prozess gefunden - nichts zu tun.'
+    fi
+  zsh: |
+    if pkill -x {{ name }}; then
+      printf '%s\n' 'Prozess beendet.'
+    else
+      printf '%s\n' 'Kein passender Prozess gefunden - nichts zu tun.'
+    fi

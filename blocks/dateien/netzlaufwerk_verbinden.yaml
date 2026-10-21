@@ -1,0 +1,33 @@
+id: netzlaufwerk_verbinden
+version: 1
+name: Netzlaufwerk verbinden
+kategorie: Dateien
+beschreibung: Verbindet eine Netzwerkfreigabe als Laufwerk (Windows) bzw. bindet sie im Finder ein (macOS).
+hilfe: |
+  Windows: Das Script NICHT als Administrator starten – sonst ist das Laufwerk im Explorer nicht sichtbar.
+  Ist der Laufwerksbuchstabe schon belegt, bricht der Schritt mit einer Meldung ab.
+risiko: gelb
+fortschritt: "Netzlaufwerk {{ pfad }} wird verbunden"
+parameter:
+  - id: laufwerk
+    label: Laufwerksbuchstabe
+    typ: laufwerksbuchstabe
+    beispiel: Z
+  - id: pfad
+    label: Netzwerkpfad
+    typ: unc_pfad
+    beispiel: \\fileserver\abteilung
+  - id: dauerhaft
+    label: Nach Neustart wiederherstellen
+    typ: ja_nein
+    pflicht: false
+    standard: true
+ziele:
+  powershell: |
+    net.exe use {{ laufwerk }} {{ pfad }} /persistent:{% if dauerhaft %}yes{% else %}no{% endif %}
+  cmd: |
+    net use {{ laufwerk }} {{ pfad }} /persistent:{% if dauerhaft %}yes{% else %}no{% endif %}
+  zsh: |
+    open {{ pfad_smb }}
+hinweise:
+  zsh: Unter macOS wird die Freigabe im Finder unter /Volumes eingebunden; der Laufwerksbuchstabe wird nicht verwendet. Anmeldedaten fragt macOS bei Bedarf ab.

@@ -1,0 +1,26 @@
+id: festplattenbelegung
+version: 1
+name: Festplattenbelegung anzeigen
+kategorie: System
+beschreibung: Zeigt für jedes Laufwerk, wie viel Speicherplatz belegt und frei ist.
+risiko: gruen
+admin_noetig:
+  cmd: true
+fortschritt: Festplattenbelegung wird ermittelt
+ziele:
+  powershell: |
+    Get-PSDrive -PSProvider FileSystem |
+        Where-Object { $null -ne $_.Used } |
+        Format-Table Name, Root, @{ Name = 'Belegt (GB)'; Expression = { [math]::Round($_.Used / 1GB, 1) } }, @{ Name = 'Frei (GB)'; Expression = { [math]::Round($_.Free / 1GB, 1) } } -AutoSize
+  cmd: |
+    for %%D in (C D E F G H I J K L M N O P Q R S T U V W X Y Z) do if exist %%D:\ (
+      echo Laufwerk %%D:
+      fsutil volume diskfree %%D: 2>nul
+    )
+    cmd /c exit 0
+  bash: |
+    df -h -x tmpfs -x devtmpfs -x squashfs -x overlay
+  zsh: |
+    df -h -l
+hinweise:
+  cmd: Nutzt "fsutil", das unter Windows Administratorrechte benötigt.

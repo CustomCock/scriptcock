@@ -1,0 +1,2 @@
+# Golden-Files byte-genau einchecken (CRLF/BOM sind Teil des Tests)
+tests/golden/** -text
