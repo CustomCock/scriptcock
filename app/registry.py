@@ -168,16 +168,23 @@ class Registry:
                 return False
         return True
 
+    def rezept_pruefen(self, rezept: RezeptDef) -> list[str]:
+        """Prüft ein Rezept gegen die geladenen Blöcke, ohne es aufzunehmen."""
+        fehler: list[str] = []
+        if rezept.id in self.rezepte:
+            fehler.append(f"{rezept.quelle}: Rezept-ID '{rezept.id}' ist bereits vergeben")
+        _pruefe_rezept(rezept, self, fehler)
+        return fehler
+
     def rezept_hinzufuegen(self, rezept: RezeptDef) -> None:
         """Fügt ein Rezept zur Laufzeit hinzu (z. B. aus der Datenbank) – mit voller Prüfung."""
-        if rezept.id in self.rezepte:
-            raise RegistryFehler([f"{rezept.quelle}: Rezept-ID '{rezept.id}' ist bereits vergeben"])
-        fehler: list[str] = []
-        self.rezepte[rezept.id] = rezept
-        _pruefe_rezept(rezept, self, fehler)
+        fehler = self.rezept_pruefen(rezept)
         if fehler:
-            del self.rezepte[rezept.id]
             raise RegistryFehler(fehler)
+        self.rezepte[rezept.id] = rezept
+
+    def rezept_entfernen(self, rezept_id: str) -> None:
+        self.rezepte.pop(rezept_id, None)
 
 
 def _yaml_laden(pfad: Path) -> Any:

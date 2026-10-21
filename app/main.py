@@ -20,7 +20,7 @@ from app.baukasten import lade_db_rezepte
 from app.config import Einstellungen, einstellungen
 from app.db import Datenbank
 from app.registry import Registry, lade_registry
-from app.routes import api, baukasten, pages
+from app.routes import api, baukasten, bibliothek, pages, verwaltung
 
 PROJEKT = Path(__file__).resolve().parent.parent
 log = logging.getLogger("baukasten")
@@ -101,6 +101,8 @@ def create_app(
     app.include_router(auth_router)
     app.include_router(pages.router)
     app.include_router(baukasten.router)
+    app.include_router(bibliothek.router)
+    app.include_router(verwaltung.router)
     app.include_router(api.router, prefix="/api/v1")
 
     @app.get("/healthz", include_in_schema=False)

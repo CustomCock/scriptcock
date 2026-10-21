@@ -26,6 +26,8 @@
     <nav class="hauptnav" aria-label="Hauptnavigation">
       <a href="{{ basis }}/">Rezepte</a>
       <a href="{{ basis }}/baukasten">Freier Baukasten</a>
+      <a href="{{ basis }}/bibliothek">Bibliothek</a>
+      {% if benutzer and benutzer.ist_admin %}<a href="{{ basis }}/verwaltung">Verwaltung</a>{% endif %}
       {% block nav_extra %}{% endblock %}
     </nav>
     {% if benutzer %}

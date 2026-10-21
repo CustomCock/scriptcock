@@ -1,0 +1,4 @@
+<button type="button" class="knopf{% if hat_bewertet %} kopiert{% endif %}" hx-post="{{ basis }}/skripte/{{ e.id }}/funktioniert"
+        hx-target="#funktioniert-{{ e.id }}" hx-swap="innerHTML" aria-pressed="{{ 'true' if hat_bewertet else 'false' }}"
+        title="{% if hat_bewertet %}Klicken, um deine Bestätigung zurückzunehmen{% else %}Bestätige, dass dieses Script bei dir funktioniert hat{% endif %}">
+  ✓ Hat funktioniert ({{ e.funktioniert }})</button>

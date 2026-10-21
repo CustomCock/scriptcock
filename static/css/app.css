@@ -191,3 +191,40 @@ input:focus, select:focus { border-color: var(--schwarz); }
   .bk-layout { grid-template-columns: 1fr; }
   .bk-palette { position: static; max-height: 22rem; }
 }
+
+/* --- Bibliothek & Verwaltung ------------------------------------------------ */
+.reiter { display: flex; gap: .25rem; border-bottom: 2px solid var(--rand); margin-bottom: 1rem; }
+.reiter a { padding: .5rem 1rem; text-decoration: none; color: var(--text); border-radius: var(--radius) var(--radius) 0 0; }
+.reiter a[aria-current="page"] { background: var(--schwarz); color: var(--sand); }
+.bib-liste { list-style: none; padding: 0; }
+.bib-eintrag { background: var(--weiss); border: 1px solid var(--rand); border-left: 5px solid var(--rot); border-radius: var(--radius);
+  padding: .8rem 1rem; margin-bottom: .8rem; }
+.bib-kopf { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.bib-titel { font-weight: 700; font-size: 1.1rem; color: var(--text); }
+.bib-text { margin: .3rem 0; }
+.bib-meta { font-size: .85rem; color: var(--text-leise); margin: .3rem 0; }
+.bib-aktionen { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; }
+.bib-aktionen .knopf { font-size: .9rem; padding: .35rem .8rem; }
+.marke-leise { background: var(--rand); }
+.seiten { display: flex; gap: 1rem; justify-content: center; margin: 1rem 0; }
+.bib-speichern { background: var(--weiss); border: 1px solid var(--rand); border-radius: var(--radius); padding: .5rem 1.25rem 1rem; margin-top: 1rem; }
+.eckdaten { display: grid; grid-template-columns: max-content 1fr; gap: .3rem 1rem; background: var(--weiss);
+  border: 1px solid var(--rand); border-radius: var(--radius); padding: .75rem 1rem; }
+.eckdaten dt { font-weight: 600; }
+.eckdaten dd { margin: 0; word-break: break-word; }
+.tabelle { width: 100%; border-collapse: collapse; background: var(--weiss); font-size: .92rem; }
+.tabelle th, .tabelle td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--rand); }
+.tabelle th { background: var(--schwarz); color: var(--sand); }
+.tabelle tr.geaendert { background: #fdf3d9; }
+.statistik { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: .75rem; }
+.statistik li { background: var(--schwarz); color: var(--sand); padding: .6rem 1rem; border-radius: var(--radius); }
+.statistik strong { color: var(--weiss); font-size: 1.2rem; }
+.verwaltung-rezept { background: var(--weiss); border: 1px solid var(--rand); border-radius: var(--radius); padding: .5rem 1.25rem 1rem; margin-bottom: 1rem; }
+.verwaltung-rezept h3 { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.knopf-gefahr { border-color: var(--rot); color: var(--rot-dunkel); }
+.knopf-gefahr:hover { background: var(--rot); color: var(--weiss); }
+@media (max-width: 40rem) {
+  .eckdaten { grid-template-columns: 1fr; }
+  .tabelle { font-size: .82rem; }
+  .bib-aktionen .knopf { width: 100%; text-align: center; }
+}

@@ -43,17 +43,17 @@ def test_rezeptliste_und_suche(client: TestClient) -> None:
 
 def test_formular_zeigt_nur_relevante_felder(client: TestClient) -> None:
     r = client.get("/rezepte/software_installieren?ziel=powershell")
-    assert 'name="paket"' in r.text and 'name="paketmanager"' not in r.text
+    assert 'name="f.paket"' in r.text and 'name="f.paketmanager"' not in r.text
     r = client.get("/rezepte/software_installieren?ziel=bash")
-    assert 'name="paketmanager"' in r.text
+    assert 'name="f.paketmanager"' in r.text
     r = client.get("/rezepte/netzlaufwerk_verbinden?ziel=zsh")
-    assert 'name="laufwerk"' not in r.text
+    assert 'name="f.laufwerk"' not in r.text
 
 
 def test_live_validierung(client: TestClient) -> None:
     url = "/rezepte/drucker_einrichten/feld/drucker_ip?ziel=bash"
-    assert "keine gültige IP-Adresse" in client.post(url, data={"drucker_ip": "1.2.3.400"}, headers=HX).text
-    assert "in Ordnung" in client.post(url, data={"drucker_ip": "10.0.0.5"}, headers=HX).text
+    assert "keine gültige IP-Adresse" in client.post(url, data={"f.drucker_ip": "1.2.3.400"}, headers=HX).text
+    assert "in Ordnung" in client.post(url, data={"f.drucker_ip": "10.0.0.5"}, headers=HX).text
 
 
 def test_csrf_schutz(client: TestClient) -> None:
@@ -62,7 +62,7 @@ def test_csrf_schutz(client: TestClient) -> None:
 
 
 def test_erzeugen_vorschau_und_download(client: TestClient) -> None:
-    daten = {"ziel": "bash", "druckername": "Empfang", "drucker_ip": "10.0.0.5", "dry_run": "false"}
+    daten = {"ziel": "bash", "f.druckername": "Empfang", "f.drucker_ip": "10.0.0.5", "dry_run": "false"}
     r = client.post("/rezepte/drucker_einrichten/erzeugen", data=daten, headers=HX)
     assert r.status_code == 200
     assert "SHA-256" in r.text and "chmod +x" in r.text
@@ -78,7 +78,7 @@ def test_erzeugen_vorschau_und_download(client: TestClient) -> None:
 
 
 def test_validierungsfehler_im_formular(client: TestClient) -> None:
-    daten = {"ziel": "bash", "druckername": "Mit Leerzeichen", "drucker_ip": "x;y"}
+    daten = {"ziel": "bash", "f.druckername": "Mit Leerzeichen", "f.drucker_ip": "x;y"}
     r = client.post("/rezepte/drucker_einrichten/erzeugen", data=daten, headers=HX)
     assert "Bitte noch korrigieren" in r.text
     assert 'id="status-druckername" hx-swap-oob' in r.text
@@ -87,7 +87,7 @@ def test_validierungsfehler_im_formular(client: TestClient) -> None:
 def test_rote_rezepte_brauchen_checkbox(client: TestClient) -> None:
     seite = client.get("/rezepte/speicherplatz_freigeben?ziel=bash").text
     assert "Ich weiß, was dieses Script tut" in seite
-    daten = {"ziel": "bash", "tage": "7", "rot_bestaetigt": "false"}
+    daten = {"ziel": "bash", "f.tage": "7", "rot_bestaetigt": "false"}
     r = client.post("/rezepte/speicherplatz_freigeben/erzeugen", data=daten, headers=HX)
     assert "Ich weiß, was dieses Script tut" in r.text and "Bitte noch korrigieren" in r.text
     daten["rot_bestaetigt"] = "true"
@@ -98,7 +98,7 @@ def test_rote_rezepte_brauchen_checkbox(client: TestClient) -> None:
 def test_admin_ohne_zusatzbestaetigung(registry, tmp_path: Path) -> None:
     c = TestClient(create_app(einst(DEV_ADMIN=True), registry, Datenbank(f"sqlite:///{tmp_path}/a.db")))
     assert "Ich weiß, was dieses Script tut" not in c.get("/rezepte/speicherplatz_freigeben?ziel=bash").text
-    r = c.post("/rezepte/speicherplatz_freigeben/erzeugen", data={"ziel": "bash", "tage": "7"}, headers=HX)
+    r = c.post("/rezepte/speicherplatz_freigeben/erzeugen", data={"ziel": "bash", "f.tage": "7"}, headers=HX)
     assert "SHA-256" in r.text
 
 
@@ -145,3 +145,11 @@ def test_ohne_auth_disabled_wird_umgeleitet(registry, tmp_path: Path) -> None:
 def test_unvollstaendige_konfiguration_bricht_ab(registry) -> None:
     with pytest.raises(RuntimeError, match="OIDC_ISSUER"):
         create_app(einst(AUTH_DISABLED=False), registry)
+
+
+def test_rezeptfeld_namens_ziel_kollidiert_nicht(client: TestClient) -> None:
+    # Regression: Das Rezept hat ein Feld "ziel" – genau wie das Zielsystem.
+    daten = {"ziel": "zsh", "f.ziel": "server01.okm.local", "f.port": "8443"}
+    r = client.post("/rezepte/netzwerkproblem_diagnostizieren/erzeugen", data=daten, headers=HX)
+    assert r.status_code == 200 and "SHA-256" in r.text
+    assert "server01.okm.local" in r.text and "8443" in r.text

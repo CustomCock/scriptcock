@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block titel %}Bibliothek{% endblock %}
+{% block inhalt %}
+<h1>{% if meine %}Meine Scripte{% else %}Bibliothek{% endif %}</h1>
+<p class="einleitung">{% if meine %}Alle Scripte, die du erzeugt hast – auch die, die nicht in der Bibliothek veröffentlicht sind.
+{% else %}Scripte, die Kolleginnen und Kollegen gespeichert haben. Mit „Hat funktioniert ✓“ zeigst du anderen, dass ein Script hilft.{% endif %}</p>
+<nav class="reiter" aria-label="Ansicht">
+  <a href="{{ basis }}/bibliothek" {% if not meine %}aria-current="page"{% endif %}>Bibliothek</a>
+  <a href="{{ basis }}/bibliothek?meine=true" {% if meine %}aria-current="page"{% endif %}>Meine Scripte</a>
+</nav>
+<form class="suche" role="search" action="{{ basis }}/bibliothek" method="get"
+      hx-get="{{ basis }}/bibliothek" hx-target="#bibliotheksliste"
+      hx-trigger="input changed delay:300ms from:#bib-suche, change, submit" hx-push-url="true">
+  {% if meine %}<input type="hidden" name="meine" value="true">{% endif %}
+  <label class="sr-only" for="bib-suche">Suche</label>
+  <input id="bib-suche" type="search" name="q" value="{{ q }}" placeholder="Titel, Beschreibung oder Tag …" autocomplete="off">
+  <label class="sr-only" for="bib-ziel">Zielsystem</label>
+  <select id="bib-ziel" name="ziel">
+    <option value="">Alle Systeme</option>
+    {% for z in ziele %}<option value="{{ z.value }}" {% if z == ziel %}selected{% endif %}>{{ ziel_anzeige[z] }}</option>{% endfor %}
+  </select>
+  <label class="sr-only" for="bib-tag">Tag</label>
+  <select id="bib-tag" name="tag">
+    <option value="">Alle Tags</option>
+    {% for t in ergebnis.alle_tags %}<option value="{{ t }}" {% if t == tag %}selected{% endif %}>#{{ t }}</option>{% endfor %}
+  </select>
+  <noscript><button type="submit">Suchen</button></noscript>
+</form>
+<div id="bibliotheksliste">{% include "_bib_liste.html" %}</div>
+{% endblock %}

@@ -237,10 +237,25 @@ def test_rezept_aus_formular_fehler(reg: Registry) -> None:
     assert "Name" in meldungen and "Kategorie" in meldungen and "Ziel" in meldungen
 
 
-def test_als_rezept_nur_admin(reg: Registry, tmp_path: Path) -> None:
+def test_nutzer_reichen_vorschlag_ein(reg: Registry, tmp_path: Path) -> None:
     c = client(reg, Datenbank(f"sqlite:///{tmp_path}/a.db"))
-    r = post(c, "/baukasten/als-rezept", [("ziel", "bash"), ("rezept_name", "x")])
-    assert r.status_code == 403
+    assert "Als Rezept vorschlagen" in c.get("/baukasten").text
+    uid = schritt(c, "systeminfo")
+    r = post(
+        c,
+        "/baukasten/als-rezept",
+        [
+            ("ziel", "bash"),
+            ("schritt", f"{uid}:systeminfo"),
+            ("rezept_name", "Infos"),
+            ("rezept_kategorie", "System"),
+            ("rezept_beschreibung", "Zeigt Infos."),
+        ],
+    )
+    assert "Vorschlag „Infos“ eingereicht" in r.text
+    # Noch nicht sichtbar
+    assert "Infos" not in c.get("/rezepte?ziel=bash").text
+    assert not any(r.name == "Infos" for r in reg.rezepte.values())
 
 
 def test_als_rezept_speichern_und_neu_laden(reg: Registry, tmp_path: Path) -> None:
@@ -265,7 +280,7 @@ def test_als_rezept_speichern_und_neu_laden(reg: Registry, tmp_path: Path) -> No
     rid = re.search(r"/rezepte/(eigen_[a-z0-9_]+)", r.text).group(1)
     assert "Server anpingen" in c.get("/rezepte?ziel=bash").text
     formular = c.get(f"/rezepte/{rid}?ziel=bash").text
-    assert 'name="s1_ziel"' in formular
+    assert 'name="f.s1_ziel"' in formular
 
     # YAML-Export ist ein gültiges Rezept
     daten = yaml.safe_load(c.get(f"/rezepte/{rid}/yaml").text)

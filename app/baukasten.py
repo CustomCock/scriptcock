@@ -200,12 +200,16 @@ def rezept_aus_formular(
 def rezept_speichern(
     registry: Registry, sitzung: Session, rezept: RezeptDef, *, autor: str, freigegeben: bool
 ) -> GespeichertesRezept:
-    """Prüft das Rezept gegen die Registry und speichert es. Freigegebene sind sofort sichtbar."""
+    """Prüft das Rezept gegen die Registry und speichert es.
+
+    Freigegebene Rezepte (von Admins) sind sofort sichtbar; Vorschläge von Nutzern
+    warten in der Verwaltung auf Freigabe.
+    """
+    fehler = registry.rezept_pruefen(rezept)
+    if fehler:
+        raise FehlerSammlung([Feldfehler(None, None, f) for f in fehler])
     if freigegeben:
-        try:
-            registry.rezept_hinzufuegen(rezept)
-        except RegistryFehler as e:
-            raise FehlerSammlung([Feldfehler(None, None, f) for f in e.fehler]) from None
+        registry.rezept_hinzufuegen(rezept)
     eintrag = GespeichertesRezept(
         rezept_id=rezept.id,
         name=rezept.name,
@@ -217,6 +221,30 @@ def rezept_speichern(
     sitzung.add(eintrag)
     sitzung.commit()
     return eintrag
+
+
+def db_rezept(eintrag: GespeichertesRezept) -> RezeptDef:
+    return RezeptDef.model_validate_json(eintrag.daten_json)
+
+
+def rezept_freigeben(registry: Registry, sitzung: Session, eintrag: GespeichertesRezept) -> RezeptDef:
+    """Gibt einen Vorschlag frei – mit erneuter Prüfung gegen die aktuellen Bausteine."""
+    try:
+        rezept = db_rezept(eintrag)
+        registry.rezept_hinzufuegen(rezept)
+    except ValidationError as e:
+        raise FehlerSammlung([Feldfehler(None, None, f"Rezept ist nicht lesbar: {e}")]) from None
+    except RegistryFehler as e:
+        raise FehlerSammlung([Feldfehler(None, None, f) for f in e.fehler]) from None
+    eintrag.freigegeben = True
+    sitzung.commit()
+    return rezept
+
+
+def rezept_loeschen(registry: Registry, sitzung: Session, eintrag: GespeichertesRezept) -> None:
+    registry.rezept_entfernen(eintrag.rezept_id)
+    sitzung.delete(eintrag)
+    sitzung.commit()
 
 
 def lade_db_rezepte(registry: Registry, sitzung: Session) -> int:

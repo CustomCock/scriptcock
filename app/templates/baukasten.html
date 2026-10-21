@@ -7,6 +7,13 @@
 (oder auf <strong>+</strong> klicken), Reihenfolge per Ziehen am <span aria-hidden="true">⠿</span>-Griff oder mit ↑ ↓ ändern,
 Werte ausfüllen. Die Vorschau aktualisiert sich automatisch.</p>
 
+{% if vorbelegung %}
+<div class="hinweis" role="status">
+  <p><strong>Gespeichertes Script geöffnet:</strong> „{{ vorbelegung.titel }}“. Änderungen ergeben ein neues Script –
+  das gespeicherte bleibt unverändert.</p>
+  {% if vorbelegung.hinweise %}<ul>{% for h in vorbelegung.hinweise %}<li>{{ h }}</li>{% endfor %}</ul>{% endif %}
+</div>
+{% endif %}
 <div class="bk-layout">
   <aside class="bk-palette" aria-label="Bausteine">
     <label class="sr-only" for="bk-suche">Baustein suchen</label>
@@ -33,7 +40,7 @@ Werte ausfüllen. Die Vorschau aktualisiert sich automatisch.</p>
   </aside>
 
   <section class="bk-arbeit">
-    <form id="baukasten" class="formular bk-leer" data-basis="{{ basis }}"
+    <form id="baukasten" class="formular{% if not schritte %} bk-leer{% endif %}" data-basis="{{ basis }}"
           hx-post="{{ basis }}/baukasten/vorschau" hx-trigger="bk-aendern, change delay:250ms, input delay:700ms"
           hx-target="#bk-vorschau" hx-swap="innerHTML">
       <fieldset id="ziel-wahl" class="ziel-wahl"
@@ -46,24 +53,24 @@ Werte ausfüllen. Die Vorschau aktualisiert sich automatisch.</p>
         {% endfor %}
       </fieldset>
 
-      <details class="optionen">
+      <details class="optionen"{% if vorbelegung %} open{% endif %}>
         <summary>Titel und Beschreibung</summary>
         <div class="feld">
           <label for="bk-titel">Titel des Scripts</label>
-          <input id="bk-titel" name="titel" type="text" maxlength="120" placeholder="Mein Script">
+          <input id="bk-titel" name="titel" type="text" maxlength="120" placeholder="Mein Script" value="{{ vorbelegung.titel if vorbelegung else '' }}">
         </div>
         <div class="feld">
           <label for="bk-beschreibung">Beschreibung (erscheint im Kopfkommentar)</label>
-          <input id="bk-beschreibung" name="beschreibung" type="text" maxlength="300">
+          <input id="bk-beschreibung" name="beschreibung" type="text" maxlength="300" value="{{ vorbelegung.beschreibung if vorbelegung else '' }}">
         </div>
       </details>
 
-      <ol id="schrittliste" class="schrittliste" aria-label="Schritte des Scripts"></ol>
+      <ol id="schrittliste" class="schrittliste" aria-label="Schritte des Scripts">{% include "_bk_liste.html" %}</ol>
       <p class="leerhinweis">Noch keine Schritte. Zieh Bausteine aus der Liste hierher oder klicke dort auf „+“.</p>
 
       <div class="feld">
         <input type="hidden" name="dry_run" value="false">
-        <label class="schalter"><input type="checkbox" name="dry_run" value="true"> <strong>Nur simulieren</strong> – das Script zeigt nur an, was es tun würde.</label>
+        <label class="schalter"><input type="checkbox" name="dry_run" value="true"{% if vorbelegung and vorbelegung.dry_run %} checked{% endif %}> <strong>Nur simulieren</strong> – das Script zeigt nur an, was es tun würde.</label>
       </div>
       <div id="bk-bestaetigung"></div>
     </form>
@@ -71,12 +78,11 @@ Werte ausfüllen. Die Vorschau aktualisiert sich automatisch.</p>
     <div id="bk-vorschau" aria-live="polite"></div>
     <div id="bk-ergebnis" aria-live="polite"></div>
 
-    {% if benutzer.ist_admin %}
     <details class="optionen rezept-speichern">
-      <summary>Als Rezept speichern (Admin)</summary>
+      <summary>{% if benutzer.ist_admin %}Als Rezept speichern{% else %}Als Rezept vorschlagen{% endif %}</summary>
       <div id="rezept-speichern">
         <p class="feldhilfe">Ausgefüllte Werte werden fest ins Rezept übernommen. Leere Pflichtfelder fragt das
-          Rezept-Formular später ab.</p>
+          Rezept-Formular später ab.{% if not benutzer.ist_admin %} Ein Admin prüft den Vorschlag, bevor er für alle sichtbar wird.{% endif %}</p>
         <div class="feld"><label for="rz-name">Name des Rezepts</label>
           <input id="rz-name" name="rezept_name" type="text" maxlength="100" placeholder="z. B. Drucker Empfang einrichten"></div>
         <div class="feld"><label for="rz-kategorie">Kategorie</label>
@@ -84,11 +90,10 @@ Werte ausfüllen. Die Vorschau aktualisiert sich automatisch.</p>
         <div class="feld"><label for="rz-beschreibung">Beschreibung</label>
           <input id="rz-beschreibung" name="rezept_beschreibung" type="text" maxlength="300"></div>
         <button type="button" class="knopf" hx-post="{{ basis }}/baukasten/als-rezept"
-                hx-include="#baukasten, #rezept-speichern" hx-target="#rezept-ergebnis">Rezept speichern</button>
+                hx-include="#baukasten, #rezept-speichern" hx-target="#rezept-ergebnis">{% if benutzer.ist_admin %}Rezept speichern{% else %}Vorschlag einreichen{% endif %}</button>
       </div>
       <div id="rezept-ergebnis" aria-live="polite"></div>
     </details>
-    {% endif %}
   </section>
 </div>
 {% endblock %}

@@ -37,8 +37,9 @@ UI-Formular / JSON ──► ScriptRequest ──► validation.py ──► Scr
 | `app/generators/base.py` | Fester Script-Aufbau (Kopf → Präambel → Schritte → Abschluss), Dry-Run-Logik |
 | `app/generators/{powershell,cmd,bash}.py` | Sprachspezifische Bausteine (`bash.py` enthält auch zsh) |
 | `app/service.py` | Rezept-Formular → Request, `generiere` (ohne Speichern) / `erzeuge` (mit Speichern) |
-| `app/baukasten.py` | Listen-Modus: Formular lesen, Rezept aus Schrittliste, DB-Rezepte laden/YAML-Export |
-| `app/routes/pages.py`, `baukasten.py`, `api.py` | HTML Rezept-Modus, HTML Listen-Modus, JSON-API |
+| `app/baukasten.py` | Listen-Modus: Formular lesen, Rezept aus Schrittliste; DB-Rezepte vorschlagen/freigeben/laden/YAML |
+| `app/bibliothek.py` | Bibliothek: Rechte, Suche, Tags, Bewertungen, „Erneut öffnen“ aus der IR, Blockversionen |
+| `app/routes/pages.py`, `baukasten.py`, `bibliothek.py`, `verwaltung.py`, `api.py` | HTML-Seiten je Bereich, JSON-API |
 | `static/js/app.js` | Einziges eigenes JS (Highlighting, Zwischenablage, Baukasten: Sortable, Palette) |
 | `app/auth.py` | OIDC (Keycloak), Rollen `nutzer`/`admin`, `AUTH_DISABLED` |
 
@@ -69,6 +70,19 @@ Die Live-Vorschau (`/baukasten/vorschau`) speichert nichts; erst `/baukasten/erz
 
 Optionaler Browser-Test: `pip install playwright` (Chromium-Pfad ggf. per `CHROMIUM_PFAD`),
 sonst wird `tests/test_browser.py` übersprungen.
+
+## Rechte
+
+| Aktion | nutzer | admin |
+|---|---|---|
+| Scripte erzeugen, eigene in Bibliothek speichern, „Hat funktioniert“ | ✓ | ✓ |
+| Bibliotheks-Scripte ansehen/herunterladen/erneut öffnen | ✓ | ✓ |
+| Fremde private Scripte sehen, fremde Einträge entfernen | – | ✓ |
+| Rezept vorschlagen / direkt speichern | vorschlagen | speichern |
+| Verwaltung: Vorschläge freigeben, DB-Rezepte löschen | – | ✓ |
+| Rote Bausteine ohne Checkbox | – | ✓ |
+
+Rezeptfelder heißen im HTML-Formular `f.<feld_id>` (Kollisionsschutz mit `ziel`, `titel` …).
 
 ## Sicherheit (Kurzfassung, Details in `docs/sicherheit.md`)
 

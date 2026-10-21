@@ -9,10 +9,12 @@ from pathlib import Path
 from sqlalchemy import (
     Boolean,
     DateTime,
+    ForeignKey,
     Integer,
     LargeBinary,
     String,
     Text,
+    UniqueConstraint,
     create_engine,
 )
 from sqlalchemy.engine import Engine
@@ -56,6 +58,18 @@ class GespeichertesRezept(Basis):
     autor: Mapped[str] = mapped_column(String(200))
     erstellt_am: Mapped[datetime] = mapped_column(DateTime)
     freigegeben: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+
+
+class Bewertung(Basis):
+    """„Hat funktioniert ✓“ – höchstens eine Stimme pro Benutzer und Script."""
+
+    __tablename__ = "bewertungen"
+    __table_args__ = (UniqueConstraint("skript_id", "benutzer", name="eine_stimme_pro_benutzer"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    skript_id: Mapped[int] = mapped_column(ForeignKey("skripte.id", ondelete="CASCADE"), index=True)
+    benutzer: Mapped[str] = mapped_column(String(200))
+    erstellt_am: Mapped[datetime] = mapped_column(DateTime)
 
 
 class Datenbank:

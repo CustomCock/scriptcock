@@ -36,10 +36,21 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 - Rezepte aus „Als Rezept speichern“ liegen nur in der Datenbank. Zum dauerhaften Übernehmen
   ins Repository den YAML-Export unter `recipes/` ablegen (dann den DB-Eintrag löschen, sonst
   existiert das Rezept doppelt mit unterschiedlicher ID).
-- Gespeicherte Rezepte können noch nicht bearbeitet oder gelöscht werden (Phase 3: Verwaltung).
+- Gespeicherte Rezepte können gelöscht, aber nicht bearbeitet werden (Workaround: im Baukasten
+  neu zusammenstellen und erneut speichern).
 - Der Browser-Test (`tests/test_browser.py`) läuft in der CI nicht, weil Playwright keine
   Projektabhängigkeit ist.
 
+## Bibliothek & Verwaltung
+
+- Freigegebene DB-Rezepte liegen im Speicher der Registry. Mit mehreren uvicorn-Workern
+  (`--workers N`) sähen andere Prozesse eine Freigabe erst nach einem Neustart. Die mitgelieferte
+  systemd-Unit startet daher genau einen Prozess.
+- Titel/Beschreibung in der Bibliothek sind reine Metadaten; der Kopfkommentar des Scripts
+  behält den Titel von der Erzeugung.
+- Es gibt keine Datenbank-Migrationen (Alembic). Neue Tabellen legt die App selbst an; neue
+  Spalten in bestehenden Tabellen bräuchten künftig eine Migration.
+
 ## Phasen
 
-- Phase 3–4 sind noch nicht umgesetzt (siehe `CHANGELOG.md`).
+- Phase 4 (Blockly) ist noch nicht umgesetzt (siehe `CHANGELOG.md`).

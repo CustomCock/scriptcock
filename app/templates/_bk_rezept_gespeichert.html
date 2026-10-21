@@ -1,7 +1,12 @@
 <div class="hinweis" role="status">
+  {% if vorschlag %}
+  <p><strong>Vorschlag „{{ rezept.name }}“ eingereicht.</strong> Ein Admin prüft ihn und gibt ihn frei –
+  danach erscheint er in der Rezeptliste.</p>
+  {% else %}
   <p><strong>Rezept „{{ rezept.name }}“ gespeichert.</strong>
   {% if ziele %}Es steht jetzt in der Rezeptliste für: {% for z in ziele %}{{ ziel_anzeige[z] }}{% if not loop.last %}, {% endif %}{% endfor %}.{% endif %}</p>
   {% if rezept.felder %}<p>Das Formular fragt ab: {% for f in rezept.felder %}{{ f.label }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
   <p>{% if ziel in ziele %}<a href="{{ basis }}/rezepte/{{ rezept.id }}?ziel={{ ziel.value }}">Rezept öffnen</a> · {% endif %}
   <a href="{{ basis }}/rezepte/{{ rezept.id }}/yaml" download>Als YAML herunterladen</a> (zum dauerhaften Übernehmen unter <code>recipes/</code>)</p>
+  {% endif %}
 </div>

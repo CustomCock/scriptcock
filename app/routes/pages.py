@@ -34,6 +34,7 @@ ZIEL_KACHELN = [
     (Ziel.BASH, "Linux", "Bash – Debian, Ubuntu, Fedora …", "linux"),
     (Ziel.ZSH, "macOS", "zsh – Terminal auf dem Mac", "mac"),
 ]
+FELD_PREFIX = "f."
 HLJS_SPRACHE = {Ziel.POWERSHELL: "powershell", Ziel.CMD: "dos", Ziel.BASH: "bash", Ziel.ZSH: "bash"}
 
 
@@ -158,7 +159,7 @@ async def feld_pruefen(
     if feld is None or z is None:
         raise HTTPException(404)
     formular = await request.form()
-    fehler = pruefe_feld(feld, formular.get(fid), z)
+    fehler = pruefe_feld(feld, formular.get(FELD_PREFIX + fid), z)
     return _render(request, "_feldstatus.html", benutzer, fehler=fehler)
 
 
@@ -176,12 +177,14 @@ async def rezept_erzeugen(
     if z is None or z not in reg.rezept_ziele(rezept):
         raise HTTPException(400, "Ungültiges Zielsystem")
     werte = {k: v for k, v in formular.items() if isinstance(v, str)}
+    # Rezeptfelder tragen das Präfix "f.", damit sie nie mit "ziel", "titel" usw. kollidieren.
+    felder = {k.removeprefix(FELD_PREFIX): v for k, v in werte.items() if k.startswith(FELD_PREFIX)}
     try:
         req = rezept_zu_request(
             reg,
             rezept,
             z,
-            werte,
+            felder,
             titel=werte.get("titel", "").strip()[:120],
             dry_run=werte.get("dry_run") == "true",
             rot_bestaetigt=werte.get("rot_bestaetigt") == "true",

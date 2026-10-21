@@ -1,0 +1,33 @@
+<p class="feldhilfe">{{ ergebnis.gesamt }} Script{% if ergebnis.gesamt != 1 %}e{% endif %} gefunden.</p>
+{% if ergebnis.eintraege %}
+<ul class="bib-liste">
+  {% for e in ergebnis.eintraege %}
+  <li class="bib-eintrag">
+    <div class="bib-kopf">
+      <a class="bib-titel" href="{{ basis }}/skripte/{{ e.id }}">{{ e.titel }}</a>
+      <span class="marke">{{ ziel_anzeige[e.ziel] if e.ziel in ziel_anzeige else e.ziel }}</span>
+      {% if meine and not e.in_bibliothek %}<span class="marke marke-leise">privat</span>{% endif %}
+    </div>
+    {% if e.beschreibung %}<p class="bib-text">{{ e.beschreibung }}</p>{% endif %}
+    <p class="bib-meta">
+      {{ e.autor }} · {{ e.erstellt_am.strftime("%d.%m.%Y %H:%M") }}
+      {% for t in tags_aus_text(e.tags) %} · <a href="{{ basis }}/bibliothek?tag={{ t }}">#{{ t }}</a>{% endfor %}
+      · <span title="So oft als funktionierend bestätigt">✓ {{ e.funktioniert }}{% if e.id in ergebnis.meine_stimmen %} (auch von dir){% endif %}</span>
+    </p>
+    <div class="bib-aktionen">
+      <a class="knopf" href="{{ basis }}/skripte/{{ e.id }}/download" download>⬇ Herunterladen</a>
+      <a class="knopf" href="{{ basis }}/baukasten?aus={{ e.id }}">Erneut öffnen und anpassen</a>
+      <a class="knopf" href="{{ basis }}/skripte/{{ e.id }}">Details</a>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% if ergebnis.gesamt > (seite + 1) * seitengroesse or seite > 0 %}
+<nav class="seiten" aria-label="Seiten">
+  {% if seite > 0 %}<a href="{{ basis }}/bibliothek?q={{ q | urlencode }}&ziel={{ ziel.value if ziel else '' }}&tag={{ tag | urlencode }}{% if meine %}&meine=true{% endif %}&seite={{ seite - 1 }}">← zurück</a>{% endif %}
+  {% if ergebnis.gesamt > (seite + 1) * seitengroesse %}<a href="{{ basis }}/bibliothek?q={{ q | urlencode }}&ziel={{ ziel.value if ziel else '' }}&tag={{ tag | urlencode }}{% if meine %}&meine=true{% endif %}&seite={{ seite + 1 }}">weiter →</a>{% endif %}
+</nav>
+{% endif %}
+{% else %}
+<p class="leer">{% if meine %}Du hast noch keine Scripte erzeugt.{% else %}Noch keine passenden Scripte in der Bibliothek. Nach dem Erzeugen kannst du ein Script mit „In Bibliothek speichern“ hier ablegen.{% endif %}</p>
+{% endif %}

@@ -29,7 +29,7 @@
 <form class="formular" hx-post="{{ basis }}/rezepte/{{ rezept.id }}/erzeugen" hx-target="#ergebnis" hx-swap="innerHTML" hx-indicator="#laedt">
   <input type="hidden" name="ziel" value="{{ ziel.value }}">
   {% for f in felder %}
-    {% with name=f.id, dom=f.id, wert=none, aktion=basis ~ "/rezepte/" ~ rezept.id ~ "/feld/" ~ f.id ~ "?ziel=" ~ ziel.value %}{% include "_feld.html" %}{% endwith %}
+    {% with name="f." ~ f.id, dom=f.id, wert=none, aktion=basis ~ "/rezepte/" ~ rezept.id ~ "/feld/" ~ f.id ~ "?ziel=" ~ ziel.value %}{% include "_feld.html" %}{% endwith %}
   {% endfor %}
   {% if not felder %}<p class="leer">Für dieses Rezept musst du nichts ausfüllen.</p>{% endif %}
 

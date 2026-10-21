@@ -139,6 +139,9 @@
         onUpdate: aendern
       });
     }
+
+    // „Erneut öffnen“: vorbelegte Schritte sofort in der Vorschau zeigen
+    if (liste.querySelector("li.schritt")) { setTimeout(aendern, 0); }
   }
 
   document.addEventListener("DOMContentLoaded", function () { hervorheben(document); baukasten(); });

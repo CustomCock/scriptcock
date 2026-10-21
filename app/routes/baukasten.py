@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
 
+from app import bibliothek
 from app.auth import aktueller_benutzer
 from app.baukasten import (
     BaukastenFormular,
@@ -17,6 +18,7 @@ from app.baukasten import (
     rezept_aus_formular,
     rezept_speichern,
 )
+from app.bibliothek import Wiederherstellung, wiederherstellen
 from app.escaping import Ziel
 from app.generators.base import ZIEL_ANZEIGE
 from app.models.block import BlockDef, Risiko
@@ -69,13 +71,32 @@ def _schritte(reg: Registry, formular: BaukastenFormular) -> list[dict[str, Any]
 
 @router.get("/baukasten", name="baukasten", response_class=HTMLResponse)
 async def baukasten(
-    request: Request, ziel: str = "powershell", benutzer: Benutzer = Depends(aktueller_benutzer)
+    request: Request,
+    ziel: str = "powershell",
+    aus: int | None = None,
+    benutzer: Benutzer = Depends(aktueller_benutzer),
+    sitzung: Any = Depends(_sitzung),
 ) -> Response:
     reg = _registry(request)
     try:
         z = Ziel(ziel)
     except ValueError:
         z = Ziel.POWERSHELL
+    vorbelegung: Wiederherstellung | None = None
+    schritte: list[dict[str, Any]] = []
+    if aus is not None:
+        # „Erneut öffnen und anpassen“: aus der gespeicherten IR, nicht aus dem Script-Text
+        try:
+            vorbelegung = wiederherstellen(reg, bibliothek.hole(sitzung, aus, benutzer))
+        except bibliothek.KeinZugriffAufScript:
+            raise HTTPException(404, "Script nicht gefunden") from None
+        except FehlerSammlung as e:
+            raise HTTPException(422, e.fehler[0].meldung) from None
+        z = vorbelegung.ziel
+        schritte = [
+            _schritt_kontext(reg, reg.bloecke[block_id], z, neue_uid(), werte)
+            for block_id, werte in vorbelegung.schritte
+        ]
     kategorien: dict[str, list[BlockDef]] = {}
     for b in sorted(reg.bloecke.values(), key=lambda b: (b.kategorie, b.name)):
         kategorien.setdefault(b.kategorie, []).append(b)
@@ -87,6 +108,8 @@ async def baukasten(
         ziele=list(Ziel),
         ziel_kurz=ZIEL_KURZ,
         kategorien=kategorien,
+        vorbelegung=vorbelegung,
+        schritte=schritte,
     )
 
 
@@ -187,8 +210,7 @@ async def baukasten_erzeugen(
 async def als_rezept(
     request: Request, benutzer: Benutzer = Depends(aktueller_benutzer), sitzung: Any = Depends(_sitzung)
 ) -> Response:
-    if not benutzer.ist_admin:
-        raise HTTPException(403, "Nur Admins dürfen Rezepte speichern.")
+    # Admins speichern direkt, Nutzer reichen einen Vorschlag zur Freigabe ein.
     reg = _registry(request)
     daten = await request.form()
     try:
@@ -204,7 +226,7 @@ async def als_rezept(
             beschreibung=str(daten.get("rezept_beschreibung", "")),
             autor=benutzer.name,
         )
-        rezept_speichern(reg, sitzung, rezept, autor=benutzer.name, freigegeben=True)
+        rezept_speichern(reg, sitzung, rezept, autor=benutzer.name, freigegeben=benutzer.ist_admin)
     except FehlerSammlung as e:
         return _render(request, "_fehler.html", benutzer, fehler=e.fehler, ohne_oob=True)
     return _render(
@@ -214,6 +236,7 @@ async def als_rezept(
         rezept=rezept,
         ziele=reg.rezept_ziele(rezept),
         ziel=formular.ziel,
+        vorschlag=not benutzer.ist_admin,
     )
 
 

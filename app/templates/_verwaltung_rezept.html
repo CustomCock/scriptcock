@@ -1,0 +1,28 @@
+<article class="verwaltung-rezept" id="rezept-{{ v.e.id }}">
+  <h3>{{ v.e.name }} {% if v.e.freigegeben %}<span class="marke">freigegeben</span>{% else %}<span class="marke marke-leise">wartet auf Freigabe</span>{% endif %}</h3>
+  <p class="bib-meta">von {{ v.e.autor }} · {{ v.e.erstellt_am.strftime("%d.%m.%Y %H:%M") }} · ID <code>{{ v.e.rezept_id }}</code>
+    {% if v.rezept %}· Kategorie {{ v.rezept.kategorie }}{% endif %}
+    {% if v.ziele %}· für {% for z in v.ziele %}{{ ziel_anzeige[z] }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}</p>
+  {% if v.rezept %}<p>{{ v.rezept.beschreibung }}</p>{% endif %}
+  {% if v.schritte %}
+  <ol>
+    {% for s in v.schritte %}
+    <li>{% if s.block %}<span class="risiko risiko-{{ s.block.risiko.value }}">{{ s.block.risiko.value }}</span>{% endif %}
+      <strong>{{ s.name }}</strong>
+      {% if s.parameter %}<span class="schritt-text">{% for k, w in s.parameter.items() %}{{ k }} = {% if w is string and w.startswith("$") and not w.startswith("$$") %}<em>Formularfeld</em>{% else %}<code>{{ w }}</code>{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}</span>{% endif %}</li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+  {% if v.rezept and v.rezept.felder %}<p class="feldhilfe">Formularfelder: {% for f in v.rezept.felder %}{{ f.label }}{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+  {% if v.fehler %}<div class="fehlerbox"><h2>Kann so nicht freigegeben werden</h2><ul>{% for f in v.fehler %}<li>{{ f }}</li>{% endfor %}</ul></div>{% endif %}
+  <div class="aktionen">
+    {% if not v.e.freigegeben and not v.fehler %}
+    <button type="button" class="knopf-primaer" hx-post="{{ basis }}/verwaltung/rezepte/{{ v.e.id }}/freigeben" hx-target="#status-rezept-{{ v.e.id }}">Freigeben</button>
+    {% endif %}
+    {% if v.e.freigegeben %}<a class="knopf" href="{{ basis }}/rezepte/{{ v.e.rezept_id }}?ziel={{ v.ziele[0].value if v.ziele else 'powershell' }}">Ansehen</a>{% endif %}
+    <a class="knopf" href="{{ basis }}/verwaltung/rezepte/{{ v.e.id }}/yaml" download>YAML</a>
+    <button type="button" class="knopf knopf-gefahr" hx-post="{{ basis }}/verwaltung/rezepte/{{ v.e.id }}/loeschen"
+            hx-confirm="Rezept „{{ v.e.name }}“ wirklich löschen?">{% if v.e.freigegeben %}Löschen{% else %}Ablehnen{% endif %}</button>
+  </div>
+  <div id="status-rezept-{{ v.e.id }}" aria-live="polite"></div>
+</article>

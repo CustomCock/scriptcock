@@ -1,5 +1,28 @@
 # Changelog
 
+## Phase 3 – Bibliothek + Verwaltung
+
+- **Bibliothek** (`/bibliothek`): erzeugte Scripte mit Titel, Beschreibung und Tags in die
+  Bibliothek speichern (direkt nach dem Erzeugen oder auf der Detailseite). Suche über Titel,
+  Beschreibung und Tags, Filter nach Zielsystem und Tag, Reiter „Meine Scripte“ (auch private),
+  Seitenweise Anzeige. Sortierung nach „Hat funktioniert“-Stimmen.
+- **Detailseite** (`/skripte/<id>`): Eckdaten, SHA-256, Code, enthaltene Bausteine mit
+  Version beim Speichern vs. aktueller Version.
+- **„Hat funktioniert ✓“**: eine Stimme pro Benutzer und Script (umschaltbar), Zähler in der Liste.
+- **„Erneut öffnen und anpassen“**: lädt die gespeicherte IR (nicht den Script-Text) in den
+  freien Baukasten – mit Hinweisen, wenn Bausteine seitdem geändert (Version), entfernt oder
+  Parameter weggefallen sind.
+- **Rollen**: Nutzer erzeugen, speichern und schlagen Rezepte vor; Admins geben Vorschläge in
+  der **Verwaltung** (`/verwaltung`) frei, lehnen sie ab oder löschen DB-Rezepte (mit erneuter
+  Prüfung gegen die aktuellen Bausteine, YAML-Export). Rote Bausteine ohne Zusatzbestätigung
+  für Admins (seit Phase 1).
+- Sichtbarkeit: private Scripte nur für Ersteller und Admins; Bibliotheks-Scripte für alle
+  Angemeldeten; Ändern/Entfernen nur Ersteller und Admins.
+- Neue Tabelle `bewertungen` (wird beim Start automatisch angelegt).
+- **Fix:** Rezeptfelder heißen im Formular jetzt `f.<feld>`. Vorher kollidierte das Feld `ziel`
+  des Rezepts „Netzwerkproblem diagnostizieren“ mit dem Zielsystem – das Rezept ließ sich im
+  Browser nicht erzeugen.
+
 ## Phase 2 – Freier Baukasten (Listen-Modus)
 
 - Neue Seite „Freier Baukasten“ (`/baukasten`): durchsuchbare Bausteinliste nach Kategorien,

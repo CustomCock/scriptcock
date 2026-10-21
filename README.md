@@ -22,6 +22,10 @@ Die Anwendung **erzeugt** Scripte, sie führt sie **nicht** selbst aus.
 - **Freier Baukasten:** Bausteine per Drag & Drop (oder „+“) zu einer Schrittliste zusammenstellen,
   umsortieren, Werte ausfüllen; Live-Vorschau, Zielsystem jederzeit umschaltbar (nicht verfügbare
   Bausteine werden markiert, der Download gesperrt). Admins können die Liste als Rezept speichern.
+- **Bibliothek:** Scripte mit Titel, Beschreibung und Tags speichern, suchen, filtern,
+  „Hat funktioniert ✓“ markieren und **erneut öffnen und anpassen** (aus der gespeicherten
+  Zwischenrepräsentation – mit Hinweis, wenn sich Bausteine seitdem geändert haben).
+- **Verwaltung für Admins:** Rezept-Vorschläge von Nutzern freigeben oder ablehnen.
 - **24 Bausteine**, z. B. Systeminfo, Ping, Traceroute, Port prüfen, Netzlaufwerk, Drucker per IP,
   Dienste, Prozesse, Windows-Update-Reset, SetupDiag, Diagnosepaket, Software installieren.
 - **8 Rezepte**, z. B. „Drucker einrichten“, „Netzwerkproblem diagnostizieren“,
