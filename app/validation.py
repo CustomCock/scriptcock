@@ -16,9 +16,15 @@ from urllib.parse import urlsplit
 
 from app import __version__
 from app.escaping import UnsicherError, Ziel, pruefe_zeichen
-from app.ir import BlockSchritt, Optionen, ParamValue, ScriptIR, ScriptMeta
+from app.ir import BlockSchritt, Knoten, Optionen, ParamValue, ScriptIR, ScriptMeta, WennFehler, Wiederhole
 from app.models.block import ParameterDef, ParamTyp, Risiko
-from app.models.request import ScriptRequest
+from app.models.request import (
+    EingabeKnoten,
+    SchrittEingabe,
+    ScriptRequest,
+    WennFehlerEingabe,
+    WiederholeEingabe,
+)
 
 if TYPE_CHECKING:
     from app.registry import Registry
@@ -375,6 +381,90 @@ def _meta_text(roh: str, max_laenge: int, mehrzeilig: bool) -> str:
     return text
 
 
+MAX_BLOECKE = 100
+MAX_TIEFE = 4
+MAX_WIEDERHOLUNGEN = 50
+_ANZAHL = ParameterDef(
+    id="anzahl", label="Anzahl Wiederholungen", typ=ParamTyp.ZAHL, min=1, max=MAX_WIEDERHOLUNGEN
+)
+
+
+class _BaumPruefer:
+    """Prüft den Schritt-Baum rekursiv.
+
+    ``Feldfehler.schritt`` ist die Position des Knotens in Vorordnung (Pre-Order) über
+    *alle* Knoten. Bei flachen Listen entspricht das dem Listenindex.
+    """
+
+    def __init__(self, registry: Registry, ziel: Ziel, fehler: list[Feldfehler]) -> None:
+        self.registry = registry
+        self.ziel = ziel
+        self.fehler = fehler
+        self.position = 0
+        self.anzahl_bloecke = 0
+        self.hat_rot = False
+
+    def liste(self, eingaben: list[EingabeKnoten], tiefe: int) -> list[Knoten]:
+        ergebnis: list[Knoten] = []
+        for eingabe in eingaben:
+            knoten = self.knoten(eingabe, tiefe)
+            if knoten is not None:
+                ergebnis.append(knoten)
+        return ergebnis
+
+    def knoten(self, eingabe: EingabeKnoten, tiefe: int) -> Knoten | None:
+        i = self.position
+        self.position += 1
+        if isinstance(eingabe, SchrittEingabe):
+            return self.block(i, eingabe)
+        if tiefe >= MAX_TIEFE:
+            self.fehler.append(Feldfehler(i, None, f"Höchstens {MAX_TIEFE} Ebenen ineinander verschachteln."))
+        if isinstance(eingabe, WennFehlerEingabe):
+            if not eingabe.versuche:
+                self.fehler.append(Feldfehler(i, None, "„Versuche“ braucht mindestens einen Schritt."))
+            versuche = self.liste(eingabe.versuche, tiefe + 1)
+            sonst = self.liste(eingabe.sonst, tiefe + 1)
+            return WennFehler(versuche=versuche, sonst=sonst)
+        # WiederholeEingabe
+        anzahl = 1
+        try:
+            wert = validiere_wert(_ANZAHL, eingabe.anzahl).wert
+            anzahl = wert if isinstance(wert, int) else 1
+        except ValidierungsFehler as e:
+            self.fehler.append(Feldfehler(i, "anzahl", f"{_ANZAHL.label}: {e}"))
+        if not eingabe.rumpf:
+            self.fehler.append(Feldfehler(i, None, "„Wiederhole“ braucht mindestens einen Schritt."))
+        return Wiederhole(anzahl=anzahl, rumpf=self.liste(eingabe.rumpf, tiefe + 1))
+
+    def block(self, i: int, eingabe: SchrittEingabe) -> BlockSchritt | None:
+        self.anzahl_bloecke += 1
+        block = self.registry.bloecke.get(eingabe.block_id)
+        if block is None:
+            self.fehler.append(Feldfehler(i, None, f"Unbekannter Baustein „{eingabe.block_id}“."))
+            return None
+        if not block.verfuegbar(self.ziel):
+            self.fehler.append(
+                Feldfehler(i, None, f"„{block.name}“ ist für dieses Zielsystem nicht verfügbar.")
+            )
+        if block.risiko is Risiko.ROT:
+            self.hat_rot = True
+        for name in sorted(set(eingabe.parameter) - {p.id for p in block.parameter}):
+            self.fehler.append(Feldfehler(i, name, f"Unbekannter Parameter „{name}“."))
+        werte: dict[str, ParamValue] = {}
+        genutzt = self.registry.benutzte_parameter(block, self.ziel)
+        for p in block.parameter:
+            if p.id not in genutzt and eingabe.parameter.get(p.id) in (None, ""):
+                # Für dieses Zielsystem nicht verwendet – daher auch keine Pflicht.
+                continue
+            try:
+                wert = validiere_wert(p, eingabe.parameter.get(p.id))
+                pruefe_wert_fuer_ziel(wert, self.ziel)
+                werte[p.id] = wert
+            except ValidierungsFehler as e:
+                self.fehler.append(Feldfehler(i, p.id, f"{p.label}: {e}"))
+        return BlockSchritt(block_id=block.id, block_version=block.version, parameter=werte)
+
+
 def validiere_request(
     req: ScriptRequest,
     registry: Registry,
@@ -404,33 +494,11 @@ def validiere_request(
     if not req.schritte:
         fehler.append(Feldfehler(None, None, "Das Script enthält noch keinen Schritt."))
 
-    schritte: list[BlockSchritt] = []
-    hat_rot = False
-    for i, eingabe in enumerate(req.schritte):
-        block = registry.bloecke.get(eingabe.block_id)
-        if block is None:
-            fehler.append(Feldfehler(i, None, f"Unbekannter Baustein „{eingabe.block_id}“."))
-            continue
-        if not block.verfuegbar(req.ziel):
-            fehler.append(Feldfehler(i, None, f"„{block.name}“ ist für dieses Zielsystem nicht verfügbar."))
-        if block.risiko is Risiko.ROT:
-            hat_rot = True
-        unbekannt = set(eingabe.parameter) - {p.id for p in block.parameter}
-        for name in sorted(unbekannt):
-            fehler.append(Feldfehler(i, name, f"Unbekannter Parameter „{name}“."))
-        werte: dict[str, ParamValue] = {}
-        genutzt = registry.benutzte_parameter(block, req.ziel)
-        for p in block.parameter:
-            if p.id not in genutzt and eingabe.parameter.get(p.id) in (None, ""):
-                # Für dieses Zielsystem nicht verwendet – daher auch keine Pflicht.
-                continue
-            try:
-                wert = validiere_wert(p, eingabe.parameter.get(p.id))
-                pruefe_wert_fuer_ziel(wert, req.ziel)
-                werte[p.id] = wert
-            except ValidierungsFehler as e:
-                fehler.append(Feldfehler(i, p.id, f"{p.label}: {e}"))
-        schritte.append(BlockSchritt(block_id=block.id, block_version=block.version, parameter=werte))
+    pruefer = _BaumPruefer(registry, req.ziel, fehler)
+    schritte = pruefer.liste(req.schritte, tiefe=0)
+    hat_rot = pruefer.hat_rot
+    if pruefer.anzahl_bloecke > MAX_BLOECKE:
+        fehler.append(Feldfehler(None, None, f"Höchstens {MAX_BLOECKE} Bausteine pro Script."))
 
     if hat_rot and not req.rot_bestaetigt and not ist_admin and not req.dry_run:
         fehler.append(
@@ -461,8 +529,6 @@ def validiere_request(
 
 def ir_zu_request(ir: ScriptIR, ziel: Ziel) -> ScriptRequest:
     """Rückweg für „erneut öffnen“: IR → Request (wird danach neu validiert)."""
-    from app.models.request import SchrittEingabe
-
     return ScriptRequest(
         ziel=ziel,
         titel=ir.meta.titel,
@@ -470,11 +536,22 @@ def ir_zu_request(ir: ScriptIR, ziel: Ziel) -> ScriptRequest:
         dry_run=ir.optionen.dry_run,
         rot_bestaetigt=ir.optionen.rot_bestaetigt,
         quelle=ir.meta.quelle,
-        schritte=[
-            SchrittEingabe(
-                block_id=s.block_id,
-                parameter={k: v.wert for k, v in s.parameter.items() if v.wert is not None},
-            )
-            for s in ir.bloecke()
-        ],
+        schritte=[_knoten_zu_eingabe(k) for k in ir.schritte],
+    )
+
+
+def _knoten_zu_eingabe(k: Knoten) -> EingabeKnoten:
+    if isinstance(k, WennFehler):
+        return WennFehlerEingabe(
+            art="wenn_fehler",
+            versuche=[_knoten_zu_eingabe(x) for x in k.versuche],
+            sonst=[_knoten_zu_eingabe(x) for x in k.sonst],
+        )
+    if isinstance(k, Wiederhole):
+        return WiederholeEingabe(
+            art="wiederhole", anzahl=k.anzahl, rumpf=[_knoten_zu_eingabe(x) for x in k.rumpf]
+        )
+    return SchrittEingabe(
+        block_id=k.block_id,
+        parameter={n: v.wert for n, v in k.parameter.items() if v.wert is not None},
     )

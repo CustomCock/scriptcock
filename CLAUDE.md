@@ -31,7 +31,7 @@ UI-Formular / JSON ──► ScriptRequest ──► validation.py ──► Scr
 |---|---|
 | `app/escaping.py` | **Sicherheitskritisch.** Literal pro Zielsprache, `Escaped`-Markertyp, echo-/Kommentar-Escaping |
 | `app/validation.py` | Parametertypen (Whitelist) → `ParamValue`; ganzer Request → `ScriptIR` |
-| `app/ir.py` | Zielunabhängige IR. Schritte = Baum über Diskriminator `art` (Phase 4: Kontrollknoten) |
+| `app/ir.py` | Zielunabhängige IR. Schritte = Baum über Diskriminator `art`: `block`, `wenn_fehler`, `wiederhole` |
 | `app/codeenv.py` | Jinja-Umgebung für Code: `finalize` lässt **nur** `Escaped` durch |
 | `app/registry.py` | Lädt/prüft `blocks/**/*.yaml` und `recipes/*.yaml` beim Start, bricht bei Fehlern ab |
 | `app/generators/base.py` | Fester Script-Aufbau (Kopf → Präambel → Schritte → Abschluss), Dry-Run-Logik |
@@ -40,7 +40,8 @@ UI-Formular / JSON ──► ScriptRequest ──► validation.py ──► Scr
 | `app/baukasten.py` | Listen-Modus: Formular lesen, Rezept aus Schrittliste; DB-Rezepte vorschlagen/freigeben/laden/YAML |
 | `app/bibliothek.py` | Bibliothek: Rechte, Suche, Tags, Bewertungen, „Erneut öffnen“ aus der IR, Blockversionen |
 | `app/routes/pages.py`, `baukasten.py`, `bibliothek.py`, `verwaltung.py`, `api.py` | HTML-Seiten je Bereich, JSON-API |
-| `static/js/app.js` | Einziges eigenes JS (Highlighting, Zwischenablage, Baukasten: Sortable, Palette) |
+| `app/routes/blockly.py`, `static/js/blockly-modus.js` | Blockly-Modus: Katalog → Toolbox, Arbeitsfläche → JSON (kein Code!) |
+| `static/js/app.js` | Gemeinsames JS (Highlighting, Zwischenablage, Listen-Modus: Sortable, Palette) |
 | `app/auth.py` | OIDC (Keycloak), Rollen `nutzer`/`admin`, `AUTH_DISABLED` |
 
 ## Konventionen
@@ -70,6 +71,20 @@ Die Live-Vorschau (`/baukasten/vorschau`) speichert nichts; erst `/baukasten/erz
 
 Optionaler Browser-Test: `pip install playwright` (Chromium-Pfad ggf. per `CHROMIUM_PFAD`),
 sonst wird `tests/test_browser.py` übersprungen.
+
+## Ablauf-Bausteine (Kontrollknoten) – Hinweise für Änderungen
+
+- Neue Knotentypen: Klasse in `app/ir.py` + Eingabe in `app/models/request.py` (Tag im
+  `Discriminator`) + Zweig in `validation._BaumPruefer` + `emit_<art>` in `generators/base.py`
+  + sprachspezifische Methode in allen vier Generatoren + Blockly-Block in `blockly-modus.js`.
+- `Feldfehler.schritt` = Position des Knotens in **Vorordnung über alle Knoten** (bei flachen
+  Listen = Listenindex). Blockly baut dieselbe Reihenfolge in `serialisieren()` auf.
+- Generator-Zustand während `erzeuge()`: `_nr` (Schrittnummer), `_id` (Container-ID für
+  Labels/Variablen), `_versuche` (Stack offener „Versuche“), `mit_kontrolle`.
+- bash/zsh: Fehler-Handler beachtet `OKM_SCHUTZ` (Rückgabe einer Versuche-Subshell) und
+  `OKM_VERSUCH` (in der Subshell nur diese beenden). Roter Abbruch im Versuch = Exit 112.
+- CMD: niemals Schritte in `for`/`( … )`-Blöcke packen – nur Sprungmarken.
+- Flache Scripte müssen byte-gleich bleiben (Golden-Files).
 
 ## Rechte
 

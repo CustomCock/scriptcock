@@ -13,6 +13,8 @@ Die Anwendung **erzeugt** Scripte, sie führt sie **nicht** selbst aus.
 > 📷 *Screenshot Vorschau mit Download und SHA-256* – folgt
 >
 > 📷 *Screenshot freier Baukasten mit Drag & Drop* – folgt
+>
+> 📷 *Screenshot Blockly-Modus mit „Versuche“ und „Wiederhole“* – folgt
 
 ## Funktionen
 
@@ -22,6 +24,9 @@ Die Anwendung **erzeugt** Scripte, sie führt sie **nicht** selbst aus.
 - **Freier Baukasten:** Bausteine per Drag & Drop (oder „+“) zu einer Schrittliste zusammenstellen,
   umsortieren, Werte ausfüllen; Live-Vorschau, Zielsystem jederzeit umschaltbar (nicht verfügbare
   Bausteine werden markiert, der Download gesperrt). Admins können die Liste als Rezept speichern.
+- **Blockly-Modus:** Bausteine grafisch zusammenstecken, inklusive Ablauf-Bausteinen
+  „Versuche … wenn das fehlschlägt …“ und „Wiederhole N-mal“. Blockly erzeugt dabei nur eine
+  Schrittliste – Prüfung und Script-Erzeugung macht immer der Server.
 - **Bibliothek:** Scripte mit Titel, Beschreibung und Tags speichern, suchen, filtern,
   „Hat funktioniert ✓“ markieren und **erneut öffnen und anpassen** (aus der gespeicherten
   Zwischenrepräsentation – mit Hinweis, wenn sich Bausteine seitdem geändert haben).

@@ -1,5 +1,38 @@
 # Changelog
 
+## Phase 4 – Blockly-Modus + Ablauf-Bausteine
+
+- **IR-Erweiterung** ohne Umbau: neue Knotentypen `wenn_fehler` („Versuche … / Wenn das
+  fehlschlägt …“, leeres „sonst“ = Fehler übergehen) und `wiederhole` (1–50-mal) in der
+  diskriminierten Union `Knoten`; `ir_version` 2, gespeicherte v1-IRs bleiben lesbar.
+  Requests ohne `art` gelten weiter als Block (Rezept- und Listen-Modus unverändert).
+- **Validierung** rekursiv mit Grenzen (Tiefe ≤ 4, ≤ 100 Bausteine insgesamt, Anzahl 1–50);
+  Fehler tragen die Position des Knotens in Vorordnung (für Blockly).
+- **Generatoren** für alle vier Ziele:
+  - PowerShell: `try/catch`-Container, Schritte geben Fehler per `throw` weiter; `for`-Schleife.
+  - CMD: lineare Sprungmarken (`:okm_sonst_N`, `:okm_ende_N`, `:okm_schleife_N`) statt
+    `for`/Klammerblöcken, weil dort `%VAR%` nur einmal expandiert würde.
+  - bash/zsh: „Versuche“ in einer Subshell mit eigenem errexit; Schutz-Flag für den Fehler-Handler,
+    Zählerdatei für erfolgreiche Schritte, Exit-Code 112 reicht einen roten Abbruch nach außen
+    durch (keine Ausweichschritte, Script endet mit 2).
+  - Kopfkommentar zeigt die Struktur; Abschluss „Fertig, X Schritte erfolgreich ausgeführt.“
+  - Scripte **ohne** Ablauf-Bausteine bleiben byte-gleich (Golden-Files unverändert).
+- **Blockly-Modus** (`/blockly`, vendored Blockly 11.2.1 mit deutschen Texten): Toolbox wird
+  automatisch aus der Registry erzeugt (Kategorien = YAML-`kategorie`, Kategorie „Ablauf“),
+  Parameter erscheinen passend zum Zielsystem, nicht verfügbare Bausteine sind in der Toolbox
+  deaktiviert und auf der Fläche markiert. Blockly erzeugt **nur JSON** für `/api/v1/vorschau`
+  (neu, speichert nicht) und `/api/v1/skripte`; Fehler des Servers erscheinen am jeweiligen
+  Baustein. Entwurf wird im Browser zwischengespeichert, „Neu beginnen“ leert ihn.
+- Bibliothek: Blockly-Scripte öffnen sich wieder im Blockly-Modus (aus der IR, inkl. Hinweise
+  auf geänderte/entfernte Bausteine); der Listen-Modus lehnt Scripte mit Ablauf-Bausteinen ab.
+- CSP: nur auf `/blockly` zusätzlich `style-src 'unsafe-inline'` (Blockly setzt Inline-Styles);
+  Inline-Scripte bleiben überall verboten.
+- Fix (CSS): `[hidden]` wird nicht mehr von `display:flex` überschrieben.
+- Tests: IR/Validierung, Syntax aller Ziele (inkl. Simulation), CMD-Sprungmarken, Ausführung
+  in bash/zsh/pwsh (Ausweichschritte, Fehler übergehen, Verschachtelung, Fehler in Ausweichschritten,
+  roter Abbruch im Versuch, Schleifen), Golden-Files `_ablauf.*`, Blockly-Seite/API/Wiederöffnen,
+  Browser-Test mit echtem Drag & Drop.
+
 ## Phase 3 – Bibliothek + Verwaltung
 
 - **Bibliothek** (`/bibliothek`): erzeugte Scripte mit Titel, Beschreibung und Tags in die

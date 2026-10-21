@@ -18,6 +18,7 @@
   --mono: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { font-size: 17px; }
 body { margin: 0; font-family: var(--schrift); color: var(--text); background: var(--sand-hell); line-height: 1.5; }
 a { color: var(--rot-dunkel); }
@@ -228,3 +229,11 @@ input:focus, select:focus { border-color: var(--schwarz); }
   .tabelle { font-size: .82rem; }
   .bib-aktionen .knopf { width: 100%; text-align: center; }
 }
+
+/* --- Blockly-Modus ---------------------------------------------------------- */
+.bl-steuerung { margin-bottom: 1rem; }
+.bl-optionen { display: flex; flex-wrap: wrap; gap: 1rem 2rem; align-items: flex-end; }
+.bl-optionen .feld { margin-bottom: 0; }
+.bl-arbeitsflaeche { height: 65vh; min-height: 26rem; border: 2px solid var(--schwarz); border-radius: var(--radius); background: var(--weiss); }
+#bl-erzeugen:disabled { background: var(--rand); border-color: var(--rand); color: var(--text-leise); cursor: not-allowed; }
+@media (max-width: 40rem) { .bl-arbeitsflaeche { height: 70vh; } }

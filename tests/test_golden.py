@@ -50,8 +50,22 @@ def test_golden(rezept_id: str, ziel: Ziel) -> None:
     )
 
 
+@pytest.mark.parametrize("ziel", list(Ziel), ids=[z.value for z in Ziel])
+def test_golden_ablauf(ziel: Ziel) -> None:
+    """Snapshot eines Scripts mit Kontrollknoten („Versuche“, „Wiederhole“)."""
+    from tests.test_kontrolle import beispiel_baum, ir_aus
+
+    datei = GOLDEN / f"_ablauf{_endung(ziel)}"
+    inhalt = (
+        generator_fuer(ziel, REG).erzeuge(ir_aus(REG, ziel, beispiel_baum(ziel), rot_bestaetigt=True)).inhalt
+    )
+    if os.environ.get("UPDATE_GOLDEN") == "1" or not datei.exists():
+        datei.write_bytes(inhalt)
+    assert inhalt == datei.read_bytes(), f"{datei.name} weicht ab (UPDATE_GOLDEN=1 zum Neuerzeugen)"
+
+
 def test_keine_verwaisten_golden_dateien() -> None:
-    erwartet = {f"{r}{_endung(z)}" for r, z in FAELLE}
+    erwartet = {f"{r}{_endung(z)}" for r, z in FAELLE} | {f"_ablauf{_endung(z)}" for z in Ziel}
     vorhanden = {p.name for p in GOLDEN.iterdir() if p.is_file()}
     assert vorhanden <= erwartet, f"Verwaiste Golden-Dateien: {sorted(vorhanden - erwartet)}"
 

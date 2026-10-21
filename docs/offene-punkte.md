@@ -51,6 +51,16 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 - Es gibt keine Datenbank-Migrationen (Alembic). Neue Tabellen legt die App selbst an; neue
   Spalten in bestehenden Tabellen bräuchten künftig eine Migration.
 
+## Blockly & Ablauf-Bausteine
+
+- Leere Textfelder sind in Blockly sehr schmal (Blockly kennt keine Platzhalter in Feldern).
+- Der Blockly-Entwurf liegt nur im `localStorage` des Browsers (pro Gerät, kein Server-Entwurf).
+- „Hat funktioniert“-Zählung, Fortschritt `[n/m]`: `m` ist die Zahl der Bausteine im Text;
+  in Schleifen wird derselbe Schritt mehrfach mit gleicher Nummer ausgegeben.
+- CMD: Innerhalb von „Versuche“ wird ein roter Abbruch wie überall über `:okm_abbruch` beendet;
+  die Ausgabe eines fehlgeschlagenen Schritts erscheint (wie generell in CMD) erst nach dem Schritt.
+- Ablauf-Bausteine gibt es nur im Blockly-Modus (nicht im Listen-Modus und nicht in Rezepten).
+
 ## Phasen
 
-- Phase 4 (Blockly) ist noch nicht umgesetzt (siehe `CHANGELOG.md`).
+- Phase 5 (LLM-Integration) ist laut Auftrag nur vorzubereiten: `docs/llm-integration.md` fehlt noch.

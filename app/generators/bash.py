@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import ClassVar
 
 from app.escaping import Ziel, sh_literal
-from app.generators.base import Generator, SchrittInfo
+from app.generators.base import Generator, SchrittInfo, einruecken
 from app.ir import ScriptIR
 from app.models.block import BlockDef
 
@@ -28,6 +28,11 @@ class ShGenerator(Generator):
     endung: ClassVar[str] = ".sh"
     shebang: ClassVar[str]
     sudo_hinweis: ClassVar[str]
+    errexit_aus: ClassVar[str]
+    errexit_an: ClassVar[str]
+    # Exit-Code, mit dem eine rote Abfrage einen „Versuche“-Block (Subshell) verlässt;
+    # er wird nach außen weitergereicht und darf keine Ausweichschritte auslösen.
+    ABBRUCH_CODE: ClassVar[int] = 112
 
     def ist_kommentar(self, zeile: str) -> bool:
         return zeile.lstrip().startswith("#")
@@ -46,9 +51,23 @@ class ShGenerator(Generator):
             *self.fehlerbehandlung(),
             "",
             'OKM_LOG="/tmp/okm-script-$(date +%Y%m%d-%H%M%S).log"',
-            f"OKM_GESAMT={gesamt}",
+            *([] if self.mit_kontrolle else [f"OKM_GESAMT={gesamt}"]),
             "OKM_OK=0",
             "OKM_SCHRITT='-'",
+        ]
+        if self.mit_kontrolle:
+            zeilen += [
+                "# Für „Versuche“-Blöcke (Subshells): Schutz-Flag, Tiefe, Zählerdatei",
+                "OKM_SCHUTZ=0",
+                "OKM_VERSUCH=0",
+                'OKM_ZAEHLER="$(mktemp)"',
+                "printf '0' > \"$OKM_ZAEHLER\"",
+                "okm_geschafft() {",
+                "  OKM_OK=$((OKM_OK + 1))",
+                '  printf \'%s\' "$OKM_OK" > "$OKM_ZAEHLER"',
+                "}",
+            ]
+        zeilen += [
             'exec > >(tee -a "$OKM_LOG") 2>&1',
             "",
             *self.fehler_handler(),
@@ -72,12 +91,33 @@ class ShGenerator(Generator):
     def fehler_handler(self) -> list[str]:
         raise NotImplementedError
 
-    @staticmethod
-    def _fehler_ausgabe() -> list[str]:
+    def _fehler_pruefungen(self) -> list[str]:
+        """Am Anfang des Fehler-Handlers: Sonderfälle der „Versuche“-Blöcke."""
+        if not self.mit_kontrolle:
+            return []
+        return [
+            "  # Rückgabewert eines „Versuche“-Blocks wertet das Script selbst aus",
+            '  if [ "$OKM_SCHUTZ" = 1 ]; then return 0; fi',
+            '  if [ "$OKM_VERSUCH" -gt 0 ]; then',
+            '    printf \'\\nSchritt %s ist fehlgeschlagen (Exit-Code %s).\\n\' "$OKM_SCHRITT" "$okm_rc"',
+            '    exit "$okm_rc"',
+            "  fi",
+        ]
+
+    def _fehler_ausgabe(self) -> list[str]:
+        """Abbruch des ganzen Scripts mit Zusammenfassung."""
+        if not self.mit_kontrolle:
+            return [
+                '  printf \'\\nFEHLER in Schritt %s (Exit-Code %s).\\n\' "$OKM_SCHRITT" "$okm_rc"',
+                '  printf \'Erfolgreich bis dahin: %s von %s Schritten.\\n\' "$OKM_OK" "$OKM_GESAMT"',
+                "  printf 'Protokoll: %s\\n' \"$OKM_LOG\"",
+                '  exit "$okm_rc"',
+            ]
         return [
             '  printf \'\\nFEHLER in Schritt %s (Exit-Code %s).\\n\' "$OKM_SCHRITT" "$okm_rc"',
-            '  printf \'Erfolgreich bis dahin: %s von %s Schritten.\\n\' "$OKM_OK" "$OKM_GESAMT"',
+            "  printf 'Erfolgreich bis dahin: %s Schritte.\\n' \"$OKM_OK\"",
             "  printf 'Protokoll: %s\\n' \"$OKM_LOG\"",
+            '  rm -f "$OKM_ZAEHLER"',
             '  exit "$okm_rc"',
         ]
 
@@ -97,17 +137,71 @@ class ShGenerator(Generator):
                 self.lies_antwort("Zum Fortfahren JA eingeben (alles andere bricht ab): "),
                 'if [ "$okm_antwort" != "JA" ]; then',
                 f"  {_ausgabe('Abgebrochen. Es wurde nichts weiter ausgeführt.')}",
-                "  printf 'Protokoll: %s\\n' \"$OKM_LOG\"",
-                "  exit 2",
+                *(
+                    [f"  exit {self.ABBRUCH_CODE}"]
+                    if self.im_versuch
+                    else ["  printf 'Protokoll: %s\\n' \"$OKM_LOG\"", "  exit 2"]
+                ),
                 "fi",
             ]
         zeilen += info.koerper
         if info.pruefung:
             zeilen += ["# Prüfung", *info.pruefung]
-        zeilen += ["OKM_OK=$((OKM_OK + 1))", ""]
+        zeilen += ["okm_geschafft" if self.mit_kontrolle else "OKM_OK=$((OKM_OK + 1))", ""]
         return zeilen
 
+    def wenn_fehler(self, nr: int, versuch: list[str], sonst: list[str]) -> list[str]:
+        rc = f"okm_rc_{nr}"
+        weiterreichen = (
+            [f"  exit {self.ABBRUCH_CODE}"]
+            if self.im_versuch
+            else ["  printf 'Protokoll: %s\\n' \"$OKM_LOG\"", '  rm -f "$OKM_ZAEHLER"', "  exit 2"]
+        )
+        return [
+            f"# ===== Versuche (Block {nr}) =====",
+            "# Läuft in einer Subshell mit eigenem Fehlerabbruch; ein Fehler darin beendet",
+            "# nur die Subshell, danach folgen die Ausweichschritte.",
+            "OKM_SCHUTZ=1",
+            self.errexit_aus,
+            "(",
+            "  OKM_SCHUTZ=0",
+            "  OKM_VERSUCH=$((OKM_VERSUCH + 1))",
+            f"  {self.errexit_an}",
+            *einruecken(versuch, 2),
+            ")",
+            f"{rc}=$?",
+            self.errexit_an,
+            "OKM_SCHUTZ=0",
+            'OKM_OK="$(cat "$OKM_ZAEHLER")"',
+            f'if [ "${rc}" -eq {self.ABBRUCH_CODE} ]; then',
+            *weiterreichen,
+            "fi",
+            f'if [ "${rc}" -ne 0 ]; then',
+            f"  {_ausgabe(self.meldung_ausweichen(bool(sonst)))}",
+            *einruecken(sonst, 2),
+            "fi",
+            f"# ===== Ende Versuche (Block {nr}) =====",
+            "",
+        ]
+
+    def wiederhole(self, nr: int, anzahl: int, rumpf: list[str]) -> list[str]:
+        var = f"okm_durchlauf_{nr}"
+        return [
+            f"# ===== Wiederhole {anzahl}-mal (Block {nr}) =====",
+            f"for (({var} = 1; {var} <= {anzahl}; {var}++)); do",
+            f"  printf '%s\\n' \"--- Durchlauf ${var} von {anzahl} ---\"",
+            *einruecken(rumpf, 2),
+            "done",
+            "",
+        ]
+
     def abschluss(self, ir: ScriptIR) -> list[str]:
+        if self.mit_kontrolle:
+            return [
+                "printf '\\nFertig, %s Schritte erfolgreich ausgeführt.\\n' \"$OKM_OK\"",
+                "printf 'Protokoll: %s\\n' \"$OKM_LOG\"",
+                'rm -f "$OKM_ZAEHLER"',
+            ]
         return [
             'printf \'\\nFertig, %s von %s Schritten erfolgreich.\\n\' "$OKM_OK" "$OKM_GESAMT"',
             "printf 'Protokoll: %s\\n' \"$OKM_LOG\"",
@@ -118,6 +212,8 @@ class BashGenerator(ShGenerator):
     ziel: ClassVar[Ziel] = Ziel.BASH
     shebang: ClassVar[str] = "#!/usr/bin/env bash"
     sudo_hinweis: ClassVar[str] = "Bitte so starten: sudo bash ./script.sh"
+    errexit_aus: ClassVar[str] = "set +e"
+    errexit_an: ClassVar[str] = "set -e"
 
     def fehlerbehandlung(self) -> list[str]:
         return ["set -Eeuo pipefail"]
@@ -126,6 +222,7 @@ class BashGenerator(ShGenerator):
         return [
             "okm_fehler() {",
             "  local okm_rc=$?",
+            *self._fehler_pruefungen(),
             "  trap - ERR",
             *self._fehler_ausgabe(),
             "}",
@@ -140,6 +237,8 @@ class ZshGenerator(ShGenerator):
     ziel: ClassVar[Ziel] = Ziel.ZSH
     shebang: ClassVar[str] = "#!/bin/zsh"
     sudo_hinweis: ClassVar[str] = "Bitte so starten: sudo zsh ./script.sh"
+    errexit_aus: ClassVar[str] = "unsetopt ERR_EXIT"
+    errexit_an: ClassVar[str] = "setopt ERR_EXIT"
 
     def fehlerbehandlung(self) -> list[str]:
         return ["setopt ERR_EXIT NO_UNSET PIPE_FAIL"]
@@ -148,6 +247,7 @@ class ZshGenerator(ShGenerator):
         return [
             "TRAPZERR() {",
             "  local okm_rc=$?",
+            *self._fehler_pruefungen(),
             *self._fehler_ausgabe(),
             "}",
         ]

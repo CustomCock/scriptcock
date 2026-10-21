@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 from pydantic import ValidationError
 from sqlalchemy import delete, func, or_, select
@@ -12,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.db import Bewertung, GespeichertesScript
 from app.escaping import UnsicherError, Ziel, pruefe_zeichen
-from app.ir import ScriptIR
+from app.ir import Knoten, ScriptIR, WennFehler, Wiederhole
 from app.registry import Registry
 from app.service import Benutzer
 from app.validation import FehlerSammlung, Feldfehler, ValidierungsFehler
@@ -234,6 +235,14 @@ def wiederherstellen(registry: Registry, eintrag: GespeichertesScript) -> Wieder
         raise FehlerSammlung(
             [Feldfehler(None, None, "Dieses Script wurde mit einer nicht mehr lesbaren Version gespeichert.")]
         ) from None
+    if ir.hat_kontrolle():
+        raise FehlerSammlung(
+            [
+                Feldfehler(
+                    None, None, "Dieses Script enthält Ablauf-Bausteine – bitte im Blockly-Modus öffnen."
+                )
+            ]
+        )
     hinweise: list[str] = []
     schritte: list[tuple[str, dict[str, str]]] = []
     for nr, s in enumerate(ir.bloecke(), start=1):
@@ -285,3 +294,42 @@ def blockversionen(registry: Registry, eintrag: GespeichertesScript) -> list[dic
             }
         )
     return ergebnis
+
+
+def baum_wiederherstellen(
+    registry: Registry, eintrag: GespeichertesScript
+) -> tuple[ScriptIR, list[Any], list[str]]:
+    """Für den Blockly-Modus: Schritt-Baum mit Werten als Text, plus Hinweise auf Änderungen."""
+    try:
+        ir = ScriptIR.model_validate_json(eintrag.ir_json)
+    except ValidationError:
+        raise FehlerSammlung(
+            [Feldfehler(None, None, "Dieses Script wurde mit einer nicht mehr lesbaren Version gespeichert.")]
+        ) from None
+    hinweise: list[str] = []
+
+    def knoten(k: Knoten) -> dict[str, Any] | None:
+        if isinstance(k, WennFehler):
+            return {"art": "wenn_fehler", "versuche": liste(k.versuche), "sonst": liste(k.sonst)}
+        if isinstance(k, Wiederhole):
+            return {"art": "wiederhole", "anzahl": k.anzahl, "rumpf": liste(k.rumpf)}
+        block = registry.bloecke.get(k.block_id)
+        if block is None:
+            hinweise.append(f"Den Baustein „{k.block_id}“ gibt es nicht mehr – er wurde weggelassen.")
+            return None
+        if block.version != k.block_version:
+            hinweise.append(
+                f"„{block.name}“ wurde seit dem Speichern geändert (Version {k.block_version} → "
+                f"{block.version}). Bitte Werte und Vorschau prüfen."
+            )
+        werte = {
+            pid: text
+            for pid, pv in k.parameter.items()
+            if block.param(pid) is not None and (text := _als_text(pv.wert)) is not None
+        }
+        return {"art": "block", "block_id": block.id, "parameter": werte}
+
+    def liste(ks: list[Knoten]) -> list[Any]:
+        return [x for x in (knoten(k) for k in ks) if x is not None]
+
+    return ir, liste(ir.schritte), hinweise

@@ -16,7 +16,7 @@
     </p>
     <div class="bib-aktionen">
       <a class="knopf" href="{{ basis }}/skripte/{{ e.id }}/download" download>⬇ Herunterladen</a>
-      <a class="knopf" href="{{ basis }}/baukasten?aus={{ e.id }}">Erneut öffnen und anpassen</a>
+      <a class="knopf" href="{{ basis }}/{{ 'blockly' if e.quelle == 'blockly' else 'baukasten' }}?aus={{ e.id }}">Erneut öffnen und anpassen</a>
       <a class="knopf" href="{{ basis }}/skripte/{{ e.id }}">Details</a>
     </div>
   </li>

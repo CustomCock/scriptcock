@@ -67,11 +67,17 @@ class CmdGenerator(Generator):
             ]
         return zeilen
 
+    @property
+    def _fehlerziel(self) -> str:
+        """Sprungziel bei einem Fehler: Ausweichschritte des innersten „Versuche“-Blocks oder Abbruch."""
+        return f":okm_sonst_{self._versuche[-1]}" if self.im_versuch else ":okm_fehler"
+
     def _gruppe(self, zeilen: list[str], interaktiv: bool) -> list[str]:
+        ziel = self._fehlerziel
         if interaktiv:
             # "if errorlevel 1" heißt ">= 1"; negative Codes (z. B. winget-HRESULTs)
             # fängt erst "if not errorlevel 0" ab.
-            return [*zeilen, "if errorlevel 1 goto :okm_fehler", "if not errorlevel 0 goto :okm_fehler"]
+            return [*zeilen, f"if errorlevel 1 goto {ziel}", f"if not errorlevel 0 goto {ziel}"]
         return [
             "(",
             *zeilen,
@@ -80,7 +86,7 @@ class CmdGenerator(Generator):
             'else (set "OKM_RC=0")',
             f"type {TMP}",
             f"type {TMP} >>{LOG}",
-            'if "%OKM_RC%"=="1" goto :okm_fehler',
+            f'if "%OKM_RC%"=="1" goto {ziel}',
         ]
 
     def schritt(self, info: SchrittInfo) -> list[str]:
@@ -110,7 +116,43 @@ class CmdGenerator(Generator):
         zeilen += ["set /a OKM_OK+=1 >nul", ""]
         return zeilen
 
+    def wenn_fehler(self, nr: int, versuch: list[str], sonst: list[str]) -> list[str]:
+        # Kein "for"/"( … )"-Block: dort würden %VARIABLEN% nur einmal expandiert und
+        # goto bräche den Block ab. Stattdessen lineare Sprungmarken.
+        meldung = "echo(Schritt %OKM_SCHRITT% ist fehlgeschlagen. " + (
+            "Es geht mit den Ausweichschritten weiter."
+            if sonst
+            else "Der Fehler wird wie vorgesehen übergangen."
+        )
+        return [
+            f"rem ===== Versuche (Block {nr}) =====",
+            *versuch,
+            f"goto :okm_ende_{nr}",
+            f":okm_sonst_{nr}",
+            meldung,
+            f">>{LOG} {meldung}",
+            *sonst,
+            f":okm_ende_{nr}",
+            f"rem ===== Ende Versuche (Block {nr}) =====",
+            "",
+        ]
+
+    def wiederhole(self, nr: int, anzahl: int, rumpf: list[str]) -> list[str]:
+        var = f"OKM_DURCHLAUF_{nr}"
+        return [
+            f"rem ===== Wiederhole {anzahl}-mal (Block {nr}) =====",
+            f'set "{var}=0"',
+            f":okm_schleife_{nr}",
+            f"set /a {var}+=1 >nul",
+            f"echo(--- Durchlauf %{var}% von {anzahl} ---",
+            f">>{LOG} echo(--- Durchlauf %{var}% von {anzahl} ---",
+            *rumpf,
+            f"if %{var}% LSS {anzahl} goto :okm_schleife_{nr}",
+            "",
+        ]
+
     def abschluss(self, ir: ScriptIR) -> list[str]:
+        schluss = self.schluss_text().format(ok="%OKM_OK%", gesamt="%OKM_GESAMT%")
         ende = [
             f"del {TMP} >nul 2>&1",
             "if not defined OKM_KEINE_PAUSE pause",
@@ -118,8 +160,8 @@ class CmdGenerator(Generator):
         ]
         return [
             "echo(",
-            "echo(Fertig, %OKM_OK% von %OKM_GESAMT% Schritten erfolgreich.",
-            f">>{LOG} echo(Fertig, %OKM_OK% von %OKM_GESAMT% Schritten erfolgreich.",
+            f"echo({schluss}",
+            f">>{LOG} echo({schluss}",
             f"echo(Protokoll: {LOG}",
             *ende,
             "exit /b 0",

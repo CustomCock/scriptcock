@@ -11,7 +11,7 @@ from app.auth import aktueller_benutzer
 from app.escaping import Ziel
 from app.models.request import ScriptRequest
 from app.registry import Registry
-from app.service import Benutzer, benutzte_parameter, erzeuge
+from app.service import Benutzer, benutzte_parameter, erzeuge, generiere
 from app.validation import FehlerSammlung
 
 router = APIRouter()
@@ -46,6 +46,28 @@ async def bloecke(request: Request, benutzer: Benutzer = Depends(aktueller_benut
     }
 
 
+def _fehler_json(e: FehlerSammlung) -> JSONResponse:
+    return JSONResponse(
+        {"fehler": [{"schritt": f.schritt, "feld": f.feld, "meldung": f.meldung} for f in e.fehler]},
+        status_code=422,
+    )
+
+
+@router.post("/vorschau")
+async def vorschau(
+    request: Request, req: ScriptRequest, benutzer: Benutzer = Depends(aktueller_benutzer)
+) -> JSONResponse:
+    """Live-Vorschau (Blockly-Modus): wird nicht gespeichert, rote Bestätigung noch nicht nötig."""
+    reg: Registry = request.app.state.registry
+    try:
+        _, script = generiere(reg, req.model_copy(update={"rot_bestaetigt": True}), benutzer)
+    except FehlerSammlung as e:
+        return _fehler_json(e)
+    return JSONResponse(
+        {"text": script.text.replace("\r\n", "\n"), "sha256": script.sha256, "dateiname": script.dateiname}
+    )
+
+
 @router.post("/skripte")
 async def skript_erzeugen(
     request: Request,
@@ -57,10 +79,7 @@ async def skript_erzeugen(
     try:
         ergebnis = erzeuge(reg, req, benutzer, sitzung)
     except FehlerSammlung as e:
-        return JSONResponse(
-            {"fehler": [{"schritt": f.schritt, "feld": f.feld, "meldung": f.meldung} for f in e.fehler]},
-            status_code=422,
-        )
+        return _fehler_json(e)
     return JSONResponse(
         {
             "id": ergebnis.gespeichert.id,

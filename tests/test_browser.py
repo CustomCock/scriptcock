@@ -104,3 +104,72 @@ def test_baukasten_im_browser(server: str, browser) -> None:
     seite.locator("#bk-ergebnis a.knopf-primaer").wait_for(timeout=5000)
     assert seite.get_attribute("#bk-ergebnis a.knopf-primaer", "href").endswith("/download")
     assert js_fehler == []
+
+
+def test_blockly_im_browser(server: str, browser) -> None:
+    """Drag & Drop aus der Toolbox, Fehler am Baustein, Wiederöffnen mit Ablauf-Bausteinen."""
+    import json
+    import urllib.request
+
+    seite = browser.new_page(viewport={"width": 1280, "height": 1100})
+    js_fehler: list[str] = []
+    seite.on("pageerror", lambda e: js_fehler.append(str(e)))
+    seite.goto(f"{server}/blockly?ziel=bash")
+    seite.locator(".blocklyDraggable", has_text="Script").first.wait_for()
+
+    def ziehen(quelle, x: float, y: float) -> None:
+        box = quelle.bounding_box()
+        seite.mouse.move(box["x"] + 12, box["y"] + 8)
+        seite.mouse.down()
+        seite.mouse.move(box["x"] + 60, box["y"] + 40, steps=5)
+        seite.mouse.move(x, y, steps=15)
+        seite.mouse.up()
+
+    start = seite.locator(".blocklyDraggable", has_text="Script").first.bounding_box()
+    seite.click(".blocklyToolboxCategory:has-text('Allgemein'), .blocklyTreeRow:has-text('Allgemein')")
+    ziehen(
+        seite.locator(".blocklyFlyout .blocklyDraggable", has_text="Meldung").first,
+        start["x"] + 30,
+        start["y"] + start["height"] - 5,
+    )
+    # Leeres Pflichtfeld → Fehler vom Server, Download gesperrt
+    seite.locator("#bl-fehler", has_text="Text der Meldung").wait_for(timeout=5000)
+    assert seite.is_disabled("#bl-erzeugen")
+    assert seite.locator(".blocklyIconGroup").count() >= 1  # Warnsymbol am Baustein
+
+    # Wiederöffnen eines gespeicherten Scripts mit Ablauf-Bausteinen
+    kontext = seite.context
+    cookies = "; ".join(f"{c['name']}={c['value']}" for c in kontext.cookies())
+    anfrage = urllib.request.Request(
+        f"{server}/api/v1/skripte",
+        data=json.dumps(
+            {
+                "ziel": "bash",
+                "titel": "Aus Blockly",
+                "quelle": "blockly",
+                "schritte": [
+                    {
+                        "art": "wiederhole",
+                        "anzahl": 2,
+                        "rumpf": [
+                            {
+                                "art": "block",
+                                "block_id": "meldung",
+                                "parameter": {"text": "Hallo", "pause": "false"},
+                            }
+                        ],
+                    }
+                ],
+            }
+        ).encode(),
+        headers={"Content-Type": "application/json", "X-Okm-Request": "1", "Cookie": cookies},
+    )
+    sid = json.loads(urllib.request.urlopen(anfrage).read())["id"]
+    seite.goto(f"{server}/blockly?aus={sid}")
+    seite.locator("#bl-code", has_text="Durchlauf").wait_for(timeout=5000)
+    assert "printf '%s\\n' 'Hallo'" in seite.inner_text("#bl-code")
+    assert not seite.is_disabled("#bl-erzeugen")
+    seite.click("#bl-erzeugen")
+    seite.locator("#bl-ergebnis a.knopf-primaer").wait_for(timeout=5000)
+    assert seite.get_attribute("#bl-ergebnis a.knopf-primaer", "href").endswith("/download")
+    assert js_fehler == []

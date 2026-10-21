@@ -33,7 +33,7 @@ class PowerShellGenerator(Generator):
         zeilen = [
             "$ErrorActionPreference = 'Stop'",
             "$OkmLog = Join-Path $env:TEMP ('okm-script-{0}.log' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))",
-            f"$OkmGesamt = {gesamt}",
+            *([] if self.mit_kontrolle else [f"$OkmGesamt = {gesamt}"]),
             "$OkmErfolgreich = 0",
             "try { Start-Transcript -Path $OkmLog -Append | Out-Null } "
             "catch { Write-Warning 'Protokoll konnte nicht gestartet werden.' }",
@@ -108,18 +108,50 @@ class PowerShellGenerator(Generator):
             "    $OkmErfolgreich++",
             "} catch {",
             f"    Write-Host ({_lit(fehlertext)} + $_.Exception.Message) -ForegroundColor Red",
-            "    Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' von ' + $OkmGesamt + "
-            "' Schritten.')",
-            "    Exit-OkmScript 1",
+        ]
+        if self.im_versuch:
+            # Fehler an den umgebenden „Versuche“-Block weitergeben
+            zeilen += ["    throw"]
+        elif self.mit_kontrolle:
+            zeilen += [
+                "    Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' Schritte.')",
+                "    Exit-OkmScript 1",
+            ]
+        else:
+            zeilen += [
+                "    Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' von ' + $OkmGesamt + "
+                "' Schritten.')",
+                "    Exit-OkmScript 1",
+            ]
+        return [*zeilen, "}", ""]
+
+    def wenn_fehler(self, nr: int, versuch: list[str], sonst: list[str]) -> list[str]:
+        return [
+            f"# ===== Versuche (Block {nr}) =====",
+            "try {",
+            *einruecken(versuch, 4),
+            "} catch {",
+            f"    Write-Host {_lit(self.meldung_ausweichen(bool(sonst)))} -ForegroundColor Yellow",
+            *einruecken(sonst, 4),
+            "}",
+            f"# ===== Ende Versuche (Block {nr}) =====",
+            "",
+        ]
+
+    def wiederhole(self, nr: int, anzahl: int, rumpf: list[str]) -> list[str]:
+        var = f"$OkmDurchlauf{nr}"
+        return [
+            f"# ===== Wiederhole {anzahl}-mal (Block {nr}) =====",
+            f"for ({var} = 1; {var} -le {anzahl}; {var}++) {{",
+            f"    Write-Host ('--- Durchlauf ' + {var} + ' von {anzahl} ---') -ForegroundColor Cyan",
+            *einruecken(rumpf, 4),
             "}",
             "",
         ]
-        return zeilen
 
     def abschluss(self, ir: ScriptIR) -> list[str]:
-        return [
-            "Write-Host ''",
-            "Write-Host ('Fertig, ' + $OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten erfolgreich.') "
-            "-ForegroundColor Green",
-            "Exit-OkmScript 0",
-        ]
+        if self.mit_kontrolle:
+            schluss = "('Fertig, ' + $OkmErfolgreich + ' Schritte erfolgreich ausgeführt.')"
+        else:
+            schluss = "('Fertig, ' + $OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten erfolgreich.')"
+        return ["Write-Host ''", f"Write-Host {schluss} -ForegroundColor Green", "Exit-OkmScript 0"]

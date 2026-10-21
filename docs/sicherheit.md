@@ -97,7 +97,15 @@ erneut durch dieselbe Validierung.
 - Downloads nur für den Ersteller (bzw. Admins / freigegebene Bibliotheks-Scripte).
 - Keine CDNs: alle Bibliotheken liegen unter `static/vendor/`.
 
-## 7. Tests
+## 7. Blockly-Modus
+
+Blockly erzeugt **keinen** Code. Die Arbeitsfläche wird nur in die Schrittliste (JSON) übersetzt,
+die das Backend genauso validiert, escaped und generiert wie in den anderen Modi. Die einzige
+Ausnahme von der strengen CSP: Auf `/blockly` ist `style-src 'unsafe-inline'` erlaubt, weil
+Blockly seine SVG-Darstellung mit Inline-Styles aufbaut. `script-src` bleibt `'self'`; die
+Seitendaten liegen in einem `<script type="application/json">`-Block (wird nicht ausgeführt).
+
+## 8. Tests
 
 - `tests/test_escaping.py`: Injection-Payloads (`test"; Remove-Item C:\ -Recurse; "`,
   `$(rm -rf ~)`, `` `whoami` ``, `a & del /q *`, `%PATH%`, `'; drop`, Unicode-Quotes, …).

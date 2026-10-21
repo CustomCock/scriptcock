@@ -20,13 +20,18 @@ from app.baukasten import lade_db_rezepte
 from app.config import Einstellungen, einstellungen
 from app.db import Datenbank
 from app.registry import Registry, lade_registry
-from app.routes import api, baukasten, bibliothek, pages, verwaltung
+from app.routes import api, baukasten, bibliothek, blockly, pages, verwaltung
 
 PROJEKT = Path(__file__).resolve().parent.parent
 log = logging.getLogger("baukasten")
 
 UNSICHERE_METHODEN = {"POST", "PUT", "PATCH", "DELETE"}
 
+# Blockly setzt Inline-Styles (SVG) – nur auf der Blockly-Seite erlaubt. Scripte bleiben 'self'.
+CSP_BLOCKLY = (
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+    "connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+)
 CSP = (
     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
     "connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
@@ -71,7 +76,8 @@ def create_app(
             if request.headers.get("HX-Request") != "true" and request.headers.get("X-Okm-Request") != "1":
                 return JSONResponse({"fehler": "Ungültige Anfrage (CSRF-Schutz)."}, status_code=403)
         antwort = await call_next(request)
-        antwort.headers.setdefault("Content-Security-Policy", CSP)
+        ist_blockly = request.url.path.rstrip("/") == einst.root_path + "/blockly"
+        antwort.headers.setdefault("Content-Security-Policy", CSP_BLOCKLY if ist_blockly else CSP)
         antwort.headers.setdefault("X-Content-Type-Options", "nosniff")
         antwort.headers.setdefault("Referrer-Policy", "same-origin")
         return antwort
@@ -103,6 +109,7 @@ def create_app(
     app.include_router(baukasten.router)
     app.include_router(bibliothek.router)
     app.include_router(verwaltung.router)
+    app.include_router(blockly.router)
     app.include_router(api.router, prefix="/api/v1")
 
     @app.get("/healthz", include_in_schema=False)

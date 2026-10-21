@@ -70,7 +70,7 @@ async def skript_detail(
     eintrag = _hole(sitzung, sid, benutzer)
     reg: Registry = request.app.state.registry
     ziel = Ziel(eintrag.ziel)
-    quelle = "Freier Baukasten"
+    quelle = "Blockly-Modus" if eintrag.quelle == "blockly" else "Freier Baukasten"
     if eintrag.quelle.startswith("rezept:"):
         rezept = reg.rezepte.get(eintrag.quelle.removeprefix("rezept:"))
         quelle = f"Rezept „{rezept.name if rezept else eintrag.quelle.removeprefix('rezept:')}“"
