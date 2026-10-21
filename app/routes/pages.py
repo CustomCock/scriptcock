@@ -96,7 +96,9 @@ async def startseite(
     vorschlaege = 0
     if benutzer.ist_admin:
         vorschlaege = sitzung.scalar(
-            select(func.count()).select_from(GespeichertesRezept).where(GespeichertesRezept.freigegeben.is_(False))
+            select(func.count())
+            .select_from(GespeichertesRezept)
+            .where(GespeichertesRezept.freigegeben.is_(False))
         )
     return _render(
         request,
