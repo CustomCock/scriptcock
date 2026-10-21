@@ -123,14 +123,13 @@ def rezept_zu_request(
     )
 
 
-def erzeuge(
+def generiere(
     registry: Registry,
     req: ScriptRequest,
     benutzer: Benutzer,
-    sitzung: Session,
     jetzt: datetime | None = None,
-) -> Ergebnis:
-    """Validiert, erzeugt und speichert ein Script."""
+) -> tuple[ScriptIR, GeneratedScript]:
+    """Validiert und erzeugt ein Script, ohne es zu speichern (z. B. für die Live-Vorschau)."""
     ir = validiere_request(
         req,
         registry,
@@ -142,6 +141,18 @@ def erzeuge(
         script = generator_fuer(req.ziel, registry).erzeuge(ir)
     except GenerierungsFehler as e:
         raise FehlerSammlung([Feldfehler(None, None, str(e))]) from None
+    return ir, script
+
+
+def erzeuge(
+    registry: Registry,
+    req: ScriptRequest,
+    benutzer: Benutzer,
+    sitzung: Session,
+    jetzt: datetime | None = None,
+) -> Ergebnis:
+    """Validiert, erzeugt und speichert ein Script."""
+    ir, script = generiere(registry, req, benutzer, jetzt)
     eintrag = GespeichertesScript(
         erstellt_am=ir.meta.erstellt_am,
         autor=benutzer.name,

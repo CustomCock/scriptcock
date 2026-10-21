@@ -29,6 +29,17 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 - **Netzlaufwerk** gibt es für Linux nicht (abhängig von Desktop/fstab/cifs-utils).
 - Die macOS-Blöcke sind ohne Mac-Testgerät nur per `zsh -n` geprüft.
 
+## Freier Baukasten
+
+- SortableJS setzt beim Ziehen ein leeres `style`-Attribut, das die CSP (`style-src 'self'`)
+  blockiert. Das erzeugt nur eine Konsolenmeldung, die Funktion ist nicht betroffen.
+- Rezepte aus „Als Rezept speichern“ liegen nur in der Datenbank. Zum dauerhaften Übernehmen
+  ins Repository den YAML-Export unter `recipes/` ablegen (dann den DB-Eintrag löschen, sonst
+  existiert das Rezept doppelt mit unterschiedlicher ID).
+- Gespeicherte Rezepte können noch nicht bearbeitet oder gelöscht werden (Phase 3: Verwaltung).
+- Der Browser-Test (`tests/test_browser.py`) läuft in der CI nicht, weil Playwright keine
+  Projektabhängigkeit ist.
+
 ## Phasen
 
-- Phase 2–4 sind noch nicht umgesetzt (siehe `CHANGELOG.md`).
+- Phase 3–4 sind noch nicht umgesetzt (siehe `CHANGELOG.md`).

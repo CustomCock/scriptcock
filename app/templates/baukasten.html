@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block titel %}Freier Baukasten{% endblock %}
+{% block kopf %}<script src="{{ basis }}/static/vendor/sortable/Sortable.min.js" defer></script>{% endblock %}
+{% block inhalt %}
+<h1>Freier Baukasten</h1>
+<p class="einleitung">Stell dir dein Script selbst zusammen: Bausteine aus der Liste in die Schrittliste ziehen
+(oder auf <strong>+</strong> klicken), Reihenfolge per Ziehen am <span aria-hidden="true">⠿</span>-Griff oder mit ↑ ↓ ändern,
+Werte ausfüllen. Die Vorschau aktualisiert sich automatisch.</p>
+
+<div class="bk-layout">
+  <aside class="bk-palette" aria-label="Bausteine">
+    <label class="sr-only" for="bk-suche">Baustein suchen</label>
+    <input id="bk-suche" type="search" placeholder="Baustein suchen …" autocomplete="off">
+    {% for kategorie, bloecke in kategorien.items() %}
+    <section class="palette-gruppe">
+      <h2>{{ kategorie }}</h2>
+      <ul class="palette-liste">
+        {% for b in bloecke %}
+        <li class="palette-block{% if not b.verfuegbar(ziel) %} nicht-verfuegbar{% endif %}" data-block="{{ b.id }}"
+            data-ziele="{{ b.ziele | map(attribute='value') | join(' ') }}"
+            data-suche="{{ (b.name ~ ' ' ~ b.beschreibung ~ ' ' ~ b.kategorie) | lower }}"
+            data-beschreibung="{{ b.beschreibung }}"
+            title="{% if b.verfuegbar(ziel) %}{{ b.beschreibung }}{% else %}Unter {{ ziel_anzeige[ziel] }} nicht verfügbar{% endif %}">
+          <span class="risiko risiko-{{ b.risiko.value }}" title="{{ b.risiko.anzeige }}">{{ b.risiko.value }}</span>
+          <span class="palette-name">{{ b.name }}</span>
+          <button type="button" class="hinzufuegen" data-hinzufuegen="{{ b.id }}" aria-label="{{ b.name }} hinzufügen"
+                  {% if not b.verfuegbar(ziel) %}disabled{% endif %}>+</button>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endfor %}
+  </aside>
+
+  <section class="bk-arbeit">
+    <form id="baukasten" class="formular bk-leer" data-basis="{{ basis }}"
+          hx-post="{{ basis }}/baukasten/vorschau" hx-trigger="bk-aendern, change delay:250ms, input delay:700ms"
+          hx-target="#bk-vorschau" hx-swap="innerHTML">
+      <fieldset id="ziel-wahl" class="ziel-wahl"
+                hx-post="{{ basis }}/baukasten/liste" hx-trigger="change" hx-target="#schrittliste" hx-swap="innerHTML"
+                hx-include="#baukasten">
+        <legend>Zielsystem</legend>
+        {% for z in ziele %}
+        <label class="ziel-option"><input type="radio" name="ziel" value="{{ z.value }}" data-anzeige="{{ ziel_anzeige[z] }}"
+          {% if z == ziel %}checked{% endif %}><span>{{ ziel_kurz[z] }}</span></label>
+        {% endfor %}
+      </fieldset>
+
+      <details class="optionen">
+        <summary>Titel und Beschreibung</summary>
+        <div class="feld">
+          <label for="bk-titel">Titel des Scripts</label>
+          <input id="bk-titel" name="titel" type="text" maxlength="120" placeholder="Mein Script">
+        </div>
+        <div class="feld">
+          <label for="bk-beschreibung">Beschreibung (erscheint im Kopfkommentar)</label>
+          <input id="bk-beschreibung" name="beschreibung" type="text" maxlength="300">
+        </div>
+      </details>
+
+      <ol id="schrittliste" class="schrittliste" aria-label="Schritte des Scripts"></ol>
+      <p class="leerhinweis">Noch keine Schritte. Zieh Bausteine aus der Liste hierher oder klicke dort auf „+“.</p>
+
+      <div class="feld">
+        <input type="hidden" name="dry_run" value="false">
+        <label class="schalter"><input type="checkbox" name="dry_run" value="true"> <strong>Nur simulieren</strong> – das Script zeigt nur an, was es tun würde.</label>
+      </div>
+      <div id="bk-bestaetigung"></div>
+    </form>
+
+    <div id="bk-vorschau" aria-live="polite"></div>
+    <div id="bk-ergebnis" aria-live="polite"></div>
+
+    {% if benutzer.ist_admin %}
+    <details class="optionen rezept-speichern">
+      <summary>Als Rezept speichern (Admin)</summary>
+      <div id="rezept-speichern">
+        <p class="feldhilfe">Ausgefüllte Werte werden fest ins Rezept übernommen. Leere Pflichtfelder fragt das
+          Rezept-Formular später ab.</p>
+        <div class="feld"><label for="rz-name">Name des Rezepts</label>
+          <input id="rz-name" name="rezept_name" type="text" maxlength="100" placeholder="z. B. Drucker Empfang einrichten"></div>
+        <div class="feld"><label for="rz-kategorie">Kategorie</label>
+          <input id="rz-kategorie" name="rezept_kategorie" type="text" maxlength="100" placeholder="z. B. Drucker"></div>
+        <div class="feld"><label for="rz-beschreibung">Beschreibung</label>
+          <input id="rz-beschreibung" name="rezept_beschreibung" type="text" maxlength="300"></div>
+        <button type="button" class="knopf" hx-post="{{ basis }}/baukasten/als-rezept"
+                hx-include="#baukasten, #rezept-speichern" hx-target="#rezept-ergebnis">Rezept speichern</button>
+      </div>
+      <div id="rezept-ergebnis" aria-live="polite"></div>
+    </details>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -36,8 +36,10 @@ UI-Formular / JSON ──► ScriptRequest ──► validation.py ──► Scr
 | `app/registry.py` | Lädt/prüft `blocks/**/*.yaml` und `recipes/*.yaml` beim Start, bricht bei Fehlern ab |
 | `app/generators/base.py` | Fester Script-Aufbau (Kopf → Präambel → Schritte → Abschluss), Dry-Run-Logik |
 | `app/generators/{powershell,cmd,bash}.py` | Sprachspezifische Bausteine (`bash.py` enthält auch zsh) |
-| `app/service.py` | Rezept-Formular → Request, Erzeugen + Speichern |
-| `app/routes/pages.py`, `api.py` | HTML (Jinja2 + htmx) und JSON-API |
+| `app/service.py` | Rezept-Formular → Request, `generiere` (ohne Speichern) / `erzeuge` (mit Speichern) |
+| `app/baukasten.py` | Listen-Modus: Formular lesen, Rezept aus Schrittliste, DB-Rezepte laden/YAML-Export |
+| `app/routes/pages.py`, `baukasten.py`, `api.py` | HTML Rezept-Modus, HTML Listen-Modus, JSON-API |
+| `static/js/app.js` | Einziges eigenes JS (Highlighting, Zwischenablage, Baukasten: Sortable, Palette) |
 | `app/auth.py` | OIDC (Keycloak), Rollen `nutzer`/`admin`, `AUTH_DISABLED` |
 
 ## Konventionen
@@ -56,6 +58,17 @@ UI-Formular / JSON ──► ScriptRequest ──► validation.py ──► Scr
 - Platzhalter-Implementierungen nur mit `TODO` + Eintrag in `docs/offene-punkte.md`.
 - PSScriptAnalyzer-Ausnahmen stehen in `tests/syntax.py` (`PSSA_AUSNAHMEN`) mit Begründung.
 - Nach jeder Phase: Tests grün, `CHANGELOG.md` ergänzen, Commit.
+
+## Listen-Modus (Baukasten) – Formular-Konvention
+
+Reihenfolge der Schritte = Reihenfolge im DOM. Jeder Schritt hat `schritt=<uid>:<block_id>`
+(uid = 8 Hex-Zeichen), Parameter heißen `p.<uid>.<parameter_id>`. Checkboxen haben davor ein
+verstecktes `false`; beim Lesen gewinnt der letzte Wert. Parameter, die das aktuelle Ziel nicht
+nutzt, werden als versteckte Felder mitgeführt, damit Werte beim Zielwechsel erhalten bleiben.
+Die Live-Vorschau (`/baukasten/vorschau`) speichert nichts; erst `/baukasten/erzeugen` speichert.
+
+Optionaler Browser-Test: `pip install playwright` (Chromium-Pfad ggf. per `CHROMIUM_PFAD`),
+sonst wird `tests/test_browser.py` übersprungen.
 
 ## Sicherheit (Kurzfassung, Details in `docs/sicherheit.md`)
 

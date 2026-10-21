@@ -139,3 +139,55 @@ input:focus, select:focus { border-color: var(--schwarz); }
   h1 { font-size: 1.4rem; }
   .aktionen > * { width: 100%; text-align: center; }
 }
+
+/* --- Freier Baukasten ------------------------------------------------------ */
+.bk-layout { display: grid; grid-template-columns: minmax(15rem, 19rem) 1fr; gap: 1.25rem; align-items: start; }
+.bk-palette { position: sticky; top: .75rem; max-height: calc(100vh - 1.5rem); overflow-y: auto; background: var(--weiss);
+  border: 1px solid var(--rand); border-radius: var(--radius); padding: .75rem; }
+.bk-palette input[type=search] { width: 100%; }
+.palette-gruppe h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: var(--text-leise); margin: .9rem 0 .3rem; }
+.palette-liste { list-style: none; padding: 0; margin: 0; }
+.palette-block { display: flex; align-items: center; gap: .4rem; padding: .35rem .4rem; border: 1px solid var(--rand);
+  border-left: 4px solid var(--schwarz); border-radius: 4px; margin-bottom: .3rem; background: var(--sand-hell); cursor: grab; font-size: .92rem; }
+.palette-block:hover { border-color: var(--schwarz); }
+.palette-name { flex: 1; }
+.palette-block.nicht-verfuegbar { opacity: .45; cursor: not-allowed; border-left-color: var(--rand); }
+.palette-block[hidden], .palette-gruppe[hidden] { display: none; }
+.hinzufuegen { font: inherit; font-weight: 700; width: 1.8rem; height: 1.8rem; border-radius: 50%; border: 2px solid var(--rot);
+  background: var(--weiss); color: var(--rot); cursor: pointer; line-height: 1; }
+.hinzufuegen:hover:not(:disabled) { background: var(--rot); color: var(--weiss); }
+.hinzufuegen:disabled { border-color: var(--rand); color: var(--rand); cursor: not-allowed; }
+
+.ziel-wahl { border: none; padding: 0; margin: 0 0 1rem; display: flex; flex-wrap: wrap; gap: .4rem; }
+.ziel-wahl legend { font-weight: 600; margin-bottom: .35rem; }
+.ziel-option input { position: absolute; opacity: 0; }
+.ziel-option span { display: inline-block; padding: .45rem .9rem; border: 2px solid var(--schwarz); border-radius: var(--radius);
+  cursor: pointer; background: var(--weiss); }
+.ziel-option input:checked + span { background: var(--schwarz); color: var(--sand); }
+.ziel-option input:focus-visible + span { outline: 3px solid var(--rot); outline-offset: 2px; }
+
+.schrittliste { list-style: none; counter-reset: schritt; padding: 0; margin: 0 0 .5rem; min-height: 4rem;
+  border: 2px dashed var(--rand); border-radius: var(--radius); padding: .5rem; }
+.schritt { counter-increment: schritt; background: var(--weiss); border: 1px solid var(--rand); border-left: 5px solid var(--schwarz);
+  border-radius: var(--radius); padding: .6rem .8rem .2rem; margin-bottom: .6rem; }
+.schritt-gesperrt { border-color: var(--rot); border-left-color: var(--rot); background: #fbeaea; }
+.schritt-kopf { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; margin-bottom: .5rem; }
+.schritt-kopf::before { content: counter(schritt) "."; font-weight: 700; color: var(--text-leise); order: 1; }
+.schritt-kopf .griff { order: 0; cursor: grab; font-size: 1.2rem; color: var(--text-leise); user-select: none; }
+.schritt-kopf > :not(.griff) { order: 2; }
+.schritt-knoepfe { margin-left: auto; display: flex; gap: .25rem; }
+.knopf-klein { font: inherit; min-width: 2rem; height: 2rem; border: 1px solid var(--rand); background: var(--weiss);
+  border-radius: 4px; cursor: pointer; }
+.knopf-klein:hover { border-color: var(--schwarz); }
+.knopf-entfernen:hover { background: var(--rot); color: var(--weiss); border-color: var(--rot); }
+.leerhinweis { display: none; color: var(--text-leise); font-style: italic; margin-top: -3.6rem; padding: 1rem; text-align: center; pointer-events: none; }
+.bk-leer .leerhinweis { display: block; }
+.sortable-ghost { opacity: .4; }
+.knopf-primaer:disabled { background: var(--rand); border-color: var(--rand); color: var(--text-leise); cursor: not-allowed; }
+.rezept-speichern { margin-top: 1.5rem; background: var(--weiss); border: 1px solid var(--rand); border-radius: var(--radius); padding: .75rem 1rem; }
+#bk-vorschau { margin-top: 1rem; }
+
+@media (max-width: 52rem) {
+  .bk-layout { grid-template-columns: 1fr; }
+  .bk-palette { position: static; max-height: 22rem; }
+}

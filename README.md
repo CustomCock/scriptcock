@@ -11,12 +11,17 @@ Die Anwendung **erzeugt** Scripte, sie führt sie **nicht** selbst aus.
 > 📷 *Screenshot Rezept-Formular mit Live-Validierung* – folgt
 >
 > 📷 *Screenshot Vorschau mit Download und SHA-256* – folgt
+>
+> 📷 *Screenshot freier Baukasten mit Drag & Drop* – folgt
 
 ## Funktionen
 
 - **Rezept-Modus:** Betriebssystem wählen → Rezept suchen → Formular ausfüllen (Live-Prüfung,
   Hilfetexte, Beispielwerte) → Vorschau mit Syntax-Highlighting → Download / Zwischenablage,
   dazu eine Anleitung „So führst du das Script aus“.
+- **Freier Baukasten:** Bausteine per Drag & Drop (oder „+“) zu einer Schrittliste zusammenstellen,
+  umsortieren, Werte ausfüllen; Live-Vorschau, Zielsystem jederzeit umschaltbar (nicht verfügbare
+  Bausteine werden markiert, der Download gesperrt). Admins können die Liste als Rezept speichern.
 - **24 Bausteine**, z. B. Systeminfo, Ping, Traceroute, Port prüfen, Netzlaufwerk, Drucker per IP,
   Dienste, Prozesse, Windows-Update-Reset, SetupDiag, Diagnosepaket, Software installieren.
 - **8 Rezepte**, z. B. „Drucker einrichten“, „Netzwerkproblem diagnostizieren“,
@@ -108,6 +113,8 @@ AUTH_DISABLED=true uvicorn app.main:app --reload
 pytest -q -rs
 ruff check . && ruff format --check . && mypy app
 ```
+
+Optional für den Browser-Test des Baukastens: `pip install playwright && playwright install chromium`.
 
 Für die vollständigen Syntax-Checks lokal `zsh`, `shellcheck` und `pwsh` (mit Modul
 `PSScriptAnalyzer`) installieren; sonst werden diese Tests mit Hinweis übersprungen.

@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.5", "mypy>=1.10", "types-PyYAML"]
+browser = ["playwright>=1.40"]
 
 [build-system]
 requires = ["setuptools>=68"]

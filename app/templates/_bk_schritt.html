@@ -1,0 +1,23 @@
+<li class="schritt{% if not verfuegbar %} schritt-gesperrt{% endif %}" id="schritt-{{ uid }}" data-uid="{{ uid }}" data-block="{{ block.id }}">
+  <input type="hidden" name="schritt" value="{{ uid }}:{{ block.id }}">
+  <div class="schritt-kopf">
+    <span class="griff" title="Ziehen zum Verschieben" aria-hidden="true">⠿</span>
+    <span class="risiko risiko-{{ block.risiko.value }}" title="{{ block.risiko.anzeige }}">{{ block.risiko.value }}</span>
+    <strong class="schritt-name">{{ block.name }}</strong>{% if admin %} <span class="marke">Admin</span>{% endif %}
+    <span class="schritt-knoepfe">
+      <button type="button" class="knopf-klein" data-hoch aria-label="{{ block.name }} nach oben">↑</button>
+      <button type="button" class="knopf-klein" data-runter aria-label="{{ block.name }} nach unten">↓</button>
+      <button type="button" class="knopf-klein knopf-entfernen" data-entfernen aria-label="{{ block.name }} entfernen">✕</button>
+    </span>
+  </div>
+  {% if not verfuegbar %}<p class="fehlertext">Unter {{ ziel_anzeige[ziel] }} nicht verfügbar – bitte entfernen oder ein anderes Zielsystem wählen.</p>{% endif %}
+  {% if hinweis %}<p class="feldhilfe">{{ hinweis }}</p>{% endif %}
+  <div class="feldstatus" id="status-{{ uid }}" aria-live="polite"></div>
+  {% for p in block.parameter %}
+    {% if p.id in genutzt %}
+      {% with f=p, name="p." ~ uid ~ "." ~ p.id, dom=uid ~ "-" ~ p.id, wert=werte.get(p.id), aktion="" %}{% include "_feld.html" %}{% endwith %}
+    {% elif p.id in werte %}
+      <input type="hidden" name="p.{{ uid }}.{{ p.id }}" value="{{ werte[p.id] }}">
+    {% endif %}
+  {% endfor %}
+</li>

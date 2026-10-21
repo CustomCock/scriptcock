@@ -1,0 +1,41 @@
+{% set nummer = {} %}{% for s in schritte %}{% set _ = nummer.update({s.uid: (loop.index, s.block.name)}) %}{% endfor %}
+{% set gesperrt = nicht_verfuegbar or allgemein or pro_feld or pro_schritt %}
+{% if not formular.uids %}
+  <p class="leer">Die Vorschau erscheint, sobald die Liste einen Schritt enthält.</p>
+{% else %}
+  {% if nicht_verfuegbar %}
+  <div class="fehlerbox" role="alert">
+    <h2>Download gesperrt</h2>
+    <p>Diese Bausteine gibt es unter {{ ziel_anzeige_aktuell }} nicht: <strong>{{ nicht_verfuegbar | join(", ") }}</strong>.
+      Entferne sie (rot markiert) oder wähle oben ein anderes Zielsystem.</p>
+  </div>
+  {% elif gesperrt %}
+  <div class="fehlerbox" role="alert">
+    <h2>Bitte noch korrigieren</h2>
+    <ul>
+      {% for m in allgemein %}<li>{{ m }}</li>{% endfor %}
+      {% for uid, meldungen in pro_schritt.items() %}{% for m in meldungen %}<li>Schritt {{ nummer[uid][0] }} ({{ nummer[uid][1] }}): {{ m }}</li>{% endfor %}{% endfor %}
+      {% for schluessel, m in pro_feld.items() %}{% set uid = schluessel.split("-")[0] %}<li>Schritt {{ nummer[uid][0] }} ({{ nummer[uid][1] }}): {{ m }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+  <div class="aktionen">
+    <button type="button" class="knopf-primaer" hx-post="{{ basis }}/baukasten/erzeugen" hx-include="#baukasten"
+            hx-target="#bk-ergebnis" {% if gesperrt %}disabled aria-disabled="true"{% endif %}>Script erzeugen &amp; herunterladen</button>
+    {% if bestaetigung_noetig and not formular.rot_bestaetigt %}<span class="feldhilfe">Enthält rote (destruktive) Schritte – bitte oben „Ich weiß, was dieses Script tut“ bestätigen.</span>{% endif %}
+  </div>
+  {% if script %}
+  <p class="feldhilfe">Live-Vorschau ({{ ziel_anzeige_aktuell }}) – gespeichert wird erst beim Erzeugen.</p>
+  <pre class="code"><code class="language-{{ sprache }}">{{ script.text.replace("\r\n", "\n") }}</code></pre>
+  {% endif %}
+{% endif %}
+{% for s in schritte %}
+<div id="status-{{ s.uid }}" hx-swap-oob="innerHTML">{% for m in pro_schritt.get(s.uid, []) %}<span class="fehlertext">{{ m }}</span>{% endfor %}</div>
+{% for pid in s.genutzt | sort %}<div id="status-{{ s.uid }}-{{ pid }}" hx-swap-oob="innerHTML">{% if pro_feld.get(s.uid ~ "-" ~ pid) %}<span class="fehlertext">{{ pro_feld[s.uid ~ "-" ~ pid] }}</span>{% endif %}</div>{% endfor %}
+{% endfor %}
+<div id="bk-bestaetigung" hx-swap-oob="innerHTML">{% if bestaetigung_noetig %}
+  <div class="feld bestaetigung">
+    <input type="hidden" name="rot_bestaetigt" value="false">
+    <label class="schalter"><input type="checkbox" name="rot_bestaetigt" value="true" {% if formular.rot_bestaetigt %}checked{% endif %}> Ich weiß, was dieses Script tut.</label>
+  </div>{% endif %}</div>
+<div id="bk-ergebnis" hx-swap-oob="innerHTML"></div>

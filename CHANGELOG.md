@@ -1,5 +1,27 @@
 # Changelog
 
+## Phase 2 – Freier Baukasten (Listen-Modus)
+
+- Neue Seite „Freier Baukasten“ (`/baukasten`): durchsuchbare Bausteinliste nach Kategorien,
+  Hinzufügen per Drag & Drop (SortableJS, vendored) oder „+“-Knopf, Umsortieren per Griff
+  oder ↑/↓, Entfernen, Parameter pro Schritt (serverseitig gerenderte Formularfelder).
+- Live-Vorschau mit Syntax-Highlighting bei jeder Änderung (wird nicht gespeichert);
+  Fehler werden dem jeweiligen Schritt und Feld zugeordnet.
+- Zielsystem jederzeit umschaltbar: Werte bleiben erhalten (auch für Parameter, die das
+  neue Ziel nicht nutzt), nicht verfügbare Bausteine werden rot markiert bzw. in der
+  Palette ausgegraut, der Download ist mit Erklärung gesperrt.
+- Rote Bausteine: Bestätigung „Ich weiß, was dieses Script tut“ erscheint automatisch.
+- „Als Rezept speichern“ für Admins: ausgefüllte Werte werden feste Rezeptwerte, leere
+  Pflichtfelder werden Formularfelder. Rezepte liegen in der Datenbank (Tabelle `rezepte`),
+  werden beim Start mit voller Registry-Prüfung geladen und lassen sich als YAML für
+  `recipes/` exportieren.
+- Rezepte mit festen Werten erscheinen nur für passende Zielsysteme (z. B. Windows-Pfad).
+- Formularfeld-Vorlage `_feld.html` für Rezept- und Listen-Modus vereinheitlicht.
+- Fix: In-Memory-SQLite nutzt einen `StaticPool` (sonst getrennte Datenbanken je Verbindung).
+- Tests: Formular-Parser, Vorschau, Fehlerzuordnung, Zielwechsel, Reihenfolge, rote Bestätigung,
+  Als-Rezept-Speichern inkl. Neustart und YAML-Export; optionaler Browser-Test (Playwright)
+  für Drag & Drop, Zielwechsel und Download.
+
 ## Phase 1 – Kern + Rezept-Modus
 
 - Kernarchitektur: Block-Schema (YAML, Pydantic), Registry mit Startprüfung (Schema,

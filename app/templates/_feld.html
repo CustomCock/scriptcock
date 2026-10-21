@@ -1,25 +1,28 @@
-{# Ein Formularfeld; erwartet: f (ParameterDef), aktion (URL für Live-Prüfung) #}
+{# Ein Formularfeld.
+   erwartet: f (ParameterDef), name (Formularname), dom (DOM-ID-Basis),
+             wert (aktueller Wert oder none → Standardwert), aktion (URL für Live-Prüfung oder leer) #}
+{% set aktuell = wert if wert is not none else f.standard %}
 <div class="feld">
-  <label for="f-{{ f.id }}">{{ f.label }}{% if f.pflicht and f.typ != ParamTyp.JA_NEIN %} <span class="pflicht" title="Pflichtfeld">*</span>{% endif %}</label>
-  {% set pruefen %}hx-post="{{ aktion }}/{{ f.id }}?ziel={{ ziel.value }}" hx-trigger="change, keyup changed delay:500ms" hx-target="#status-{{ f.id }}" hx-swap="innerHTML"{% endset %}
+  <label for="f-{{ dom }}">{{ f.label }}{% if f.pflicht and f.typ != ParamTyp.JA_NEIN %} <span class="pflicht" title="Pflichtfeld">*</span>{% endif %}</label>
+  {% set pruefen %}{% if aktion %}hx-post="{{ aktion }}" hx-trigger="change, keyup changed delay:500ms" hx-target="#status-{{ dom }}" hx-swap="innerHTML"{% endif %}{% endset %}
   {% if f.typ == ParamTyp.JA_NEIN %}
-    <input type="hidden" name="{{ f.id }}" value="false">
-    <label class="schalter"><input id="f-{{ f.id }}" type="checkbox" name="{{ f.id }}" value="true" {% if f.standard %}checked{% endif %}> Ja</label>
+    <input type="hidden" name="{{ name }}" value="false">
+    <label class="schalter"><input id="f-{{ dom }}" type="checkbox" name="{{ name }}" value="true" {% if aktuell in (true, "true", "on", "ja", "1") %}checked{% endif %}> Ja</label>
   {% elif f.typ == ParamTyp.AUSWAHL %}
-    <select id="f-{{ f.id }}" name="{{ f.id }}">
-      {% for o in f.optionen %}<option value="{{ o.wert }}" {% if o.wert == f.standard %}selected{% endif %}>{{ o.label }}</option>{% endfor %}
+    <select id="f-{{ dom }}" name="{{ name }}">
+      {% for o in f.optionen %}<option value="{{ o.wert }}" {% if o.wert == aktuell %}selected{% endif %}>{{ o.label }}</option>{% endfor %}
     </select>
   {% elif f.typ in (ParamTyp.ZAHL, ParamTyp.PORT) %}
-    <input id="f-{{ f.id }}" name="{{ f.id }}" type="number" inputmode="numeric"
+    <input id="f-{{ dom }}" name="{{ name }}" type="number" inputmode="numeric"
       {% if f.min is not none %}min="{{ f.min }}"{% endif %} {% if f.max is not none %}max="{{ f.max }}"{% endif %}
       {% if f.typ == ParamTyp.PORT %}min="1" max="65535"{% endif %}
-      value="{{ f.standard if f.standard is not none else '' }}" placeholder="{{ f.beispiel if f.beispiel is not none else '' }}"
-      {% if f.pflicht %}required{% endif %} {{ pruefen|safe }} aria-describedby="status-{{ f.id }} hilfe-{{ f.id }}">
+      value="{{ aktuell if aktuell is not none else '' }}" placeholder="{{ f.beispiel if f.beispiel is not none else '' }}"
+      {% if f.pflicht %}required{% endif %} {{ pruefen|safe }} aria-describedby="status-{{ dom }} hilfe-{{ dom }}">
   {% else %}
-    <input id="f-{{ f.id }}" name="{{ f.id }}" type="text" autocomplete="off" spellcheck="false"
-      value="{{ f.standard if f.standard is not none else '' }}" placeholder="{{ 'z. B. ' ~ f.beispiel if f.beispiel is not none else '' }}"
-      {% if f.pflicht %}required{% endif %} {{ pruefen|safe }} aria-describedby="status-{{ f.id }} hilfe-{{ f.id }}">
+    <input id="f-{{ dom }}" name="{{ name }}" type="text" autocomplete="off" spellcheck="false"
+      value="{{ aktuell if aktuell is not none else '' }}" placeholder="{{ 'z. B. ' ~ f.beispiel if f.beispiel is not none else '' }}"
+      {% if f.pflicht %}required{% endif %} {{ pruefen|safe }} aria-describedby="status-{{ dom }} hilfe-{{ dom }}">
   {% endif %}
-  <div class="feldstatus" id="status-{{ f.id }}" aria-live="polite"></div>
-  {% if f.hilfe %}<p class="feldhilfe" id="hilfe-{{ f.id }}">{{ f.hilfe }}</p>{% endif %}
+  <div class="feldstatus" id="status-{{ dom }}" aria-live="polite"></div>
+  {% if f.hilfe %}<p class="feldhilfe" id="hilfe-{{ dom }}">{{ f.hilfe }}</p>{% endif %}
 </div>

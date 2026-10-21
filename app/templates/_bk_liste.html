@@ -1,0 +1,1 @@
+{% for s in schritte %}{% with uid=s.uid, block=s.block, ziel=s.ziel, werte=s.werte, genutzt=s.genutzt, verfuegbar=s.verfuegbar, admin=s.admin, hinweis=s.hinweis %}{% include "_bk_schritt.html" %}{% endwith %}{% endfor %}

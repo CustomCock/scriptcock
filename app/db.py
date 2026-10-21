@@ -17,6 +17,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 
 class Basis(DeclarativeBase):
@@ -43,13 +44,33 @@ class GespeichertesScript(Basis):
     funktioniert: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class GespeichertesRezept(Basis):
+    """Rezepte, die im Baukasten erstellt wurden (zusätzlich zu ``recipes/*.yaml``)."""
+
+    __tablename__ = "rezepte"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    rezept_id: Mapped[str] = mapped_column(String(80), unique=True)
+    name: Mapped[str] = mapped_column(String(200))
+    daten_json: Mapped[str] = mapped_column(Text)
+    autor: Mapped[str] = mapped_column(String(200))
+    erstellt_am: Mapped[datetime] = mapped_column(DateTime)
+    freigegeben: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+
+
 class Datenbank:
     def __init__(self, url: str) -> None:
         if url.startswith("sqlite:///"):
             pfad = url.removeprefix("sqlite:///")
             if pfad and pfad != ":memory:":
                 Path(pfad).parent.mkdir(parents=True, exist_ok=True)
-        self.engine: Engine = create_engine(url, connect_args={"check_same_thread": False})
+        im_speicher = url in ("sqlite://", "sqlite:///:memory:")
+        self.engine: Engine = create_engine(
+            url,
+            connect_args={"check_same_thread": False},
+            # In-Memory-SQLite: alle Sitzungen müssen dieselbe Verbindung nutzen.
+            poolclass=StaticPool if im_speicher else None,
+        )
         self._sitzung = sessionmaker(bind=self.engine, expire_on_commit=False)
         Basis.metadata.create_all(self.engine)
 

@@ -16,10 +16,11 @@ from starlette.middleware.sessions import SessionMiddleware
 from app import __version__
 from app.auth import KeinZugriff, NichtAngemeldet, oauth_client
 from app.auth import router as auth_router
+from app.baukasten import lade_db_rezepte
 from app.config import Einstellungen, einstellungen
 from app.db import Datenbank
 from app.registry import Registry, lade_registry
-from app.routes import api, pages
+from app.routes import api, baukasten, pages
 
 PROJEKT = Path(__file__).resolve().parent.parent
 log = logging.getLogger("baukasten")
@@ -47,6 +48,10 @@ def create_app(
     app.state.registry = registry or lade_registry()
     app.state.db = datenbank or Datenbank(einst.database_url)
     app.state.oauth = oauth_client(einst)
+    with app.state.db.neue_sitzung() as sitzung:
+        anzahl = lade_db_rezepte(app.state.registry, sitzung)
+    if anzahl:
+        log.info("%d eigene Rezepte aus der Datenbank geladen.", anzahl)
 
     templates = Jinja2Templates(directory=str(PROJEKT / "app" / "templates"))
     templates.env.globals.update(
@@ -95,6 +100,7 @@ def create_app(
     app.mount("/static", StaticFiles(directory=str(PROJEKT / "static")), name="static")
     app.include_router(auth_router)
     app.include_router(pages.router)
+    app.include_router(baukasten.router)
     app.include_router(api.router, prefix="/api/v1")
 
     @app.get("/healthz", include_in_schema=False)

@@ -25,8 +25,8 @@ from pydantic import ValidationError
 from app.codeenv import code_umgebung, text_umgebung
 from app.escaping import Ziel
 from app.models.block import EINGEBAUTE_VARIABLEN, BlockDef, ParameterDef
-from app.models.recipe import RezeptDef, feld_verweis, konstante
-from app.validation import ValidierungsFehler, validiere_wert
+from app.models.recipe import RezeptDef, RezeptSchritt, feld_verweis, konstante
+from app.validation import ValidierungsFehler, pruefe_wert_fuer_ziel, validiere_wert
 
 PROJEKT = Path(__file__).resolve().parent.parent
 BLOCK_VERZEICHNIS = PROJEKT / "blocks"
@@ -143,15 +143,41 @@ class Registry:
         return {abgeleitet.get(v, v) for v in variablen}
 
     def rezept_ziele(self, rezept: RezeptDef) -> list[Ziel]:
-        """Ziele, für die alle aktiven Schritte eines Rezepts verfügbar sind."""
+        """Ziele, für die alle aktiven Schritte eines Rezepts verfügbar sind.
+
+        Feste Werte müssen zum Ziel passen (z. B. ein Windows-Pfad nicht unter Linux).
+        """
         ergebnis = []
         for ziel in Ziel:
             schritte = rezept.schritte_fuer(ziel)
-            if schritte and all(
-                (b := self.bloecke.get(s.block)) is not None and b.verfuegbar(ziel) for s in schritte
-            ):
+            if schritte and all(self._schritt_passt(s, ziel) for s in schritte):
                 ergebnis.append(ziel)
         return ergebnis
+
+    def _schritt_passt(self, schritt: RezeptSchritt, ziel: Ziel) -> bool:
+        block = self.bloecke.get(schritt.block)
+        if block is None or not block.verfuegbar(ziel):
+            return False
+        for pid, wert in schritt.parameter.items():
+            param = block.param(pid)
+            if param is None or feld_verweis(wert) is not None:
+                continue
+            try:
+                pruefe_wert_fuer_ziel(validiere_wert(param, konstante(wert)), ziel)
+            except ValidierungsFehler:
+                return False
+        return True
+
+    def rezept_hinzufuegen(self, rezept: RezeptDef) -> None:
+        """Fügt ein Rezept zur Laufzeit hinzu (z. B. aus der Datenbank) – mit voller Prüfung."""
+        if rezept.id in self.rezepte:
+            raise RegistryFehler([f"{rezept.quelle}: Rezept-ID '{rezept.id}' ist bereits vergeben"])
+        fehler: list[str] = []
+        self.rezepte[rezept.id] = rezept
+        _pruefe_rezept(rezept, self, fehler)
+        if fehler:
+            del self.rezepte[rezept.id]
+            raise RegistryFehler(fehler)
 
 
 def _yaml_laden(pfad: Path) -> Any:
