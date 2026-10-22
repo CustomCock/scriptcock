@@ -22,7 +22,7 @@
   <script src="{{ basis }}/static/js/software-katalog.js" defer></script>
   {% block kopf %}{% endblock %}
 </head>
-<body>
+<body data-basis="{{ basis }}">
   {% if auth_disabled %}
   <div class="warnbanner" role="alert">⚠ Anmeldung abgeschaltet (AUTH_DISABLED=true) – nur für die Entwicklung, niemals produktiv betreiben!</div>
   {% endif %}

@@ -36,11 +36,34 @@
     return ok;
   }
 
+  /* Script-Text über den Export-Endpunkt in das Dateiformat des Ziels bringen (Zeilenenden, chcp …).
+     Liefert ein Promise mit der Response (Bytes für den Download, Text fürs Kopieren). */
+  function exportieren(text, ziel, dateiname) {
+    var basis = document.body.dataset.basis || "";
+    return fetch(basis + "/api/script/export", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "X-Okm-Request": "1" },
+      body: JSON.stringify({ text: text, ziel: ziel, dateiname: dateiname || "script" })
+    }).then(function (antwort) {
+      if (!antwort.ok) { throw new Error("Export fehlgeschlagen (" + antwort.status + ")"); }
+      return antwort;
+    });
+  }
+  window.OkmExport = exportieren;
+
   document.addEventListener("click", function (ev) {
     var knopf = ev.target.closest("[data-kopieren]");
     if (!knopf) { return; }
     var quelle = document.querySelector(knopf.getAttribute("data-kopieren"));
-    if (quelle) { kopieren(quelle.textContent, knopf); }
+    if (!quelle) { return; }
+    var ziel = knopf.getAttribute("data-ziel");
+    if (!ziel) { kopieren(quelle.textContent, knopf); return; }
+    // Gleiche Regeln wie beim Download; schlägt der Export fehl, wird der angezeigte Text kopiert.
+    exportieren(quelle.textContent, ziel).then(function (a) { return a.text(); }).then(
+      function (text) { kopieren(text.replace(/^\ufeff/, ""), knopf); },
+      function () { kopieren(quelle.textContent, knopf); }
+    );
   });
 
   // --- Freier Baukasten -------------------------------------------------------

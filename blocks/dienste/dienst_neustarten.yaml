@@ -9,6 +9,7 @@ hilfe: |
 risiko: gelb
 admin_noetig: true
 fortschritt: "Dienst {{ dienst }} wird neu gestartet"
+tipp: Dienstnamen prüfen (nicht den Anzeigenamen) und ob das Script mit Administratorrechten läuft.
 parameter:
   - id: dienst
     label: Dienstname

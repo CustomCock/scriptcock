@@ -17,25 +17,77 @@
 #
 # Generiert mit dem okm Script-Baukasten
 # ======================================================================
+param(
+    # Am Ende nicht auf Enter warten (für Fernwartung/RMM)
+    [switch]$NoPause
+)
 
 $ErrorActionPreference = 'Stop'
+$OkmKeinePause = [bool]$NoPause
+# Konsole auf UTF-8: Ausgaben externer Programme (winget, ipconfig, netsh …) werden sonst
+# mit der OEM-Codepage gelesen und erscheinen als Zeichensalat (Gr├Â├ƒe statt Größe).
+$OkmUtf8 = New-Object System.Text.UTF8Encoding $false
+try { [Console]::OutputEncoding = $OkmUtf8 } catch { $null = $_ }
+$OutputEncoding = $OkmUtf8
 $OkmLog = Join-Path $env:TEMP ('okm-script-{0}.log' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
 $OkmGesamt = 7
 $OkmErfolgreich = 0
+$OkmNr = 0
+$OkmStatus = 'laeuft'
 try { Start-Transcript -Path $OkmLog -Append | Out-Null } catch { Write-Warning 'Protokoll konnte nicht gestartet werden.' }
+
+# Meldungen: Werte immer als Argument übergeben, nie in Strings einsetzen
+function Write-OkmInfo([string]$Text) { Write-Host $Text }
+function Write-OkmOk([string]$Text = '') {
+    if ($Text) { Write-Host ('      OK  ' + $Text) -ForegroundColor Green }
+    else { Write-Host '      OK' -ForegroundColor Green }
+}
+function Write-OkmWarnung([string]$Text) { Write-Host ('      WARNUNG  ' + $Text) -ForegroundColor Yellow }
+function Write-OkmFehler([string]$Text) { Write-Host ('      FEHLER  ' + $Text) -ForegroundColor Red }
+
+# Fenster offen halten (Rechtsklick > Mit PowerShell ausführen) – aber nicht mit -NoPause,
+# ohne Benutzer, bei umgeleiteter Eingabe oder -NonInteractive (Fernwartung/RMM).
+function Wait-OkmEnde {
+    if ($OkmKeinePause -or -not [Environment]::UserInteractive) { return }
+    try { if ([Console]::IsInputRedirected) { return } } catch { return }
+    $OkmArgumente = @([Environment]::GetCommandLineArgs() | Where-Object { $_ -like '-NonI*' })
+    if ($OkmArgumente.Count -gt 0) { return }
+    [void](Read-Host 'Drücke Enter zum Schließen …')
+}
 
 function Exit-OkmScript {
     param([int]$Code)
-    Write-Host ''
-    Write-Host ('Protokoll: ' + $OkmLog)
+    Write-Host '----------------------------------------------'
+    switch ($script:OkmStatus) {
+        'fertig' { Write-Host (' Fertig: ' + $script:OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten erfolgreich.') -ForegroundColor Green }
+        'abbruch' {
+            Write-Host ' Abgebrochen durch Benutzer. Es wurde nichts weiter ausgeführt.' -ForegroundColor Yellow
+        }
+        'rechte' {
+            Write-Host ' Abgebrochen: fehlende Administratorrechte.' -ForegroundColor Red
+        }
+        default {
+            Write-Host (' Abgebrochen bei Schritt ' + $script:OkmNr + ' von ' + $OkmGesamt + '.') -ForegroundColor Red
+            Write-Host (' Erfolgreich bis dahin: ' + $script:OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten.')
+        }
+    }
+    Write-Host (' Protokoll: ' + $OkmLog)
+    Write-Host '----------------------------------------------'
     try { Stop-Transcript | Out-Null } catch { $null = $_ }
+    Wait-OkmEnde
     exit $Code
 }
+
+Write-OkmInfo '=============================================='
+Write-OkmInfo ' okm Script-Baukasten · Netzwerkproblem diagnostizieren'
+Write-OkmInfo ' Erstellt: 15.01.2026 09:30 · von pytest'
+Write-OkmInfo '=============================================='
 
 # --------------------------------------------------------------------
 # Schritt 1/7: IP-Konfiguration anzeigen (Risiko: gruen)
 # --------------------------------------------------------------------
-Write-Host '[1/7] IP-Konfiguration wird angezeigt …'
+$OkmNr = 1
+Write-OkmInfo '[1/7] IP-Konfiguration wird angezeigt ...'
 try {
     $global:LASTEXITCODE = 0
     . {
@@ -43,16 +95,18 @@ try {
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
     $OkmErfolgreich++
+    Write-OkmOk
 } catch {
-    Write-Host ('FEHLER in Schritt 1/7 (IP-Konfiguration anzeigen): ' + $_.Exception.Message) -ForegroundColor Red
-    Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten.')
+    Write-OkmFehler $_.Exception.Message
+    $OkmStatus = 'fehler'
     Exit-OkmScript 1
 }
 
 # --------------------------------------------------------------------
 # Schritt 2/7: Standard-Gateway anpingen (Risiko: gruen)
 # --------------------------------------------------------------------
-Write-Host '[2/7] Standard-Gateway wird geprüft …'
+$OkmNr = 2
+Write-OkmInfo '[2/7] Standard-Gateway wird geprüft ...'
 try {
     $global:LASTEXITCODE = 0
     . {
@@ -67,16 +121,18 @@ try {
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
     $OkmErfolgreich++
+    Write-OkmOk
 } catch {
-    Write-Host ('FEHLER in Schritt 2/7 (Standard-Gateway anpingen): ' + $_.Exception.Message) -ForegroundColor Red
-    Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten.')
+    Write-OkmFehler $_.Exception.Message
+    $OkmStatus = 'fehler'
     Exit-OkmScript 1
 }
 
 # --------------------------------------------------------------------
 # Schritt 3/7: Ping auf Ziel (Risiko: gruen)
 # --------------------------------------------------------------------
-Write-Host '[3/7] Ping auf 1.1.1.1 (2x) …'
+$OkmNr = 3
+Write-OkmInfo '[3/7] Ping auf 1.1.1.1 (2x) ...'
 try {
     $global:LASTEXITCODE = 0
     . {
@@ -88,16 +144,19 @@ try {
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
     $OkmErfolgreich++
+    Write-OkmOk
 } catch {
-    Write-Host ('FEHLER in Schritt 3/7 (Ping auf Ziel): ' + $_.Exception.Message) -ForegroundColor Red
-    Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten.')
+    Write-OkmFehler $_.Exception.Message
+    Write-OkmInfo '      Tipp: Ist das Gerät eingeschaltet und im selben Netz? Manche Geräte und Firewalls antworten grundsätzlich nicht auf Ping.'
+    $OkmStatus = 'fehler'
     Exit-OkmScript 1
 }
 
 # --------------------------------------------------------------------
 # Schritt 4/7: Namensauflösung (DNS) testen (Risiko: gruen)
 # --------------------------------------------------------------------
-Write-Host '[4/7] DNS-Auflösung von www.microsoft.com wird geprüft …'
+$OkmNr = 4
+Write-OkmInfo '[4/7] DNS-Auflösung von www.microsoft.com wird geprüft ...'
 try {
     $global:LASTEXITCODE = 0
     . {
@@ -110,16 +169,18 @@ try {
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
     $OkmErfolgreich++
+    Write-OkmOk
 } catch {
-    Write-Host ('FEHLER in Schritt 4/7 (Namensauflösung (DNS) testen): ' + $_.Exception.Message) -ForegroundColor Red
-    Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten.')
+    Write-OkmFehler $_.Exception.Message
+    $OkmStatus = 'fehler'
     Exit-OkmScript 1
 }
 
 # --------------------------------------------------------------------
 # Schritt 5/7: Ping auf Ziel (Risiko: gruen)
 # --------------------------------------------------------------------
-Write-Host '[5/7] Ping auf intranet.okm.local (4x) …'
+$OkmNr = 5
+Write-OkmInfo '[5/7] Ping auf intranet.okm.local (4x) ...'
 try {
     $global:LASTEXITCODE = 0
     . {
@@ -131,16 +192,19 @@ try {
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
     $OkmErfolgreich++
+    Write-OkmOk
 } catch {
-    Write-Host ('FEHLER in Schritt 5/7 (Ping auf Ziel): ' + $_.Exception.Message) -ForegroundColor Red
-    Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten.')
+    Write-OkmFehler $_.Exception.Message
+    Write-OkmInfo '      Tipp: Ist das Gerät eingeschaltet und im selben Netz? Manche Geräte und Firewalls antworten grundsätzlich nicht auf Ping.'
+    $OkmStatus = 'fehler'
     Exit-OkmScript 1
 }
 
 # --------------------------------------------------------------------
 # Schritt 6/7: Traceroute (Risiko: gruen)
 # --------------------------------------------------------------------
-Write-Host '[6/7] Traceroute zu intranet.okm.local …'
+$OkmNr = 6
+Write-OkmInfo '[6/7] Traceroute zu intranet.okm.local ...'
 try {
     $global:LASTEXITCODE = 0
     . {
@@ -149,16 +213,18 @@ try {
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
     $OkmErfolgreich++
+    Write-OkmOk
 } catch {
-    Write-Host ('FEHLER in Schritt 6/7 (Traceroute): ' + $_.Exception.Message) -ForegroundColor Red
-    Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten.')
+    Write-OkmFehler $_.Exception.Message
+    $OkmStatus = 'fehler'
     Exit-OkmScript 1
 }
 
 # --------------------------------------------------------------------
 # Schritt 7/7: Port erreichbar prüfen (Risiko: gruen)
 # --------------------------------------------------------------------
-Write-Host '[7/7] Port 443 auf intranet.okm.local wird geprüft …'
+$OkmNr = 7
+Write-OkmInfo '[7/7] Port 443 auf intranet.okm.local wird geprüft ...'
 try {
     $global:LASTEXITCODE = 0
     . {
@@ -171,12 +237,13 @@ try {
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
     $OkmErfolgreich++
+    Write-OkmOk
 } catch {
-    Write-Host ('FEHLER in Schritt 7/7 (Port erreichbar prüfen): ' + $_.Exception.Message) -ForegroundColor Red
-    Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten.')
+    Write-OkmFehler $_.Exception.Message
+    Write-OkmInfo '      Tipp: Läuft der Dienst auf dem Zielrechner, und lässt die Firewall den Port durch?'
+    $OkmStatus = 'fehler'
     Exit-OkmScript 1
 }
 
-Write-Host ''
-Write-Host ('Fertig, ' + $OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten erfolgreich.') -ForegroundColor Green
+$OkmStatus = 'fertig'
 Exit-OkmScript 0

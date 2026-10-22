@@ -73,7 +73,7 @@ def test_erfolgreicher_ablauf_und_log(registry: Registry, tmp_path: Path, shell:
     r = ausfuehren(shell, s.inhalt, tmp_path)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "[1/4]" in r.stdout and "[4/4]" in r.stdout
-    assert "Fertig, 4 von 4 Schritten erfolgreich." in r.stdout
+    assert "Fertig: 4 von 4 Schritten erfolgreich." in r.stdout
     assert "Hallo (Test)!" in r.stdout
     assert "Kein passender Prozess gefunden." in r.stdout
     assert (Path(boese) / "quelle.txt").read_text(encoding="utf-8") == "hallo"
@@ -94,7 +94,8 @@ def test_fehler_bricht_ab(registry: Registry, tmp_path: Path, shell: str, ziel: 
     )
     r = ausfuehren(shell, s.inhalt, tmp_path)
     assert r.returncode != 0
-    assert "FEHLER in Schritt 2/3 (Datei/Ordner kopieren)" in r.stdout
+    assert "FEHLER  Schritt 2/3 (Datei/Ordner kopieren): Befehl endete mit Exit-Code" in r.stdout
+    assert "Abgebrochen bei Schritt 2 von 3." in r.stdout
     assert "Erfolgreich bis dahin: 1 von 3 Schritten." in r.stdout
     assert not (tmp_path / "b").exists(), "Script ist nach dem Fehler weitergelaufen"
 
@@ -154,7 +155,7 @@ def test_powershell_ablauf(registry: Registry, tmp_path: Path) -> None:
     r = ausfuehren("pwsh", s.inhalt, tmp_path, env={"TEMP": str(tmp_path)})
     assert r.returncode == 0, r.stdout + r.stderr
     assert "[1/2]" in r.stdout and "Hallo 'Welt' (Test)!" in r.stdout
-    assert "Fertig, 2 von 2 Schritten erfolgreich." in r.stdout
+    assert "Fertig: 2 von 2 Schritten erfolgreich." in r.stdout
     assert "--- LOG ---" in r.stdout, "Transcript fehlt"
     assert "Hallo 'Welt' (Test)!" in r.stdout.split("--- LOG ---")[1]
 
@@ -172,5 +173,6 @@ def test_powershell_fehler_bricht_ab(registry: Registry, tmp_path: Path) -> None
     )
     r = ausfuehren("pwsh", s.inhalt, tmp_path, env={"TEMP": str(tmp_path)})
     assert r.returncode == 1
-    assert "FEHLER in Schritt 2/3 (Ping auf Ziel)" in r.stdout
+    assert "FEHLER  " in r.stdout
+    assert "Abgebrochen bei Schritt 2 von 3." in r.stdout
     assert "darf nicht erscheinen" not in r.stdout.split("--- LOG ---")[0]

@@ -41,7 +41,7 @@ def code_umgebung() -> SandboxedEnvironment:
         finalize=_nur_escaped,
         trim_blocks=True,
         lstrip_blocks=True,
-        keep_trailing_newline=False,
+        keep_trailing_newline=True,
     )
     env.filters.clear()
     return env

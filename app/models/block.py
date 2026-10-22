@@ -112,6 +112,8 @@ class BlockDef(BaseModel):
     # Fortschrittstext, z. B. "Dienst {{ dienst }} wird neu gestartet".
     # Wird mit den Rohwerten gerendert und danach als Ganzes escaped.
     fortschritt: str | None = None
+    # Hilfe bei einem Fehler, wird unter „FEHLER …“ als „Tipp: …“ ausgegeben.
+    tipp: str = ""
     parameter: list[ParameterDef] = Field(default_factory=list)
     ziele: dict[Ziel, str]
     pruefung: dict[Ziel, str] = Field(default_factory=dict)

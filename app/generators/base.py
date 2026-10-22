@@ -18,6 +18,7 @@ from urllib.parse import quote
 
 from app import escaping
 from app.escaping import Escaped, UnsicherError, Ziel
+from app.export import exportiere, text_fuer
 from app.ir import BlockSchritt, Knoten, ScriptIR, WennFehler, Wiederhole
 from app.models.block import BlockDef, Risiko
 from app.registry import Registry
@@ -61,6 +62,11 @@ ZIEL_ANZEIGE = {
 }
 
 SIMULATION_PREFIX = "[SIMULATION] würde ausführen: "
+
+# Einheitliches Ausgabeformat aller Ziele (siehe docs/sicherheit.md bzw. CHANGELOG)
+LINIE_DOPPELT = "=" * 46
+LINIE = "-" * 46
+EINZUG = " " * 6
 
 
 def unc_zu_smb_url(unc: str) -> str:
@@ -117,9 +123,9 @@ class Generator(ABC):
         zeilen += self.emit_liste(ir.schritte)
         zeilen += self.abschluss(ir)
 
-        text = "\n".join(zeilen).replace("\r\n", "\n").rstrip("\n") + "\n"
-        text = text.replace("\n", self.zeilenende)
-        inhalt = (b"\xef\xbb\xbf" if self.bom else b"") + text.encode("utf-8")
+        roh = "\n".join(zeilen).rstrip("\n") + "\n"
+        text = text_fuer(roh, self.ziel)
+        inhalt = exportiere(roh, self.ziel)
         return GeneratedScript(
             ziel=self.ziel,
             text=text,
@@ -181,6 +187,21 @@ class Generator(ABC):
         if mit_sonst:
             return "Ein Schritt ist fehlgeschlagen - es geht mit den Ausweichschritten weiter."
         return "Ein Schritt ist fehlgeschlagen - der Fehler wird wie vorgesehen übergangen."
+
+    def kopf_ausgabe(self, ir: ScriptIR) -> list[str]:
+        """Kasten am Scriptanfang (wird auf Konsole und ins Protokoll geschrieben)."""
+        erstellt = ir.meta.erstellt_am.strftime("%d.%m.%Y %H:%M")
+        zeilen = [
+            LINIE_DOPPELT,
+            f" okm Script-Baukasten · {ir.meta.titel}",
+            f" Erstellt: {erstellt} · von {ir.meta.autor}",
+        ]
+        if ir.optionen.dry_run:
+            zeilen.append(" NUR SIMULATION – es wird nichts verändert")
+        return [*zeilen, LINIE_DOPPELT]
+
+    def schritt_titel(self, info: SchrittInfo) -> str:
+        return f"[{info.bezeichnung}] {info.fortschritt} ..."
 
     def schluss_text(self) -> str:
         """Text der Abschlussmeldung (mit Schleifen gibt es keine feste Gesamtzahl)."""

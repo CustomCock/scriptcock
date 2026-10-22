@@ -116,7 +116,7 @@ def test_kopfkommentar_und_ablauf(registry: Registry, ziel: Ziel) -> None:
         "[2/3] Ping auf 10.0.0.1 ^(4x^)" if ziel is Ziel.CMD else "[2/3] Ping auf 10.0.0.1 (4x)",
         "[3/3]",
         "okm-script-",
-        "Fertig, ",
+        "Fertig: ",
         "Protokoll",
     ]:
         assert erwartet in t, (ziel, erwartet)
@@ -126,7 +126,7 @@ def test_fehlerbehandlung(registry: Registry) -> None:
     ps = erzeuge(registry, Ziel.POWERSHELL, [("systeminfo", {})]).text
     assert "$ErrorActionPreference = 'Stop'" in ps and "try {" in ps and "} catch {" in ps
     assert "Start-Transcript" in ps
-    assert "if errorlevel 1" in erzeuge(registry, Ziel.CMD, [("systeminfo", {})]).text
+    assert 'if not "%OKM_RC%"=="0" goto :okm_fehler' in erzeuge(registry, Ziel.CMD, [("systeminfo", {})]).text
     assert "set -Eeuo pipefail" in erzeuge(registry, Ziel.BASH, [("systeminfo", {})]).text
     assert "setopt ERR_EXIT NO_UNSET PIPE_FAIL" in erzeuge(registry, Ziel.ZSH, [("systeminfo", {})]).text
 
@@ -232,6 +232,7 @@ def test_bibliothek_hat_alle_risikostufen(registry: Registry, risiko: Risiko) ->
 def test_cmd_erkennt_negative_exitcodes(registry: Registry) -> None:
     # winget meldet Fehler als negative HRESULTs – "if errorlevel 1" allein reicht nicht.
     erfasst = erzeuge(registry, Ziel.CMD, [("paket_installieren", {"paket": "Mozilla.Firefox"})]).text
-    assert 'else if not errorlevel 0 (set "OKM_RC=1")' in erfasst
+    # Der Code wird als Text gesichert und mit "0" verglichen – das erfasst auch negative Werte.
+    assert 'set "OKM_RC=%ERRORLEVEL%"' in erfasst and 'if not "%OKM_RC%"=="0" goto :okm_fehler' in erfasst
     interaktiv = erzeuge(registry, Ziel.CMD, [("meldung", {"text": "Hallo"})]).text
-    assert "if not errorlevel 0 goto :okm_fehler" in interaktiv
+    assert 'if not "%OKM_RC%"=="0" goto :okm_fehler' in interaktiv

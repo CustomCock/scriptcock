@@ -10,17 +10,15 @@ from __future__ import annotations
 from typing import ClassVar
 
 from app.escaping import Ziel, sh_literal
-from app.generators.base import Generator, SchrittInfo, einruecken
+from app.generators.base import EINZUG, LINIE, Generator, SchrittInfo, einruecken
 from app.ir import ScriptIR
 from app.models.block import BlockDef
+
+ABBRUCH_TEXT = " Abgebrochen durch Benutzer. Es wurde nichts weiter ausgeführt."
 
 
 def _lit(text: str) -> str:
     return str(sh_literal(text))
-
-
-def _ausgabe(text: str) -> str:
-    return f"printf '%s\\n' {_lit(text)}"
 
 
 class ShGenerator(Generator):
@@ -50,10 +48,23 @@ class ShGenerator(Generator):
         zeilen = [
             *self.fehlerbehandlung(),
             "",
-            'OKM_LOG="/tmp/okm-script-$(date +%Y%m%d-%H%M%S).log"',
+            'OKM_LOG="${TMPDIR:-/tmp}/okm-script-$(date +%Y%m%d-%H%M%S).log"',
             *([] if self.mit_kontrolle else [f"OKM_GESAMT={gesamt}"]),
             "OKM_OK=0",
+            "OKM_NR=0",
             "OKM_SCHRITT='-'",
+            "OKM_STATUS=laeuft",
+            "OKM_TIPP=''",
+            "",
+            "# Meldungen: Werte immer als Argumente übergeben, nie in den Formatstring einsetzen.",
+            "# Keine Farben – die Ausgabe geht auch ins Protokoll.",
+            "okm_info() { printf '%s\\n' \"$*\"; }",
+            '# shellcheck disable=SC2120  # Text ist optional (Blöcke dürfen okm_ok "…" nutzen)',
+            f"okm_ok() {{ if [ $# -gt 0 ]; then printf '{EINZUG}OK  %s\\n' \"$*\"; "
+            f"else printf '%s\\n' '{EINZUG}OK'; fi; }}",
+            f"okm_warn() {{ printf '{EINZUG}WARNUNG  %s\\n' \"$*\"; }}",
+            f"okm_fehler() {{ printf '{EINZUG}FEHLER  %s\\n' \"$*\"; }}",
+            *self._zusammenfassung(),
         ]
         if self.mit_kontrolle:
             zeilen += [
@@ -72,21 +83,45 @@ class ShGenerator(Generator):
             "",
             *self.fehler_handler(),
             "",
+            *[f"okm_info {_lit(z)}" for z in self.kopf_ausgabe(ir)],
+            "",
         ]
-        if ir.optionen.dry_run:
-            zeilen += [_ausgabe("NUR SIMULATION: Es wird nichts verändert."), ""]
         if braucht_admin:
             zeilen += [
                 "# Prüfung: root-Rechte",
                 'if [ "$(id -u)" -ne 0 ]; then',
-                f"  {_ausgabe('Dieses Script braucht Administratorrechte (root).')}",
-                f"  {_ausgabe(self.sudo_hinweis)}",
-                "  printf 'Protokoll: %s\\n' \"$OKM_LOG\"",
+                f"  okm_fehler {_lit('Dieses Script braucht Administratorrechte (root).')}",
+                f"  okm_info {_lit(EINZUG + self.sudo_hinweis)}",
+                "  OKM_STATUS=rechte",
+                "  okm_zusammenfassung",
                 "  exit 1",
                 "fi",
                 "",
             ]
         return zeilen
+
+    def _zusammenfassung(self) -> list[str]:
+        if self.mit_kontrolle:
+            fertig = "printf ' Fertig: %s Schritte erfolgreich ausgeführt.\\n' \"$OKM_OK\""
+            fehler = "printf ' Abgebrochen bei Schritt %s.\\n' \"$OKM_NR\""
+            bisher = "printf ' Erfolgreich bis dahin: %s Schritte.\\n' \"$OKM_OK\""
+        else:
+            fertig = 'printf \' Fertig: %s von %s Schritten erfolgreich.\\n\' "$OKM_OK" "$OKM_GESAMT"'
+            fehler = 'printf \' Abgebrochen bei Schritt %s von %s.\\n\' "$OKM_NR" "$OKM_GESAMT"'
+            bisher = 'printf \' Erfolgreich bis dahin: %s von %s Schritten.\\n\' "$OKM_OK" "$OKM_GESAMT"'
+        return [
+            "okm_zusammenfassung() {",
+            f"  okm_info {_lit(LINIE)}",
+            '  case "$OKM_STATUS" in',
+            f"    fertig) {fertig} ;;",
+            f"    abbruch) okm_info {_lit(ABBRUCH_TEXT)} ;;",
+            f"    rechte) okm_info {_lit(' Abgebrochen: fehlende Rechte.')} ;;",
+            f"    *) {fehler}; {bisher} ;;",
+            "  esac",
+            "  printf ' Protokoll: %s\\n' \"$OKM_LOG\"",
+            f"  okm_info {_lit(LINIE)}",
+            "}",
+        ]
 
     def fehler_handler(self) -> list[str]:
         raise NotImplementedError
@@ -99,25 +134,19 @@ class ShGenerator(Generator):
             "  # Rückgabewert eines „Versuche“-Blocks wertet das Script selbst aus",
             '  if [ "$OKM_SCHUTZ" = 1 ]; then return 0; fi',
             '  if [ "$OKM_VERSUCH" -gt 0 ]; then',
-            '    printf \'\\nSchritt %s ist fehlgeschlagen (Exit-Code %s).\\n\' "$OKM_SCHRITT" "$okm_rc"',
+            '    okm_fehler "Schritt $OKM_SCHRITT ist fehlgeschlagen (Exit-Code $okm_rc)."',
             '    exit "$okm_rc"',
             "  fi",
         ]
 
     def _fehler_ausgabe(self) -> list[str]:
         """Abbruch des ganzen Scripts mit Zusammenfassung."""
-        if not self.mit_kontrolle:
-            return [
-                '  printf \'\\nFEHLER in Schritt %s (Exit-Code %s).\\n\' "$OKM_SCHRITT" "$okm_rc"',
-                '  printf \'Erfolgreich bis dahin: %s von %s Schritten.\\n\' "$OKM_OK" "$OKM_GESAMT"',
-                "  printf 'Protokoll: %s\\n' \"$OKM_LOG\"",
-                '  exit "$okm_rc"',
-            ]
         return [
-            '  printf \'\\nFEHLER in Schritt %s (Exit-Code %s).\\n\' "$OKM_SCHRITT" "$okm_rc"',
-            "  printf 'Erfolgreich bis dahin: %s Schritte.\\n' \"$OKM_OK\"",
-            "  printf 'Protokoll: %s\\n' \"$OKM_LOG\"",
-            '  rm -f "$OKM_ZAEHLER"',
+            '  okm_fehler "Schritt $OKM_SCHRITT: Befehl endete mit Exit-Code $okm_rc."',
+            '  if [ -n "$OKM_TIPP" ]; then okm_info "' + EINZUG + 'Tipp: $OKM_TIPP"; fi',
+            "  OKM_STATUS=fehler",
+            "  okm_zusammenfassung",
+            *(['  rm -f "$OKM_ZAEHLER"'] if self.mit_kontrolle else []),
             '  exit "$okm_rc"',
         ]
 
@@ -127,27 +156,28 @@ class ShGenerator(Generator):
             "# " + "-" * 68,
             f"# Schritt {info.bezeichnung}: {b.name} (Risiko: {b.risiko.value})",
             "# " + "-" * 68,
+            f"OKM_NR={info.nr}",
             f"OKM_SCHRITT={_lit(f'{info.bezeichnung} ({b.name})')}",
-            _ausgabe(f"[{info.bezeichnung}] {info.fortschritt} …"),
+            f"OKM_TIPP={_lit(b.tipp)}",
+            f"okm_info {_lit(self.schritt_titel(info))}",
         ]
         if info.bestaetigen:
             zeilen += [
-                _ausgabe(f"ACHTUNG: Dieser Schritt ist destruktiv: {b.name}"),
+                f"okm_warn {_lit(f'ACHTUNG: Dieser Schritt ist destruktiv: {b.name}')}",
                 'okm_antwort=""',
                 self.lies_antwort("Zum Fortfahren JA eingeben (alles andere bricht ab): "),
                 'if [ "$okm_antwort" != "JA" ]; then',
-                f"  {_ausgabe('Abgebrochen. Es wurde nichts weiter ausgeführt.')}",
                 *(
                     [f"  exit {self.ABBRUCH_CODE}"]
                     if self.im_versuch
-                    else ["  printf 'Protokoll: %s\\n' \"$OKM_LOG\"", "  exit 2"]
+                    else ["  OKM_STATUS=abbruch", "  okm_zusammenfassung", "  exit 2"]
                 ),
                 "fi",
             ]
         zeilen += info.koerper
         if info.pruefung:
             zeilen += ["# Prüfung", *info.pruefung]
-        zeilen += ["okm_geschafft" if self.mit_kontrolle else "OKM_OK=$((OKM_OK + 1))", ""]
+        zeilen += ["okm_geschafft" if self.mit_kontrolle else "OKM_OK=$((OKM_OK + 1))", "okm_ok", ""]
         return zeilen
 
     def wenn_fehler(self, nr: int, versuch: list[str], sonst: list[str]) -> list[str]:
@@ -155,7 +185,7 @@ class ShGenerator(Generator):
         weiterreichen = (
             [f"  exit {self.ABBRUCH_CODE}"]
             if self.im_versuch
-            else ["  printf 'Protokoll: %s\\n' \"$OKM_LOG\"", '  rm -f "$OKM_ZAEHLER"', "  exit 2"]
+            else ["  OKM_STATUS=abbruch", "  okm_zusammenfassung", '  rm -f "$OKM_ZAEHLER"', "  exit 2"]
         )
         return [
             f"# ===== Versuche (Block {nr}) =====",
@@ -177,7 +207,7 @@ class ShGenerator(Generator):
             *weiterreichen,
             "fi",
             f'if [ "${rc}" -ne 0 ]; then',
-            f"  {_ausgabe(self.meldung_ausweichen(bool(sonst)))}",
+            f"  okm_warn {_lit(self.meldung_ausweichen(bool(sonst)))}",
             *einruecken(sonst, 2),
             "fi",
             f"# ===== Ende Versuche (Block {nr}) =====",
@@ -189,22 +219,17 @@ class ShGenerator(Generator):
         return [
             f"# ===== Wiederhole {anzahl}-mal (Block {nr}) =====",
             f"for (({var} = 1; {var} <= {anzahl}; {var}++)); do",
-            f"  printf '%s\\n' \"--- Durchlauf ${var} von {anzahl} ---\"",
+            f'  okm_info "--- Durchlauf ${var} von {anzahl} ---"',
             *einruecken(rumpf, 2),
             "done",
             "",
         ]
 
     def abschluss(self, ir: ScriptIR) -> list[str]:
-        if self.mit_kontrolle:
-            return [
-                "printf '\\nFertig, %s Schritte erfolgreich ausgeführt.\\n' \"$OKM_OK\"",
-                "printf 'Protokoll: %s\\n' \"$OKM_LOG\"",
-                'rm -f "$OKM_ZAEHLER"',
-            ]
         return [
-            'printf \'\\nFertig, %s von %s Schritten erfolgreich.\\n\' "$OKM_OK" "$OKM_GESAMT"',
-            "printf 'Protokoll: %s\\n' \"$OKM_LOG\"",
+            "OKM_STATUS=fertig",
+            "okm_zusammenfassung",
+            *(['rm -f "$OKM_ZAEHLER"'] if self.mit_kontrolle else []),
         ]
 
 
@@ -220,13 +245,13 @@ class BashGenerator(ShGenerator):
 
     def fehler_handler(self) -> list[str]:
         return [
-            "okm_fehler() {",
+            "okm_bei_fehler() {",
             "  local okm_rc=$?",
             *self._fehler_pruefungen(),
             "  trap - ERR",
             *self._fehler_ausgabe(),
             "}",
-            "trap okm_fehler ERR",
+            "trap okm_bei_fehler ERR",
         ]
 
     def lies_antwort(self, prompt: str) -> str:

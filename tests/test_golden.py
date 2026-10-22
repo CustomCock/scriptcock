@@ -65,7 +65,9 @@ def test_golden_ablauf(ziel: Ziel) -> None:
 
 
 def test_keine_verwaisten_golden_dateien() -> None:
-    erwartet = {f"{r}{_endung(z)}" for r, z in FAELLE} | {f"_ablauf{_endung(z)}" for z in Ziel}
+    erwartet = {f"{r}{_endung(z)}" for r, z in FAELLE} | {
+        f"{n}{_endung(z)}" for n in ("_ablauf", "_umlaute") for z in Ziel
+    }
     vorhanden = {p.name for p in GOLDEN.iterdir() if p.is_file()}
     assert vorhanden <= erwartet, f"Verwaiste Golden-Dateien: {sorted(vorhanden - erwartet)}"
 
@@ -82,3 +84,26 @@ def test_golden_syntax() -> None:
         if d.suffix == ".cmd":
             assert syntax.cmd_lint(d.read_bytes()) == [], d.name
     syntax.pwsh_pruefen([d for d in dateien if d.suffix == ".ps1"])
+
+
+@pytest.mark.parametrize("ziel", list(Ziel), ids=[z.value for z in Ziel])
+def test_golden_umlaute(ziel: Ziel) -> None:
+    """Umlaute in Titel, Meldung und Pfad – müssen in jedem Ziel unverändert ankommen."""
+    from tests.conftest import erzeuge
+
+    pfad = "C:\\Büro\\Größe" if ziel in (Ziel.POWERSHELL, Ziel.CMD) else "/tmp/Büro/Größe"
+    inhalt = erzeuge(
+        REG,
+        ziel,
+        [
+            ("meldung", {"text": "Büro: Größe prüfen, nichts löschen!", "pause": False}),
+            ("ordner_anlegen", {"pfad": pfad}),
+        ],
+        titel="Büro – Größe und Löschen",
+    ).inhalt
+    for wort in ("Büro", "Größe", "Löschen"):
+        assert wort.encode() in inhalt
+    datei = GOLDEN / f"_umlaute{_endung(ziel)}"
+    if os.environ.get("UPDATE_GOLDEN") == "1" or not datei.exists():
+        datei.write_bytes(inhalt)
+    assert inhalt == datei.read_bytes()

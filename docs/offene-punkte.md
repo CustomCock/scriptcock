@@ -26,7 +26,7 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 | `onedrive_reset` | powershell | Prüft drei typische Installationspfade; Firmen-Installationen „pro Computer“ ggf. an anderem Ort. |
 | `boot_dauer` | powershell | Startdauer aus `Properties[5]` von Ereignis 100 (Diagnostics-Performance) – Index prüfen. |
 | `fehlgeschlagene_anmeldungen` | powershell/bash | Feld-Indizes von Ereignis 4625 (5 = Konto, 10 = Anmeldetyp, 19 = IP); Linux braucht persistentes Journal bzw. sshd-Meldungen im Journal. |
-| `dism_sfc` | powershell/cmd | `sfc` schreibt UTF-16 – im Protokoll erscheinen Leerzeichen zwischen den Zeichen. |
+| `dism_sfc` | powershell/cmd | `sfc` schreibt umgeleitet UTF-16: PowerShell liest die Ausgabe dafür kurz als UTF-16, CMD führt den Schritt ohne Umleitung aus (Ausgabe dann nicht im Protokoll). Auf Win 11 prüfen. |
 | `update_status` | powershell | Die COM-Suche nach Updates dauert mitunter Minuten und folgt WSUS, falls konfiguriert. |
 | `winget_upgrade_alle` | powershell/cmd | winget ist im SYSTEM-Kontext (z. B. Fernwartung als Dienst) nicht verfügbar. |
 | `support_infos` | cmd | Keine Seriennummer (wmic ist abgekündigt). AnyDesk-ID nur bei Standard-Installation unter `ProgramData`. |

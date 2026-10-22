@@ -22,7 +22,7 @@ from app.db import Datenbank
 from app.katalog import lade_katalog
 from app.models.software import SoftwareKatalog
 from app.registry import Registry, lade_registry
-from app.routes import api, baukasten, bibliothek, blockly, pages, software, verwaltung
+from app.routes import api, baukasten, bibliothek, blockly, export, pages, software, verwaltung
 
 PROJEKT = Path(__file__).resolve().parent.parent
 log = logging.getLogger("baukasten")
@@ -117,6 +117,7 @@ def create_app(
     app.include_router(verwaltung.router)
     app.include_router(blockly.router)
     app.include_router(software.router)
+    app.include_router(export.router)
     app.include_router(api.router, prefix="/api/v1")
 
     @app.get("/healthz", include_in_schema=False)

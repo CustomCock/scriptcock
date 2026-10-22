@@ -25,24 +25,76 @@
 #
 # Generiert mit dem okm Script-Baukasten
 # ======================================================================
+param(
+    # Am Ende nicht auf Enter warten (für Fernwartung/RMM)
+    [switch]$NoPause
+)
 
 $ErrorActionPreference = 'Stop'
+$OkmKeinePause = [bool]$NoPause
+# Konsole auf UTF-8: Ausgaben externer Programme (winget, ipconfig, netsh …) werden sonst
+# mit der OEM-Codepage gelesen und erscheinen als Zeichensalat (Gr├Â├ƒe statt Größe).
+$OkmUtf8 = New-Object System.Text.UTF8Encoding $false
+try { [Console]::OutputEncoding = $OkmUtf8 } catch { $null = $_ }
+$OutputEncoding = $OkmUtf8
 $OkmLog = Join-Path $env:TEMP ('okm-script-{0}.log' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
 $OkmErfolgreich = 0
+$OkmNr = 0
+$OkmStatus = 'laeuft'
 try { Start-Transcript -Path $OkmLog -Append | Out-Null } catch { Write-Warning 'Protokoll konnte nicht gestartet werden.' }
+
+# Meldungen: Werte immer als Argument übergeben, nie in Strings einsetzen
+function Write-OkmInfo([string]$Text) { Write-Host $Text }
+function Write-OkmOk([string]$Text = '') {
+    if ($Text) { Write-Host ('      OK  ' + $Text) -ForegroundColor Green }
+    else { Write-Host '      OK' -ForegroundColor Green }
+}
+function Write-OkmWarnung([string]$Text) { Write-Host ('      WARNUNG  ' + $Text) -ForegroundColor Yellow }
+function Write-OkmFehler([string]$Text) { Write-Host ('      FEHLER  ' + $Text) -ForegroundColor Red }
+
+# Fenster offen halten (Rechtsklick > Mit PowerShell ausführen) – aber nicht mit -NoPause,
+# ohne Benutzer, bei umgeleiteter Eingabe oder -NonInteractive (Fernwartung/RMM).
+function Wait-OkmEnde {
+    if ($OkmKeinePause -or -not [Environment]::UserInteractive) { return }
+    try { if ([Console]::IsInputRedirected) { return } } catch { return }
+    $OkmArgumente = @([Environment]::GetCommandLineArgs() | Where-Object { $_ -like '-NonI*' })
+    if ($OkmArgumente.Count -gt 0) { return }
+    [void](Read-Host 'Drücke Enter zum Schließen …')
+}
 
 function Exit-OkmScript {
     param([int]$Code)
-    Write-Host ''
-    Write-Host ('Protokoll: ' + $OkmLog)
+    Write-Host '----------------------------------------------'
+    switch ($script:OkmStatus) {
+        'fertig' { Write-Host (' Fertig: ' + $script:OkmErfolgreich + ' Schritte erfolgreich ausgeführt.') -ForegroundColor Green }
+        'abbruch' {
+            Write-Host ' Abgebrochen durch Benutzer. Es wurde nichts weiter ausgeführt.' -ForegroundColor Yellow
+        }
+        'rechte' {
+            Write-Host ' Abgebrochen: fehlende Administratorrechte.' -ForegroundColor Red
+        }
+        default {
+            Write-Host (' Abgebrochen bei Schritt ' + $script:OkmNr + '.') -ForegroundColor Red
+            Write-Host (' Erfolgreich bis dahin: ' + $script:OkmErfolgreich + ' Schritte.')
+        }
+    }
+    Write-Host (' Protokoll: ' + $OkmLog)
+    Write-Host '----------------------------------------------'
     try { Stop-Transcript | Out-Null } catch { $null = $_ }
+    Wait-OkmEnde
     exit $Code
 }
+
+Write-OkmInfo '=============================================='
+Write-OkmInfo ' okm Script-Baukasten · Ablauf'
+Write-OkmInfo ' Erstellt: 15.01.2026 09:30 · von pytest'
+Write-OkmInfo '=============================================='
 
 # --------------------------------------------------------------------
 # Schritt 1/8: Meldung/Pause für den Benutzer (Risiko: gruen)
 # --------------------------------------------------------------------
-Write-Host '[1/8] Hinweis für den Benutzer …'
+$OkmNr = 1
+Write-OkmInfo '[1/8] Hinweis für den Benutzer ...'
 try {
     $global:LASTEXITCODE = 0
     . {
@@ -50,9 +102,10 @@ try {
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
     $OkmErfolgreich++
+    Write-OkmOk
 } catch {
-    Write-Host ('FEHLER in Schritt 1/8 (Meldung/Pause für den Benutzer): ' + $_.Exception.Message) -ForegroundColor Red
-    Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' Schritte.')
+    Write-OkmFehler $_.Exception.Message
+    $OkmStatus = 'fehler'
     Exit-OkmScript 1
 }
 
@@ -61,7 +114,8 @@ try {
     # --------------------------------------------------------------------
     # Schritt 2/8: Ordner anlegen (Risiko: gelb)
     # --------------------------------------------------------------------
-    Write-Host '[2/8] Ordner C:\temp\okm wird angelegt …'
+    $OkmNr = 2
+    Write-OkmInfo '[2/8] Ordner C:\temp\okm wird angelegt ...'
     try {
         $global:LASTEXITCODE = 0
         . {
@@ -69,8 +123,9 @@ try {
         } | Out-Host
         if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
         $OkmErfolgreich++
+        Write-OkmOk
     } catch {
-        Write-Host ('FEHLER in Schritt 2/8 (Ordner anlegen): ' + $_.Exception.Message) -ForegroundColor Red
+        Write-OkmFehler $_.Exception.Message
         throw
     }
 
@@ -79,7 +134,8 @@ try {
         # --------------------------------------------------------------------
         # Schritt 3/8: Ping auf Ziel (Risiko: gruen)
         # --------------------------------------------------------------------
-        Write-Host '[3/8] Ping auf 10.0.0.1 (4x) …'
+        $OkmNr = 3
+        Write-OkmInfo '[3/8] Ping auf 10.0.0.1 (4x) ...'
         try {
             $global:LASTEXITCODE = 0
             . {
@@ -90,22 +146,25 @@ try {
             } | Out-Host
             if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
             $OkmErfolgreich++
+            Write-OkmOk
         } catch {
-            Write-Host ('FEHLER in Schritt 3/8 (Ping auf Ziel): ' + $_.Exception.Message) -ForegroundColor Red
+            Write-OkmFehler $_.Exception.Message
+            Write-OkmInfo '      Tipp: Ist das Gerät eingeschaltet und im selben Netz? Manche Geräte und Firewalls antworten grundsätzlich nicht auf Ping.'
             throw
         }
 
     } catch {
-        Write-Host 'Ein Schritt ist fehlgeschlagen - der Fehler wird wie vorgesehen übergangen.' -ForegroundColor Yellow
+        Write-OkmWarnung 'Ein Schritt ist fehlgeschlagen - der Fehler wird wie vorgesehen übergangen.'
     }
     # ===== Ende Versuche (Block 2) =====
 
 } catch {
-    Write-Host 'Ein Schritt ist fehlgeschlagen - es geht mit den Ausweichschritten weiter.' -ForegroundColor Yellow
+    Write-OkmWarnung 'Ein Schritt ist fehlgeschlagen - es geht mit den Ausweichschritten weiter.'
     # --------------------------------------------------------------------
     # Schritt 4/8: Meldung/Pause für den Benutzer (Risiko: gruen)
     # --------------------------------------------------------------------
-    Write-Host '[4/8] Hinweis für den Benutzer …'
+    $OkmNr = 4
+    Write-OkmInfo '[4/8] Hinweis für den Benutzer ...'
     try {
         $global:LASTEXITCODE = 0
         . {
@@ -113,23 +172,25 @@ try {
         } | Out-Host
         if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
         $OkmErfolgreich++
+        Write-OkmOk
     } catch {
-        Write-Host ('FEHLER in Schritt 4/8 (Meldung/Pause für den Benutzer): ' + $_.Exception.Message) -ForegroundColor Red
-        Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' Schritte.')
+        Write-OkmFehler $_.Exception.Message
+        $OkmStatus = 'fehler'
         Exit-OkmScript 1
     }
 
     # ===== Wiederhole 2-mal (Block 3) =====
     for ($OkmDurchlauf3 = 1; $OkmDurchlauf3 -le 2; $OkmDurchlauf3++) {
-        Write-Host ('--- Durchlauf ' + $OkmDurchlauf3 + ' von 2 ---') -ForegroundColor Cyan
+        Write-OkmInfo ('--- Durchlauf ' + $OkmDurchlauf3 + ' von 2 ---')
         # --------------------------------------------------------------------
         # Schritt 5/8: Prozess beenden (Risiko: rot)
         # --------------------------------------------------------------------
-        Write-Host '[5/8] Prozess notepad wird beendet …'
-        Write-Host 'ACHTUNG: Dieser Schritt ist destruktiv: Prozess beenden' -ForegroundColor Yellow
+        $OkmNr = 5
+        Write-OkmInfo '[5/8] Prozess notepad wird beendet ...'
+        Write-OkmWarnung 'ACHTUNG: Dieser Schritt ist destruktiv: Prozess beenden'
         $OkmAntwort = Read-Host 'Zum Fortfahren JA eingeben (alles andere bricht ab)'
         if ($OkmAntwort -cne 'JA') {
-            Write-Host 'Abgebrochen. Es wurde nichts weiter ausgeführt.' -ForegroundColor Yellow
+            $OkmStatus = 'abbruch'
             Exit-OkmScript 2
         }
         try {
@@ -144,9 +205,10 @@ try {
             } | Out-Host
             if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
             $OkmErfolgreich++
+            Write-OkmOk
         } catch {
-            Write-Host ('FEHLER in Schritt 5/8 (Prozess beenden): ' + $_.Exception.Message) -ForegroundColor Red
-            Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' Schritte.')
+            Write-OkmFehler $_.Exception.Message
+            $OkmStatus = 'fehler'
             Exit-OkmScript 1
         }
 
@@ -157,11 +219,12 @@ try {
 
 # ===== Wiederhole 3-mal (Block 4) =====
 for ($OkmDurchlauf4 = 1; $OkmDurchlauf4 -le 3; $OkmDurchlauf4++) {
-    Write-Host ('--- Durchlauf ' + $OkmDurchlauf4 + ' von 3 ---') -ForegroundColor Cyan
+    Write-OkmInfo ('--- Durchlauf ' + $OkmDurchlauf4 + ' von 3 ---')
     # --------------------------------------------------------------------
     # Schritt 6/8: Meldung/Pause für den Benutzer (Risiko: gruen)
     # --------------------------------------------------------------------
-    Write-Host '[6/8] Hinweis für den Benutzer …'
+    $OkmNr = 6
+    Write-OkmInfo '[6/8] Hinweis für den Benutzer ...'
     try {
         $global:LASTEXITCODE = 0
         . {
@@ -169,9 +232,10 @@ for ($OkmDurchlauf4 = 1; $OkmDurchlauf4 -le 3; $OkmDurchlauf4++) {
         } | Out-Host
         if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
         $OkmErfolgreich++
+        Write-OkmOk
     } catch {
-        Write-Host ('FEHLER in Schritt 6/8 (Meldung/Pause für den Benutzer): ' + $_.Exception.Message) -ForegroundColor Red
-        Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' Schritte.')
+        Write-OkmFehler $_.Exception.Message
+        $OkmStatus = 'fehler'
         Exit-OkmScript 1
     }
 
@@ -180,7 +244,8 @@ for ($OkmDurchlauf4 = 1; $OkmDurchlauf4 -le 3; $OkmDurchlauf4++) {
         # --------------------------------------------------------------------
         # Schritt 7/8: Dienst-Status prüfen (Risiko: gruen)
         # --------------------------------------------------------------------
-        Write-Host '[7/8] Status von Dienst Spooler wird abgefragt …'
+        $OkmNr = 7
+        Write-OkmInfo '[7/8] Status von Dienst Spooler wird abgefragt ...'
         try {
             $global:LASTEXITCODE = 0
             . {
@@ -188,13 +253,14 @@ for ($OkmDurchlauf4 = 1; $OkmDurchlauf4 -le 3; $OkmDurchlauf4++) {
             } | Out-Host
             if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
             $OkmErfolgreich++
+            Write-OkmOk
         } catch {
-            Write-Host ('FEHLER in Schritt 7/8 (Dienst-Status prüfen): ' + $_.Exception.Message) -ForegroundColor Red
+            Write-OkmFehler $_.Exception.Message
             throw
         }
 
     } catch {
-        Write-Host 'Ein Schritt ist fehlgeschlagen - der Fehler wird wie vorgesehen übergangen.' -ForegroundColor Yellow
+        Write-OkmWarnung 'Ein Schritt ist fehlgeschlagen - der Fehler wird wie vorgesehen übergangen.'
     }
     # ===== Ende Versuche (Block 5) =====
 
@@ -203,7 +269,8 @@ for ($OkmDurchlauf4 = 1; $OkmDurchlauf4 -le 3; $OkmDurchlauf4++) {
 # --------------------------------------------------------------------
 # Schritt 8/8: Meldung/Pause für den Benutzer (Risiko: gruen)
 # --------------------------------------------------------------------
-Write-Host '[8/8] Hinweis für den Benutzer …'
+$OkmNr = 8
+Write-OkmInfo '[8/8] Hinweis für den Benutzer ...'
 try {
     $global:LASTEXITCODE = 0
     . {
@@ -211,12 +278,12 @@ try {
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
     $OkmErfolgreich++
+    Write-OkmOk
 } catch {
-    Write-Host ('FEHLER in Schritt 8/8 (Meldung/Pause für den Benutzer): ' + $_.Exception.Message) -ForegroundColor Red
-    Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' Schritte.')
+    Write-OkmFehler $_.Exception.Message
+    $OkmStatus = 'fehler'
     Exit-OkmScript 1
 }
 
-Write-Host ''
-Write-Host ('Fertig, ' + $OkmErfolgreich + ' Schritte erfolgreich ausgeführt.') -ForegroundColor Green
+$OkmStatus = 'fertig'
 Exit-OkmScript 0

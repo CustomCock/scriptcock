@@ -233,7 +233,7 @@ def test_ausweichschritte_bei_fehler(registry: Registry, tmp_path: Path, shell: 
     assert "es geht mit den Ausweichschritten weiter" in r.stdout
     assert "AUSWEICHEN" in r.stdout and "danach" in r.stdout
     # vorher, a, AUSWEICHEN, c, danach = 5 erfolgreiche Schritte
-    assert "Fertig, 5 Schritte erfolgreich ausgeführt." in r.stdout
+    assert "Fertig: 5 Schritte erfolgreich ausgeführt." in r.stdout
 
 
 @pytest.mark.parametrize(("shell", "ziel"), SH)
@@ -244,7 +244,7 @@ def test_ohne_fehler_keine_ausweichschritte(
     r = ausfuehren(shell, inhalt, tmp_path)
     assert r.returncode == 0, r.stdout + r.stderr
     assert "AUSWEICHEN" not in r.stdout.split("--- LOG ---")[0].replace("printf", "")
-    assert "Fertig, 2 Schritte erfolgreich ausgeführt." in r.stdout
+    assert "Fertig: 2 Schritte erfolgreich ausgeführt." in r.stdout
 
 
 @pytest.mark.parametrize(("shell", "ziel"), SH)
@@ -264,7 +264,7 @@ def test_fehler_ignorieren_und_fehler_in_ausweichschritten(
     )
     r = ausfuehren(shell, inhalt, tmp_path)
     assert r.returncode != 0
-    assert "FEHLER in Schritt 2/3" in r.stdout
+    assert "Abgebrochen bei Schritt 2." in r.stdout
     assert "NIE" not in r.stdout.split("--- LOG ---")[0]
 
 
@@ -316,7 +316,7 @@ def test_wiederhole(registry: Registry, tmp_path: Path, shell: str, ziel: Ziel) 
     assert r.returncode == 0, r.stdout + r.stderr
     assert out.count("RUNDE\n") == 3
     assert "--- Durchlauf 3 von 3 ---" in out
-    assert "Fertig, 4 Schritte erfolgreich ausgeführt." in out
+    assert "Fertig: 4 Schritte erfolgreich ausgeführt." in out
 
 
 def test_powershell_ablauf(registry: Registry, tmp_path: Path) -> None:
@@ -335,7 +335,7 @@ def test_powershell_ablauf(registry: Registry, tmp_path: Path) -> None:
     assert r.returncode == 0, r.stdout + r.stderr
     assert out.count("RUNDE") == 2 and "--- Durchlauf 2 von 2 ---" in out
     assert "AUSWEICHEN" in out and "NIE" not in out and "übergangen" in out and "ENDE" in out
-    assert "Fertig, 4 Schritte erfolgreich ausgeführt." in out
+    assert "Fertig: 4 Schritte erfolgreich ausgeführt." in out
 
 
 def test_powershell_fehler_in_ausweichschritten(registry: Registry, tmp_path: Path) -> None:

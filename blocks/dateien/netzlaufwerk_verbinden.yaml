@@ -8,6 +8,7 @@ hilfe: |
   Ist der Laufwerksbuchstabe schon belegt, bricht der Schritt mit einer Meldung ab.
 risiko: gelb
 fortschritt: "Netzlaufwerk {{ pfad }} wird verbunden"
+tipp: 'Pfad prüfen (\\server\freigabe) und ob du auf die Freigabe Zugriff hast. Der Laufwerksbuchstabe darf noch nicht belegt sein.'
 parameter:
   - id: laufwerk
     label: Laufwerksbuchstabe

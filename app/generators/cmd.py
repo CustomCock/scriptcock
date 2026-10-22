@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import ClassVar
 
 from app.escaping import Ziel, echo_cmd, kommentar_text
-from app.generators.base import Generator, SchrittInfo
+from app.generators.base import EINZUG, LINIE, Generator, SchrittInfo
 from app.ir import ScriptIR
 from app.models.block import BlockDef
 
@@ -53,11 +53,11 @@ class CmdGenerator(Generator):
             f'set "OKM_GESAMT={gesamt}"',
             'set "OKM_OK=0"',
             'set "OKM_SCHRITT=0"',
-            *_echo_beides("okm Script-Baukasten: " + ir.meta.titel),
+            'set "OKM_RC=0"',
+            'set "OKM_TIPP="',
+            *[z for k in self.kopf_ausgabe(ir) for z in _echo_beides(k)],
             "",
         ]
-        if ir.optionen.dry_run:
-            zeilen += [*_echo_beides("NUR SIMULATION: Es wird nichts verändert."), ""]
         if braucht_admin:
             zeilen += [
                 "rem Prüfung: Administratorrechte",
@@ -74,19 +74,18 @@ class CmdGenerator(Generator):
 
     def _gruppe(self, zeilen: list[str], interaktiv: bool) -> list[str]:
         ziel = self._fehlerziel
+        # Exit-Code direkt sichern (auch negative Codes wie winget-HRESULTs), bevor "type" ihn ändert.
+        # Im Generator erlaubt; in Block-Templates ist %ERRORLEVEL% verboten.
         if interaktiv:
-            # "if errorlevel 1" heißt ">= 1"; negative Codes (z. B. winget-HRESULTs)
-            # fängt erst "if not errorlevel 0" ab.
-            return [*zeilen, f"if errorlevel 1 goto {ziel}", f"if not errorlevel 0 goto {ziel}"]
+            return [*zeilen, 'set "OKM_RC=%ERRORLEVEL%"', f'if not "%OKM_RC%"=="0" goto {ziel}']
         return [
             "(",
             *zeilen,
             f") >{TMP} 2>&1",
-            'if errorlevel 1 (set "OKM_RC=1") else if not errorlevel 0 (set "OKM_RC=1") '
-            'else (set "OKM_RC=0")',
+            'set "OKM_RC=%ERRORLEVEL%"',
             f"type {TMP}",
             f"type {TMP} >>{LOG}",
-            f'if "%OKM_RC%"=="1" goto {ziel}',
+            f'if not "%OKM_RC%"=="0" goto {ziel}',
         ]
 
     def schritt(self, info: SchrittInfo) -> list[str]:
@@ -97,7 +96,9 @@ class CmdGenerator(Generator):
             f"rem Schritt {info.bezeichnung}: {name} (Risiko: {b.risiko.value})",
             "rem " + "-" * 68,
             f'set "OKM_SCHRITT={info.nr}"',
-            *_echo_beides(f"[{info.bezeichnung}] {info.fortschritt} ..."),
+            # Tipp ohne CMD-Sonderzeichen, weil er später per %OKM_TIPP% ausgegeben wird
+            f'set "OKM_TIPP={kommentar_text(Ziel.CMD, b.tipp)}"' if b.tipp else 'set "OKM_TIPP="',
+            *_echo_beides(self.schritt_titel(info)),
         ]
         if info.bestaetigen:
             zeilen += [
@@ -113,7 +114,7 @@ class CmdGenerator(Generator):
         zeilen += ["(call )", *self._gruppe(info.koerper, b.interaktiv)]
         if info.pruefung:
             zeilen += ["rem Prüfung", "(call )", *self._gruppe(info.pruefung, b.interaktiv)]
-        zeilen += ["set /a OKM_OK+=1 >nul", ""]
+        zeilen += ["set /a OKM_OK+=1 >nul", *_echo_beides(EINZUG + "OK"), ""]
         return zeilen
 
     def wenn_fehler(self, nr: int, versuch: list[str], sonst: list[str]) -> list[str]:
@@ -152,40 +153,52 @@ class CmdGenerator(Generator):
         ]
 
     def abschluss(self, ir: ScriptIR) -> list[str]:
-        schluss = self.schluss_text().format(ok="%OKM_OK%", gesamt="%OKM_GESAMT%")
-        ende = [
-            f"del {TMP} >nul 2>&1",
-            "if not defined OKM_KEINE_PAUSE pause",
-            "endlocal",
-        ]
+        if self.mit_kontrolle:
+            fertig = " Fertig: %OKM_OK% Schritte erfolgreich ausgeführt."
+            fehler = " Abgebrochen bei Schritt %OKM_SCHRITT%."
+            bisher = " Erfolgreich bis dahin: %OKM_OK% Schritte."
+        else:
+            fertig = " Fertig: %OKM_OK% von %OKM_GESAMT% Schritten erfolgreich."
+            fehler = " Abgebrochen bei Schritt %OKM_SCHRITT% von %OKM_GESAMT%."
+            bisher = " Erfolgreich bis dahin: %OKM_OK% von %OKM_GESAMT% Schritten."
+
+        def beides(text: str) -> list[str]:
+            # Text mit %VARIABLEN% (vom Generator, keine Benutzerwerte) auf Konsole und ins Log
+            return [f"echo({text}", f">>{LOG} echo({text}"]
+
+        def fuss(*texte: str) -> list[str]:
+            zeilen = [*_echo_beides(LINIE)]
+            for text in texte:
+                zeilen += beides(text)
+            return [
+                *zeilen,
+                *beides(f" Protokoll: {LOG}"),
+                *_echo_beides(LINIE),
+                f"del {TMP} >nul 2>&1",
+                "if not defined OKM_KEINE_PAUSE pause",
+                "endlocal",
+            ]
+
         return [
-            "echo(",
-            f"echo({schluss}",
-            f">>{LOG} echo({schluss}",
-            f"echo(Protokoll: {LOG}",
-            *ende,
+            *fuss(fertig),
             "exit /b 0",
             "",
             ":okm_fehler",
-            "echo(",
-            "echo(FEHLER in Schritt %OKM_SCHRITT% von %OKM_GESAMT%. Details siehe Ausgabe oben.",
-            f">>{LOG} echo(FEHLER in Schritt %OKM_SCHRITT% von %OKM_GESAMT%.",
-            "echo(Erfolgreich bis dahin: %OKM_OK% Schritte.",
-            f"echo(Protokoll: {LOG}",
-            *ende,
+            *beides(EINZUG + "FEHLER  Schritt %OKM_SCHRITT% endete mit Fehlercode %OKM_RC%."),
+            f"if defined OKM_TIPP echo({EINZUG}Tipp: %OKM_TIPP%",
+            f"if defined OKM_TIPP >>{LOG} echo({EINZUG}Tipp: %OKM_TIPP%",
+            *fuss(fehler, bisher),
             "exit /b 1",
             "",
             ":okm_abbruch",
-            "echo(Abgebrochen. Es wurde nichts weiter ausgeführt.",
-            f">>{LOG} echo(Abgebrochen durch Benutzer.",
-            f"echo(Protokoll: {LOG}",
-            *ende,
+            *fuss(" Abgebrochen durch Benutzer. Es wurde nichts weiter ausgeführt."),
             "exit /b 2",
             "",
             ":okm_kein_admin",
-            "echo(Dieses Script braucht Administratorrechte.",
-            'echo(Bitte die Eingabeaufforderung mit Rechtsklick ^> "Als Administrator ausführen" öffnen',
-            "echo(und das Script erneut starten.",
-            *ende,
+            *beides(EINZUG + "FEHLER  Dieses Script braucht Administratorrechte."),
+            f"echo({EINZUG}Bitte die Eingabeaufforderung mit Rechtsklick ^> "
+            '"Als Administrator ausführen" öffnen',
+            f"echo({EINZUG}und das Script erneut starten.",
+            *fuss(" Abgebrochen: fehlende Administratorrechte."),
             "exit /b 1",
         ]

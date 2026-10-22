@@ -1,5 +1,5 @@
 id: dism_sfc
-version: 1
+version: 2
 name: Systemdateien reparieren (DISM + SFC)
 kategorie: Updates
 beschreibung: Repariert den Windows-Komponentenspeicher (DISM) und prüft anschließend alle Systemdateien (sfc /scannow).
@@ -7,13 +7,18 @@ hilfe: |
   Dauert 10–30 Minuten und braucht für DISM eine Internetverbindung. Danach den Rechner neu starten.
   Das Ergebnis von SFC steht zusätzlich in C:\Windows\Logs\CBS\CBS.log.
 risiko: gelb
+# CMD: ohne Umleitung ausführen – sfc schreibt umgeleitet UTF-16, das „type“ als Zeichensalat zeigt.
+interaktiv: true
 admin_noetig: true
 fortschritt: Systemdateien werden geprüft und repariert (dauert)
 ziele:
   powershell: |
     DISM.exe /Online /Cleanup-Image /RestoreHealth
     if ($LASTEXITCODE -ne 0) { throw ('DISM endete mit Code ' + $LASTEXITCODE) }
-    sfc.exe /scannow
+    # sfc schreibt umgeleitet UTF-16 (sonst erscheint „S y s t e m“ mit Nullzeichen)
+    $OkmKodierung = [Console]::OutputEncoding
+    [Console]::OutputEncoding = [System.Text.Encoding]::Unicode
+    try { sfc.exe /scannow } finally { [Console]::OutputEncoding = $OkmKodierung }
     if ($LASTEXITCODE -ne 0) { Write-Host 'SFC hat Probleme gemeldet – Details in C:\Windows\Logs\CBS\CBS.log.' -ForegroundColor Yellow }
     $global:LASTEXITCODE = 0
   cmd: |

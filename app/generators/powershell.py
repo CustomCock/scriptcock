@@ -1,6 +1,7 @@
 """Generator für Windows PowerShell 5.1 (``.ps1``, CRLF, UTF-8 mit BOM).
 
 Kein PS7-only-Syntax (``??``, ``?.``, Ternary, ``-Parallel``)!
+Farben nur über ``Write-Host -ForegroundColor`` – nie ANSI-Sequenzen (conhost zeigt sie als Text).
 """
 
 from __future__ import annotations
@@ -8,7 +9,7 @@ from __future__ import annotations
 from typing import ClassVar
 
 from app.escaping import Ziel, powershell_literal
-from app.generators.base import Generator, SchrittInfo, einruecken
+from app.generators.base import EINZUG, LINIE, Generator, SchrittInfo, einruecken
 from app.ir import ScriptIR
 from app.models.block import BlockDef
 
@@ -27,31 +28,98 @@ class PowerShellGenerator(Generator):
         return zeile.lstrip().startswith("#")
 
     def kopf(self, ir: ScriptIR, defs: list[BlockDef]) -> list[str]:
-        return ["#Requires -Version 5.1", *[f"# {z}".rstrip() for z in self.kommentar_zeilen(ir, defs)], ""]
+        return [
+            "#Requires -Version 5.1",
+            *[f"# {z}".rstrip() for z in self.kommentar_zeilen(ir, defs)],
+            "param(",
+            "    # Am Ende nicht auf Enter warten (für Fernwartung/RMM)",
+            "    [switch]$NoPause",
+            ")",
+            "",
+        ]
+
+    def _zusammenfassung(self) -> list[str]:
+        if self.mit_kontrolle:
+            fertig = "(' Fertig: ' + $script:OkmErfolgreich + ' Schritte erfolgreich ausgeführt.')"
+            fehler = "(' Abgebrochen bei Schritt ' + $script:OkmNr + '.')"
+            bisher = "(' Erfolgreich bis dahin: ' + $script:OkmErfolgreich + ' Schritte.')"
+        else:
+            fertig = (
+                "(' Fertig: ' + $script:OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten erfolgreich.')"
+            )
+            fehler = "(' Abgebrochen bei Schritt ' + $script:OkmNr + ' von ' + $OkmGesamt + '.')"
+            bisher = (
+                "(' Erfolgreich bis dahin: ' + $script:OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten.')"
+            )
+        return [
+            "# Fenster offen halten (Rechtsklick > Mit PowerShell ausführen) – aber nicht mit -NoPause,",
+            "# ohne Benutzer, bei umgeleiteter Eingabe oder -NonInteractive (Fernwartung/RMM).",
+            "function Wait-OkmEnde {",
+            "    if ($OkmKeinePause -or -not [Environment]::UserInteractive) { return }",
+            "    try { if ([Console]::IsInputRedirected) { return } } catch { return }",
+            "    $OkmArgumente = @([Environment]::GetCommandLineArgs() | Where-Object { $_ -like '-NonI*' })",
+            "    if ($OkmArgumente.Count -gt 0) { return }",
+            "    [void](Read-Host 'Drücke Enter zum Schließen …')",
+            "}",
+            "",
+            "function Exit-OkmScript {",
+            "    param([int]$Code)",
+            f"    Write-Host {_lit(LINIE)}",
+            "    switch ($script:OkmStatus) {",
+            f"        'fertig' {{ Write-Host {fertig} -ForegroundColor Green }}",
+            "        'abbruch' {",
+            "            Write-Host ' Abgebrochen durch Benutzer. Es wurde nichts weiter ausgeführt.' "
+            "-ForegroundColor Yellow",
+            "        }",
+            "        'rechte' {",
+            "            Write-Host ' Abgebrochen: fehlende Administratorrechte.' -ForegroundColor Red",
+            "        }",
+            "        default {",
+            f"            Write-Host {fehler} -ForegroundColor Red",
+            f"            Write-Host {bisher}",
+            "        }",
+            "    }",
+            "    Write-Host (' Protokoll: ' + $OkmLog)",
+            f"    Write-Host {_lit(LINIE)}",
+            "    try { Stop-Transcript | Out-Null } catch { $null = $_ }",
+            "    Wait-OkmEnde",
+            "    exit $Code",
+            "}",
+        ]
 
     def praeambel(self, ir: ScriptIR, gesamt: int, braucht_admin: bool) -> list[str]:
         zeilen = [
             "$ErrorActionPreference = 'Stop'",
+            "$OkmKeinePause = [bool]$NoPause",
+            "# Konsole auf UTF-8: Ausgaben externer Programme (winget, ipconfig, netsh …) werden sonst",
+            "# mit der OEM-Codepage gelesen und erscheinen als Zeichensalat (Gr├Â├ƒe statt Größe).",
+            "$OkmUtf8 = New-Object System.Text.UTF8Encoding $false",
+            "try { [Console]::OutputEncoding = $OkmUtf8 } catch { $null = $_ }",
+            "$OutputEncoding = $OkmUtf8",
             "$OkmLog = Join-Path $env:TEMP ('okm-script-{0}.log' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))",
             *([] if self.mit_kontrolle else [f"$OkmGesamt = {gesamt}"]),
             "$OkmErfolgreich = 0",
+            "$OkmNr = 0",
+            "$OkmStatus = 'laeuft'",
             "try { Start-Transcript -Path $OkmLog -Append | Out-Null } "
             "catch { Write-Warning 'Protokoll konnte nicht gestartet werden.' }",
             "",
-            "function Exit-OkmScript {",
-            "    param([int]$Code)",
-            "    Write-Host ''",
-            "    Write-Host ('Protokoll: ' + $OkmLog)",
-            "    try { Stop-Transcript | Out-Null } catch { $null = $_ }",
-            "    exit $Code",
+            "# Meldungen: Werte immer als Argument übergeben, nie in Strings einsetzen",
+            "function Write-OkmInfo([string]$Text) { Write-Host $Text }",
+            "function Write-OkmOk([string]$Text = '') {",
+            f"    if ($Text) {{ Write-Host ({_lit(EINZUG + 'OK  ')} + $Text) -ForegroundColor Green }}",
+            f"    else {{ Write-Host {_lit(EINZUG + 'OK')} -ForegroundColor Green }}",
             "}",
+            f"function Write-OkmWarnung([string]$Text) {{ Write-Host ({_lit(EINZUG + 'WARNUNG  ')} + $Text) "
+            "-ForegroundColor Yellow }",
+            f"function Write-OkmFehler([string]$Text) {{ Write-Host ({_lit(EINZUG + 'FEHLER  ')} + $Text) "
+            "-ForegroundColor Red }",
+            "",
+            *self._zusammenfassung(),
+            "",
+            *[f"Write-OkmInfo {_lit(z)}" for z in self.kopf_ausgabe(ir)],
             "",
         ]
-        if ir.optionen.dry_run:
-            zeilen += [
-                "Write-Host 'NUR SIMULATION: Es wird nichts verändert.' -ForegroundColor Cyan",
-                "",
-            ]
         if braucht_admin:
             meldung = (
                 "Dieses Script braucht Administratorrechte. Bitte PowerShell mit Rechtsklick > "
@@ -62,7 +130,8 @@ class PowerShellGenerator(Generator):
                 "$OkmPrincipal = New-Object Security.Principal.WindowsPrincipal("
                 "[Security.Principal.WindowsIdentity]::GetCurrent())",
                 "if (-not $OkmPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {",
-                f"    Write-Host {_lit(meldung)} -ForegroundColor Red",
+                f"    Write-OkmFehler {_lit(meldung)}",
+                "    $OkmStatus = 'rechte'",
                 "    Exit-OkmScript 1",
                 "}",
                 "",
@@ -75,19 +144,19 @@ class PowerShellGenerator(Generator):
             "# " + "-" * 68,
             f"# Schritt {info.bezeichnung}: {b.name} (Risiko: {b.risiko.value})",
             "# " + "-" * 68,
-            f"Write-Host {_lit(f'[{info.bezeichnung}] {info.fortschritt} …')}",
+            f"$OkmNr = {info.nr}",
+            f"Write-OkmInfo {_lit(self.schritt_titel(info))}",
         ]
         if info.bestaetigen:
             warnung = _lit(f"ACHTUNG: Dieser Schritt ist destruktiv: {b.name}")
             zeilen += [
-                f"Write-Host {warnung} -ForegroundColor Yellow",
+                f"Write-OkmWarnung {warnung}",
                 "$OkmAntwort = Read-Host 'Zum Fortfahren JA eingeben (alles andere bricht ab)'",
                 "if ($OkmAntwort -cne 'JA') {",
-                "    Write-Host 'Abgebrochen. Es wurde nichts weiter ausgeführt.' -ForegroundColor Yellow",
+                "    $OkmStatus = 'abbruch'",
                 "    Exit-OkmScript 2",
                 "}",
             ]
-        fehlertext = f"FEHLER in Schritt {info.bezeichnung} ({b.name}): "
         zeilen += [
             "try {",
             "    $global:LASTEXITCODE = 0",
@@ -106,23 +175,17 @@ class PowerShellGenerator(Generator):
             ]
         zeilen += [
             "    $OkmErfolgreich++",
+            "    Write-OkmOk",
             "} catch {",
-            f"    Write-Host ({_lit(fehlertext)} + $_.Exception.Message) -ForegroundColor Red",
+            "    Write-OkmFehler $_.Exception.Message",
         ]
+        if b.tipp:
+            zeilen.append(f"    Write-OkmInfo {_lit(EINZUG + 'Tipp: ' + b.tipp)}")
         if self.im_versuch:
             # Fehler an den umgebenden „Versuche“-Block weitergeben
             zeilen += ["    throw"]
-        elif self.mit_kontrolle:
-            zeilen += [
-                "    Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' Schritte.')",
-                "    Exit-OkmScript 1",
-            ]
         else:
-            zeilen += [
-                "    Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' von ' + $OkmGesamt + "
-                "' Schritten.')",
-                "    Exit-OkmScript 1",
-            ]
+            zeilen += ["    $OkmStatus = 'fehler'", "    Exit-OkmScript 1"]
         return [*zeilen, "}", ""]
 
     def wenn_fehler(self, nr: int, versuch: list[str], sonst: list[str]) -> list[str]:
@@ -131,7 +194,7 @@ class PowerShellGenerator(Generator):
             "try {",
             *einruecken(versuch, 4),
             "} catch {",
-            f"    Write-Host {_lit(self.meldung_ausweichen(bool(sonst)))} -ForegroundColor Yellow",
+            f"    Write-OkmWarnung {_lit(self.meldung_ausweichen(bool(sonst)))}",
             *einruecken(sonst, 4),
             "}",
             f"# ===== Ende Versuche (Block {nr}) =====",
@@ -143,15 +206,11 @@ class PowerShellGenerator(Generator):
         return [
             f"# ===== Wiederhole {anzahl}-mal (Block {nr}) =====",
             f"for ({var} = 1; {var} -le {anzahl}; {var}++) {{",
-            f"    Write-Host ('--- Durchlauf ' + {var} + ' von {anzahl} ---') -ForegroundColor Cyan",
+            f"    Write-OkmInfo ('--- Durchlauf ' + {var} + ' von {anzahl} ---')",
             *einruecken(rumpf, 4),
             "}",
             "",
         ]
 
     def abschluss(self, ir: ScriptIR) -> list[str]:
-        if self.mit_kontrolle:
-            schluss = "('Fertig, ' + $OkmErfolgreich + ' Schritte erfolgreich ausgeführt.')"
-        else:
-            schluss = "('Fertig, ' + $OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten erfolgreich.')"
-        return ["Write-Host ''", f"Write-Host {schluss} -ForegroundColor Green", "Exit-OkmScript 0"]
+        return ["$OkmStatus = 'fertig'", "Exit-OkmScript 0"]

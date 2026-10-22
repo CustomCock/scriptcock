@@ -7,6 +7,7 @@ hilfe: |
   Typische Ports: 80 (HTTP), 443 (HTTPS), 445 (Windows-Freigaben), 3389 (Remotedesktop), 22 (SSH).
 risiko: gruen
 fortschritt: "Port {{ port }} auf {{ ziel }} wird geprüft"
+tipp: Läuft der Dienst auf dem Zielrechner, und lässt die Firewall den Port durch?
 parameter:
   - id: ziel
     label: Ziel (IP-Adresse oder Rechnername)

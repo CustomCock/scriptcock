@@ -8,6 +8,7 @@ hilfe: |
   Ordner: Der INHALT des Quellordners wird in den Zielordner kopiert; der Zielordner wird bei Bedarf angelegt.
 risiko: gelb
 fortschritt: "{{ quelle }} wird nach {{ ziel }} kopiert"
+tipp: Gibt es die Quelle, und hast du Schreibrechte im Zielordner?
 parameter:
   - id: art
     label: Was soll kopiert werden?

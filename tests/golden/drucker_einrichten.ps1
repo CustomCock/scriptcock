@@ -12,32 +12,85 @@
 #
 # Generiert mit dem okm Script-Baukasten
 # ======================================================================
+param(
+    # Am Ende nicht auf Enter warten (für Fernwartung/RMM)
+    [switch]$NoPause
+)
 
 $ErrorActionPreference = 'Stop'
+$OkmKeinePause = [bool]$NoPause
+# Konsole auf UTF-8: Ausgaben externer Programme (winget, ipconfig, netsh …) werden sonst
+# mit der OEM-Codepage gelesen und erscheinen als Zeichensalat (Gr├Â├ƒe statt Größe).
+$OkmUtf8 = New-Object System.Text.UTF8Encoding $false
+try { [Console]::OutputEncoding = $OkmUtf8 } catch { $null = $_ }
+$OutputEncoding = $OkmUtf8
 $OkmLog = Join-Path $env:TEMP ('okm-script-{0}.log' -f (Get-Date -Format 'yyyyMMdd-HHmmss'))
 $OkmGesamt = 2
 $OkmErfolgreich = 0
+$OkmNr = 0
+$OkmStatus = 'laeuft'
 try { Start-Transcript -Path $OkmLog -Append | Out-Null } catch { Write-Warning 'Protokoll konnte nicht gestartet werden.' }
+
+# Meldungen: Werte immer als Argument übergeben, nie in Strings einsetzen
+function Write-OkmInfo([string]$Text) { Write-Host $Text }
+function Write-OkmOk([string]$Text = '') {
+    if ($Text) { Write-Host ('      OK  ' + $Text) -ForegroundColor Green }
+    else { Write-Host '      OK' -ForegroundColor Green }
+}
+function Write-OkmWarnung([string]$Text) { Write-Host ('      WARNUNG  ' + $Text) -ForegroundColor Yellow }
+function Write-OkmFehler([string]$Text) { Write-Host ('      FEHLER  ' + $Text) -ForegroundColor Red }
+
+# Fenster offen halten (Rechtsklick > Mit PowerShell ausführen) – aber nicht mit -NoPause,
+# ohne Benutzer, bei umgeleiteter Eingabe oder -NonInteractive (Fernwartung/RMM).
+function Wait-OkmEnde {
+    if ($OkmKeinePause -or -not [Environment]::UserInteractive) { return }
+    try { if ([Console]::IsInputRedirected) { return } } catch { return }
+    $OkmArgumente = @([Environment]::GetCommandLineArgs() | Where-Object { $_ -like '-NonI*' })
+    if ($OkmArgumente.Count -gt 0) { return }
+    [void](Read-Host 'Drücke Enter zum Schließen …')
+}
 
 function Exit-OkmScript {
     param([int]$Code)
-    Write-Host ''
-    Write-Host ('Protokoll: ' + $OkmLog)
+    Write-Host '----------------------------------------------'
+    switch ($script:OkmStatus) {
+        'fertig' { Write-Host (' Fertig: ' + $script:OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten erfolgreich.') -ForegroundColor Green }
+        'abbruch' {
+            Write-Host ' Abgebrochen durch Benutzer. Es wurde nichts weiter ausgeführt.' -ForegroundColor Yellow
+        }
+        'rechte' {
+            Write-Host ' Abgebrochen: fehlende Administratorrechte.' -ForegroundColor Red
+        }
+        default {
+            Write-Host (' Abgebrochen bei Schritt ' + $script:OkmNr + ' von ' + $OkmGesamt + '.') -ForegroundColor Red
+            Write-Host (' Erfolgreich bis dahin: ' + $script:OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten.')
+        }
+    }
+    Write-Host (' Protokoll: ' + $OkmLog)
+    Write-Host '----------------------------------------------'
     try { Stop-Transcript | Out-Null } catch { $null = $_ }
+    Wait-OkmEnde
     exit $Code
 }
+
+Write-OkmInfo '=============================================='
+Write-OkmInfo ' okm Script-Baukasten · Drucker einrichten'
+Write-OkmInfo ' Erstellt: 15.01.2026 09:30 · von pytest'
+Write-OkmInfo '=============================================='
 
 # Prüfung: Administratorrechte
 $OkmPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
 if (-not $OkmPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Host 'Dieses Script braucht Administratorrechte. Bitte PowerShell mit Rechtsklick > "Als Administrator ausführen" öffnen und das Script erneut starten.' -ForegroundColor Red
+    Write-OkmFehler 'Dieses Script braucht Administratorrechte. Bitte PowerShell mit Rechtsklick > "Als Administrator ausführen" öffnen und das Script erneut starten.'
+    $OkmStatus = 'rechte'
     Exit-OkmScript 1
 }
 
 # --------------------------------------------------------------------
 # Schritt 1/2: Ping auf Ziel (Risiko: gruen)
 # --------------------------------------------------------------------
-Write-Host '[1/2] Ping auf 192.168.1.50 (2x) …'
+$OkmNr = 1
+Write-OkmInfo '[1/2] Ping auf 192.168.1.50 (2x) ...'
 try {
     $global:LASTEXITCODE = 0
     . {
@@ -48,16 +101,19 @@ try {
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
     $OkmErfolgreich++
+    Write-OkmOk
 } catch {
-    Write-Host ('FEHLER in Schritt 1/2 (Ping auf Ziel): ' + $_.Exception.Message) -ForegroundColor Red
-    Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten.')
+    Write-OkmFehler $_.Exception.Message
+    Write-OkmInfo '      Tipp: Ist das Gerät eingeschaltet und im selben Netz? Manche Geräte und Firewalls antworten grundsätzlich nicht auf Ping.'
+    $OkmStatus = 'fehler'
     Exit-OkmScript 1
 }
 
 # --------------------------------------------------------------------
 # Schritt 2/2: Drucker per IP hinzufügen (Risiko: gelb)
 # --------------------------------------------------------------------
-Write-Host '[2/2] Drucker Drucker-Empfang (192.168.1.50) wird eingerichtet …'
+$OkmNr = 2
+Write-OkmInfo '[2/2] Drucker Drucker-Empfang (192.168.1.50) wird eingerichtet ...'
 try {
     $global:LASTEXITCODE = 0
     . {
@@ -74,12 +130,13 @@ try {
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Prüfung endete mit Exit-Code ' + $LASTEXITCODE) }
     $OkmErfolgreich++
+    Write-OkmOk
 } catch {
-    Write-Host ('FEHLER in Schritt 2/2 (Drucker per IP hinzufügen): ' + $_.Exception.Message) -ForegroundColor Red
-    Write-Host ('Erfolgreich bis dahin: ' + $OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten.')
+    Write-OkmFehler $_.Exception.Message
+    Write-OkmInfo '      Tipp: Prüfe, ob der Drucker per Ping erreichbar ist und ob der gewählte Treiber installiert ist.'
+    $OkmStatus = 'fehler'
     Exit-OkmScript 1
 }
 
-Write-Host ''
-Write-Host ('Fertig, ' + $OkmErfolgreich + ' von ' + $OkmGesamt + ' Schritten erfolgreich.') -ForegroundColor Green
+$OkmStatus = 'fertig'
 Exit-OkmScript 0

@@ -28,9 +28,31 @@
 
 set -Eeuo pipefail
 
-OKM_LOG="/tmp/okm-script-$(date +%Y%m%d-%H%M%S).log"
+OKM_LOG="${TMPDIR:-/tmp}/okm-script-$(date +%Y%m%d-%H%M%S).log"
 OKM_OK=0
+OKM_NR=0
 OKM_SCHRITT='-'
+OKM_STATUS=laeuft
+OKM_TIPP=''
+
+# Meldungen: Werte immer als Argumente übergeben, nie in den Formatstring einsetzen.
+# Keine Farben – die Ausgabe geht auch ins Protokoll.
+okm_info() { printf '%s\n' "$*"; }
+# shellcheck disable=SC2120  # Text ist optional (Blöcke dürfen okm_ok "…" nutzen)
+okm_ok() { if [ $# -gt 0 ]; then printf '      OK  %s\n' "$*"; else printf '%s\n' '      OK'; fi; }
+okm_warn() { printf '      WARNUNG  %s\n' "$*"; }
+okm_fehler() { printf '      FEHLER  %s\n' "$*"; }
+okm_zusammenfassung() {
+  okm_info '----------------------------------------------'
+  case "$OKM_STATUS" in
+    fertig) printf ' Fertig: %s Schritte erfolgreich ausgeführt.\n' "$OKM_OK" ;;
+    abbruch) okm_info ' Abgebrochen durch Benutzer. Es wurde nichts weiter ausgeführt.' ;;
+    rechte) okm_info ' Abgebrochen: fehlende Rechte.' ;;
+    *) printf ' Abgebrochen bei Schritt %s.\n' "$OKM_NR"; printf ' Erfolgreich bis dahin: %s Schritte.\n' "$OKM_OK" ;;
+  esac
+  printf ' Protokoll: %s\n' "$OKM_LOG"
+  okm_info '----------------------------------------------'
+}
 # Für „Versuche“-Blöcke (Subshells): Schutz-Flag, Tiefe, Zählerdatei
 OKM_SCHUTZ=0
 OKM_VERSUCH=0
@@ -42,30 +64,39 @@ okm_geschafft() {
 }
 exec > >(tee -a "$OKM_LOG") 2>&1
 
-okm_fehler() {
+okm_bei_fehler() {
   local okm_rc=$?
   # Rückgabewert eines „Versuche“-Blocks wertet das Script selbst aus
   if [ "$OKM_SCHUTZ" = 1 ]; then return 0; fi
   if [ "$OKM_VERSUCH" -gt 0 ]; then
-    printf '\nSchritt %s ist fehlgeschlagen (Exit-Code %s).\n' "$OKM_SCHRITT" "$okm_rc"
+    okm_fehler "Schritt $OKM_SCHRITT ist fehlgeschlagen (Exit-Code $okm_rc)."
     exit "$okm_rc"
   fi
   trap - ERR
-  printf '\nFEHLER in Schritt %s (Exit-Code %s).\n' "$OKM_SCHRITT" "$okm_rc"
-  printf 'Erfolgreich bis dahin: %s Schritte.\n' "$OKM_OK"
-  printf 'Protokoll: %s\n' "$OKM_LOG"
+  okm_fehler "Schritt $OKM_SCHRITT: Befehl endete mit Exit-Code $okm_rc."
+  if [ -n "$OKM_TIPP" ]; then okm_info "      Tipp: $OKM_TIPP"; fi
+  OKM_STATUS=fehler
+  okm_zusammenfassung
   rm -f "$OKM_ZAEHLER"
   exit "$okm_rc"
 }
-trap okm_fehler ERR
+trap okm_bei_fehler ERR
+
+okm_info '=============================================='
+okm_info ' okm Script-Baukasten · Ablauf'
+okm_info ' Erstellt: 15.01.2026 09:30 · von pytest'
+okm_info '=============================================='
 
 # --------------------------------------------------------------------
 # Schritt 1/8: Meldung/Pause für den Benutzer (Risiko: gruen)
 # --------------------------------------------------------------------
+OKM_NR=1
 OKM_SCHRITT='1/8 (Meldung/Pause für den Benutzer)'
-printf '%s\n' '[1/8] Hinweis für den Benutzer …'
+OKM_TIPP=''
+okm_info '[1/8] Hinweis für den Benutzer ...'
 printf '%s\n' 'Start'
 okm_geschafft
+okm_ok
 
 # ===== Versuche (Block 1) =====
 # Läuft in einer Subshell mit eigenem Fehlerabbruch; ein Fehler darin beendet
@@ -79,10 +110,13 @@ set +e
   # --------------------------------------------------------------------
   # Schritt 2/8: Ordner anlegen (Risiko: gelb)
   # --------------------------------------------------------------------
+  OKM_NR=2
   OKM_SCHRITT='2/8 (Ordner anlegen)'
-  printf '%s\n' '[2/8] Ordner /tmp/okm-test wird angelegt …'
+  OKM_TIPP=''
+  okm_info '[2/8] Ordner /tmp/okm-test wird angelegt ...'
   mkdir -p -- '/tmp/okm-test'
   okm_geschafft
+  okm_ok
 
   # ===== Versuche (Block 2) =====
   # Läuft in einer Subshell mit eigenem Fehlerabbruch; ein Fehler darin beendet
@@ -96,10 +130,13 @@ set +e
     # --------------------------------------------------------------------
     # Schritt 3/8: Ping auf Ziel (Risiko: gruen)
     # --------------------------------------------------------------------
+    OKM_NR=3
     OKM_SCHRITT='3/8 (Ping auf Ziel)'
-    printf '%s\n' '[3/8] Ping auf 10.0.0.1 (4x) …'
+    OKM_TIPP='Ist das Gerät eingeschaltet und im selben Netz? Manche Geräte und Firewalls antworten grundsätzlich nicht auf Ping.'
+    okm_info '[3/8] Ping auf 10.0.0.1 (4x) ...'
     ping -c 4 '10.0.0.1'
     okm_geschafft
+    okm_ok
 
   )
   okm_rc_2=$?
@@ -110,7 +147,7 @@ set +e
     exit 112
   fi
   if [ "$okm_rc_2" -ne 0 ]; then
-    printf '%s\n' 'Ein Schritt ist fehlgeschlagen - der Fehler wird wie vorgesehen übergangen.'
+    okm_warn 'Ein Schritt ist fehlgeschlagen - der Fehler wird wie vorgesehen übergangen.'
   fi
   # ===== Ende Versuche (Block 2) =====
 
@@ -120,34 +157,40 @@ set -e
 OKM_SCHUTZ=0
 OKM_OK="$(cat "$OKM_ZAEHLER")"
 if [ "$okm_rc_1" -eq 112 ]; then
-  printf 'Protokoll: %s\n' "$OKM_LOG"
+  OKM_STATUS=abbruch
+  okm_zusammenfassung
   rm -f "$OKM_ZAEHLER"
   exit 2
 fi
 if [ "$okm_rc_1" -ne 0 ]; then
-  printf '%s\n' 'Ein Schritt ist fehlgeschlagen - es geht mit den Ausweichschritten weiter.'
+  okm_warn 'Ein Schritt ist fehlgeschlagen - es geht mit den Ausweichschritten weiter.'
   # --------------------------------------------------------------------
   # Schritt 4/8: Meldung/Pause für den Benutzer (Risiko: gruen)
   # --------------------------------------------------------------------
+  OKM_NR=4
   OKM_SCHRITT='4/8 (Meldung/Pause für den Benutzer)'
-  printf '%s\n' '[4/8] Hinweis für den Benutzer …'
+  OKM_TIPP=''
+  okm_info '[4/8] Hinweis für den Benutzer ...'
   printf '%s\n' 'Ausweichen'
   okm_geschafft
+  okm_ok
 
   # ===== Wiederhole 2-mal (Block 3) =====
   for ((okm_durchlauf_3 = 1; okm_durchlauf_3 <= 2; okm_durchlauf_3++)); do
-    printf '%s\n' "--- Durchlauf $okm_durchlauf_3 von 2 ---"
+    okm_info "--- Durchlauf $okm_durchlauf_3 von 2 ---"
     # --------------------------------------------------------------------
     # Schritt 5/8: Prozess beenden (Risiko: rot)
     # --------------------------------------------------------------------
+    OKM_NR=5
     OKM_SCHRITT='5/8 (Prozess beenden)'
-    printf '%s\n' '[5/8] Prozess notepad wird beendet …'
-    printf '%s\n' 'ACHTUNG: Dieser Schritt ist destruktiv: Prozess beenden'
+    OKM_TIPP=''
+    okm_info '[5/8] Prozess notepad wird beendet ...'
+    okm_warn 'ACHTUNG: Dieser Schritt ist destruktiv: Prozess beenden'
     okm_antwort=""
     read -r -p 'Zum Fortfahren JA eingeben (alles andere bricht ab): ' okm_antwort || true
     if [ "$okm_antwort" != "JA" ]; then
-      printf '%s\n' 'Abgebrochen. Es wurde nichts weiter ausgeführt.'
-      printf 'Protokoll: %s\n' "$OKM_LOG"
+      OKM_STATUS=abbruch
+      okm_zusammenfassung
       exit 2
     fi
     if pkill -x -- 'notepad'; then
@@ -156,6 +199,7 @@ if [ "$okm_rc_1" -ne 0 ]; then
       printf '%s\n' 'Kein passender Prozess gefunden - nichts zu tun.'
     fi
     okm_geschafft
+    okm_ok
 
   done
 
@@ -164,14 +208,17 @@ fi
 
 # ===== Wiederhole 3-mal (Block 4) =====
 for ((okm_durchlauf_4 = 1; okm_durchlauf_4 <= 3; okm_durchlauf_4++)); do
-  printf '%s\n' "--- Durchlauf $okm_durchlauf_4 von 3 ---"
+  okm_info "--- Durchlauf $okm_durchlauf_4 von 3 ---"
   # --------------------------------------------------------------------
   # Schritt 6/8: Meldung/Pause für den Benutzer (Risiko: gruen)
   # --------------------------------------------------------------------
+  OKM_NR=6
   OKM_SCHRITT='6/8 (Meldung/Pause für den Benutzer)'
-  printf '%s\n' '[6/8] Hinweis für den Benutzer …'
+  OKM_TIPP=''
+  okm_info '[6/8] Hinweis für den Benutzer ...'
   printf '%s\n' 'Schleife'
   okm_geschafft
+  okm_ok
 
   # ===== Versuche (Block 5) =====
   # Läuft in einer Subshell mit eigenem Fehlerabbruch; ein Fehler darin beendet
@@ -185,10 +232,13 @@ for ((okm_durchlauf_4 = 1; okm_durchlauf_4 <= 3; okm_durchlauf_4++)); do
     # --------------------------------------------------------------------
     # Schritt 7/8: Dienst-Status prüfen (Risiko: gruen)
     # --------------------------------------------------------------------
+    OKM_NR=7
     OKM_SCHRITT='7/8 (Dienst-Status prüfen)'
-    printf '%s\n' '[7/8] Status von Dienst Spooler wird abgefragt …'
+    OKM_TIPP=''
+    okm_info '[7/8] Status von Dienst Spooler wird abgefragt ...'
     systemctl --no-pager status 'Spooler' || [ $? -eq 3 ]
     okm_geschafft
+    okm_ok
 
   )
   okm_rc_5=$?
@@ -196,12 +246,13 @@ for ((okm_durchlauf_4 = 1; okm_durchlauf_4 <= 3; okm_durchlauf_4++)); do
   OKM_SCHUTZ=0
   OKM_OK="$(cat "$OKM_ZAEHLER")"
   if [ "$okm_rc_5" -eq 112 ]; then
-    printf 'Protokoll: %s\n' "$OKM_LOG"
+    OKM_STATUS=abbruch
+    okm_zusammenfassung
     rm -f "$OKM_ZAEHLER"
     exit 2
   fi
   if [ "$okm_rc_5" -ne 0 ]; then
-    printf '%s\n' 'Ein Schritt ist fehlgeschlagen - der Fehler wird wie vorgesehen übergangen.'
+    okm_warn 'Ein Schritt ist fehlgeschlagen - der Fehler wird wie vorgesehen übergangen.'
   fi
   # ===== Ende Versuche (Block 5) =====
 
@@ -210,11 +261,14 @@ done
 # --------------------------------------------------------------------
 # Schritt 8/8: Meldung/Pause für den Benutzer (Risiko: gruen)
 # --------------------------------------------------------------------
+OKM_NR=8
 OKM_SCHRITT='8/8 (Meldung/Pause für den Benutzer)'
-printf '%s\n' '[8/8] Hinweis für den Benutzer …'
+OKM_TIPP=''
+okm_info '[8/8] Hinweis für den Benutzer ...'
 printf '%s\n' 'Ende'
 okm_geschafft
+okm_ok
 
-printf '\nFertig, %s Schritte erfolgreich ausgeführt.\n' "$OKM_OK"
-printf 'Protokoll: %s\n' "$OKM_LOG"
+OKM_STATUS=fertig
+okm_zusammenfassung
 rm -f "$OKM_ZAEHLER"

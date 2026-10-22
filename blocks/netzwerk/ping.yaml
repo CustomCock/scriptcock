@@ -8,6 +8,7 @@ hilfe: |
   Manche Geräte beantworten Pings absichtlich nicht – dann ist "keine Antwort" nicht unbedingt ein Fehler.
 risiko: gruen
 fortschritt: "Ping auf {{ ziel }} ({{ anzahl }}x)"
+tipp: Ist das Gerät eingeschaltet und im selben Netz? Manche Geräte und Firewalls antworten grundsätzlich nicht auf Ping.
 parameter:
   - id: ziel
     label: Ziel (IP-Adresse oder Rechnername)

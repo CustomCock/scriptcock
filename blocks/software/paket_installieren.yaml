@@ -10,6 +10,7 @@ risiko: gelb
 admin_noetig:
   bash: true
 fortschritt: "{{ paket }} wird installiert"
+tipp: Paket-ID im Software-Katalog prüfen. Ist das Programm schon installiert, meldet der Paketmanager ebenfalls einen Fehler.
 parameter:
   - id: paket
     label: Paketname bzw. Paket-ID

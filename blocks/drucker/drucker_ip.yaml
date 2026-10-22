@@ -10,6 +10,7 @@ hilfe: |
 risiko: gelb
 admin_noetig: true
 fortschritt: "Drucker {{ name }} ({{ ip }}) wird eingerichtet"
+tipp: Prüfe, ob der Drucker per Ping erreichbar ist und ob der gewählte Treiber installiert ist.
 parameter:
   - id: name
     label: Druckername

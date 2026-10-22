@@ -1,5 +1,37 @@
 # Changelog
 
+## Fehlerbehebung Runde 1
+
+### 1. Unlesbare Ausgabe („Wirrwarr“)
+
+- **Ursache (reproduziert):** Jeder PowerShell-Schritt leitet seine Ausgabe durch `| Out-Host`,
+  damit sie im Transcript landet. PowerShell 5.1 dekodiert die Ausgabe externer Programme dabei
+  mit der OEM-Codepage (850). winget, DISM & Co. schreiben UTF-8 → aus „Größe“ wurde
+  „Gr├Â├ƒe“ (Test mit pwsh und Codepage 850). `sfc` schreibt umgeleitet sogar UTF-16.
+- **Nicht die Ursache:** Der Download baute nie per JS-`Blob` aus dem Vorschautext; er kam schon
+  immer als Bytes vom Server (BOM/CRLF korrekt). Kopieren lieferte aber Text ohne BOM – wer ihn
+  in Notepad einfügt und speichert, bekommt in PowerShell 5.1 kaputte Umlaute.
+- **Lösung:**
+  - PowerShell setzt am Anfang `[Console]::OutputEncoding` und `$OutputEncoding` auf UTF-8
+    (ohne BOM); `dism_sfc` liest die sfc-Ausgabe kurz als UTF-16, in CMD läuft sfc ohne Umleitung.
+  - Neuer Endpunkt `POST /api/script/export` (Text + Ziel → Bytes, `application/octet-stream`).
+    Die Regeln (PS: UTF-8 mit BOM + CRLF, CMD: ohne BOM + CRLF + `chcp 65001`, bash/zsh: LF)
+    stehen nur noch in `app/export.py`; Generator und Endpunkt nutzen dieselbe Funktion.
+  - „In Zwischenablage kopieren“ läuft über den Export; bei PowerShell steht ein Hinweis zu
+    „UTF-8 mit BOM“.
+  - Einheitliches Ausgabeformat für alle Ziele: Kopfkasten (Titel, Datum, Autor), `[n/m] … ...`,
+    eingerückt `OK` / `FEHLER  …` / `Tipp: …`, Schlusskasten mit Ergebnis und Protokollpfad.
+    Meldungen über Hilfsfunktionen (`okm_info`/`okm_ok`/`okm_warn`/`okm_fehler`, in PowerShell
+    `Write-OkmInfo`/`-Ok`/`-Warnung`/`-Fehler`), Werte immer als Argumente.
+  - Neues Block-Feld `tipp` (für die häufigsten Fehlerfälle gesetzt).
+  - Keine ANSI-Farbcodes: PowerShell nur `Write-Host -ForegroundColor`, CMD und bash/zsh ohne
+    Farben (die Ausgabe geht auch ins Protokoll). bash/zsh-Protokoll unter `${TMPDIR:-/tmp}`.
+  - Jinja-Code-Umgebung mit `keep_trailing_newline=True` (trim/lstrip waren schon an).
+- **Tests:** Byte-Tests des Exports (BOM einmal/keinmal, nur CRLF bzw. nur LF, `chcp`), Endpunkt
+  inkl. CSRF und Größenlimit, Generator = Export, keine `\x1b`, Ausgabeformat in bash/zsh/pwsh/CMD,
+  pwsh mit Codepage 850, Golden-Files `_umlaute.*` (Büro, Größe, Löschen) für alle Ziele.
+- **Golden-Files** neu erzeugt: neues Ausgabeformat (gewollt).
+
 ## Software-Katalog
 
 - **Katalog mit 259 Programmen** (`katalog/software-katalog.yaml`) – einzige Datenquelle,
