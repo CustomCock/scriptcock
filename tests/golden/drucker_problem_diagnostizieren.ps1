@@ -75,6 +75,13 @@ function Exit-OkmScript {
     exit $Code
 }
 
+# Netz für alles, was kein Schritt abfängt: Meldung + Zusammenfassung statt stillem Ende
+trap {
+    Write-OkmFehler ('Unerwarteter Fehler: ' + $_.Exception.Message + ' (Zeile ' + $_.InvocationInfo.ScriptLineNumber + ')')
+    $script:OkmStatus = 'fehler'
+    Exit-OkmScript 1
+}
+
 Write-OkmInfo '=============================================='
 Write-OkmInfo ' okm Script-Baukasten · Drucker-Problem diagnostizieren'
 Write-OkmInfo ' Erstellt: 15.01.2026 09:30 · von pytest'
@@ -98,7 +105,7 @@ try {
     $OkmErfolgreich++
     Write-OkmOk
 } catch {
-    Write-OkmFehler $_.Exception.Message
+    Write-OkmFehler ($_.Exception.Message + ' (Zeile ' + $_.InvocationInfo.ScriptLineNumber + ')')
     Write-OkmInfo '      Tipp: Ist das Gerät eingeschaltet und im selben Netz? Manche Geräte und Firewalls antworten grundsätzlich nicht auf Ping.'
     $OkmStatus = 'fehler'
     Exit-OkmScript 1
@@ -123,7 +130,7 @@ try {
     $OkmErfolgreich++
     Write-OkmOk
 } catch {
-    Write-OkmFehler $_.Exception.Message
+    Write-OkmFehler ($_.Exception.Message + ' (Zeile ' + $_.InvocationInfo.ScriptLineNumber + ')')
     $OkmStatus = 'fehler'
     Exit-OkmScript 1
 }
@@ -136,13 +143,19 @@ Write-OkmInfo '[3/4] Status von Dienst Spooler wird abgefragt ...'
 try {
     $global:LASTEXITCODE = 0
     . {
-        Get-Service -Name 'Spooler' | Format-Table Name, DisplayName, Status, StartType -AutoSize
+        $okmDienst = Get-Service -Name 'Spooler' -ErrorAction SilentlyContinue
+        if (-not $okmDienst) {
+            Write-OkmWarnung 'Diesen Dienst gibt es nicht.'
+        } else {
+            $okmDienst | Format-Table Name, DisplayName, Status, StartType -AutoSize
+            if ($okmDienst.Status -ne 'Running') { Write-OkmWarnung 'Der Dienst ist vorhanden, läuft aber nicht.' }
+        }
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
     $OkmErfolgreich++
     Write-OkmOk
 } catch {
-    Write-OkmFehler $_.Exception.Message
+    Write-OkmFehler ($_.Exception.Message + ' (Zeile ' + $_.InvocationInfo.ScriptLineNumber + ')')
     $OkmStatus = 'fehler'
     Exit-OkmScript 1
 }
@@ -162,7 +175,7 @@ try {
     $OkmErfolgreich++
     Write-OkmOk
 } catch {
-    Write-OkmFehler $_.Exception.Message
+    Write-OkmFehler ($_.Exception.Message + ' (Zeile ' + $_.InvocationInfo.ScriptLineNumber + ')')
     $OkmStatus = 'fehler'
     Exit-OkmScript 1
 }

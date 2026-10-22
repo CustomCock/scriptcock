@@ -117,6 +117,14 @@ class PowerShellGenerator(Generator):
             "",
             *self._zusammenfassung(),
             "",
+            "# Netz für alles, was kein Schritt abfängt: Meldung + Zusammenfassung statt stillem Ende",
+            "trap {",
+            "    Write-OkmFehler ('Unerwarteter Fehler: ' + $_.Exception.Message + ' (Zeile ' + "
+            "$_.InvocationInfo.ScriptLineNumber + ')')",
+            "    $script:OkmStatus = 'fehler'",
+            "    Exit-OkmScript 1",
+            "}",
+            "",
             *[f"Write-OkmInfo {_lit(z)}" for z in self.kopf_ausgabe(ir)],
             "",
         ]
@@ -177,7 +185,8 @@ class PowerShellGenerator(Generator):
             "    $OkmErfolgreich++",
             "    Write-OkmOk",
             "} catch {",
-            "    Write-OkmFehler $_.Exception.Message",
+            "    Write-OkmFehler ($_.Exception.Message + ' (Zeile ' + "
+            "$_.InvocationInfo.ScriptLineNumber + ')')",
         ]
         if b.tipp:
             zeilen.append(f"    Write-OkmInfo {_lit(EINZUG + 'Tipp: ' + b.tipp)}")

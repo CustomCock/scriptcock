@@ -75,6 +75,13 @@ function Exit-OkmScript {
     exit $Code
 }
 
+# Netz für alles, was kein Schritt abfängt: Meldung + Zusammenfassung statt stillem Ende
+trap {
+    Write-OkmFehler ('Unerwarteter Fehler: ' + $_.Exception.Message + ' (Zeile ' + $_.InvocationInfo.ScriptLineNumber + ')')
+    $script:OkmStatus = 'fehler'
+    Exit-OkmScript 1
+}
+
 Write-OkmInfo '=============================================='
 Write-OkmInfo ' okm Script-Baukasten · Windows Update reparieren'
 Write-OkmInfo ' Erstellt: 15.01.2026 09:30 · von pytest'
@@ -104,7 +111,7 @@ try {
     $OkmErfolgreich++
     Write-OkmOk
 } catch {
-    Write-OkmFehler $_.Exception.Message
+    Write-OkmFehler ($_.Exception.Message + ' (Zeile ' + $_.InvocationInfo.ScriptLineNumber + ')')
     $OkmStatus = 'fehler'
     Exit-OkmScript 1
 }
@@ -135,7 +142,7 @@ try {
     $OkmErfolgreich++
     Write-OkmOk
 } catch {
-    Write-OkmFehler $_.Exception.Message
+    Write-OkmFehler ($_.Exception.Message + ' (Zeile ' + $_.InvocationInfo.ScriptLineNumber + ')')
     $OkmStatus = 'fehler'
     Exit-OkmScript 1
 }
@@ -158,7 +165,7 @@ try {
     $OkmErfolgreich++
     Write-OkmOk
 } catch {
-    Write-OkmFehler $_.Exception.Message
+    Write-OkmFehler ($_.Exception.Message + ' (Zeile ' + $_.InvocationInfo.ScriptLineNumber + ')')
     $OkmStatus = 'fehler'
     Exit-OkmScript 1
 }
@@ -178,7 +185,7 @@ try {
     $OkmErfolgreich++
     Write-OkmOk
 } catch {
-    Write-OkmFehler $_.Exception.Message
+    Write-OkmFehler ($_.Exception.Message + ' (Zeile ' + $_.InvocationInfo.ScriptLineNumber + ')')
     $OkmStatus = 'fehler'
     Exit-OkmScript 1
 }

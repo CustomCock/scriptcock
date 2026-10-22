@@ -44,10 +44,18 @@ class ShGenerator(Generator):
     def lies_antwort(self, prompt: str) -> str:
         raise NotImplementedError
 
+    def pause(self) -> list[str]:
+        raise NotImplementedError
+
     def praeambel(self, ir: ScriptIR, gesamt: int, braucht_admin: bool) -> list[str]:
         zeilen = [
             *self.fehlerbehandlung(),
             "",
+            "# --nopause: am Ende nicht auf Enter warten (Fernwartung/RMM)",
+            "OKM_KEINE_PAUSE=0",
+            'for okm_arg in "$@"; do',
+            '  if [ "$okm_arg" = --nopause ]; then OKM_KEINE_PAUSE=1; fi',
+            "done",
             'OKM_LOG="${TMPDIR:-/tmp}/okm-script-$(date +%Y%m%d-%H%M%S).log"',
             *([] if self.mit_kontrolle else [f"OKM_GESAMT={gesamt}"]),
             "OKM_OK=0",
@@ -65,6 +73,11 @@ class ShGenerator(Generator):
             f"okm_warn() {{ printf '{EINZUG}WARNUNG  %s\\n' \"$*\"; }}",
             f"okm_fehler() {{ printf '{EINZUG}FEHLER  %s\\n' \"$*\"; }}",
             *self._zusammenfassung(),
+            "# Fenster/Terminal offen halten – nur wenn ein Mensch davor sitzt",
+            "okm_pause() {",
+            '  if [ "$OKM_KEINE_PAUSE" = 1 ] || [ ! -t 0 ]; then return 0; fi',
+            *self.pause(),
+            "}",
         ]
         if self.mit_kontrolle:
             zeilen += [
@@ -79,9 +92,43 @@ class ShGenerator(Generator):
                 "}",
             ]
         zeilen += [
-            'exec > >(tee -a "$OKM_LOG") 2>&1',
-            "",
             *self.fehler_handler(),
+            "",
+            "# Zusammenfassung bei JEDEM Ende – auch bei Fehlern, die kein ERR auslösen",
+            "# (z. B. nicht gesetzte Variable) oder einem Abbruch ohne Meldung.",
+            "okm_ende() {",
+            "  local okm_rc=$?",
+            '  if [ "$OKM_STATUS" = laeuft ]; then',
+            '    if [ "$okm_rc" -eq 0 ]; then',
+            "      OKM_STATUS=fertig",
+            "    else",
+            '      okm_fehler "Script unerwartet beendet in Schritt $OKM_SCHRITT (Exit-Code $okm_rc)."',
+            "      OKM_STATUS=fehler",
+            "    fi",
+            "  fi",
+            "  okm_zusammenfassung",
+            *(['  rm -f "$OKM_ZAEHLER"'] if self.mit_kontrolle else []),
+            "  okm_pause",
+            "  # Ausgabe schließen und kurz auf tee warten, sonst fehlen beim Schließen des Fensters",
+            "  # die letzten Zeilen (höchstens 2 s – ein Hintergrundprozess darf nichts aufhalten)",
+            "  exec 1>&- 2>&-",
+            "  okm_i=0",
+            '  while [ "$okm_i" -lt 20 ] && kill -0 "${OKM_TEE:-0}" 2>/dev/null; do',
+            "    sleep 0.1",
+            "    okm_i=$((okm_i + 1))",
+            "  done",
+            '  exit "$okm_rc"',
+            "}",
+            "trap okm_ende EXIT",
+            "",
+            "# Ausgabe zusätzlich ins Protokoll – über eine FIFO statt >(tee), damit das Script am Ende",
+            "# auf tee warten kann (zsh verliert sonst die komplette Ausgabe, wenn das Fenster zugeht).",
+            'OKM_TMPDIR="$(mktemp -d)"',
+            'mkfifo -m 600 "$OKM_TMPDIR/ausgabe"',
+            'tee -a "$OKM_LOG" < "$OKM_TMPDIR/ausgabe" &',
+            "OKM_TEE=$!",
+            'exec > "$OKM_TMPDIR/ausgabe" 2>&1',
+            'rm -rf "$OKM_TMPDIR"',
             "",
             *[f"okm_info {_lit(z)}" for z in self.kopf_ausgabe(ir)],
             "",
@@ -93,7 +140,6 @@ class ShGenerator(Generator):
                 f"  okm_fehler {_lit('Dieses Script braucht Administratorrechte (root).')}",
                 f"  okm_info {_lit(EINZUG + self.sudo_hinweis)}",
                 "  OKM_STATUS=rechte",
-                "  okm_zusammenfassung",
                 "  exit 1",
                 "fi",
                 "",
@@ -140,15 +186,17 @@ class ShGenerator(Generator):
         ]
 
     def _fehler_ausgabe(self) -> list[str]:
-        """Abbruch des ganzen Scripts mit Zusammenfassung."""
+        """Abbruch des ganzen Scripts; die Zusammenfassung schreibt okm_ende (EXIT)."""
         return [
             '  okm_fehler "Schritt $OKM_SCHRITT: Befehl endete mit Exit-Code $okm_rc."',
+            *self.fehler_ort(),
             '  if [ -n "$OKM_TIPP" ]; then okm_info "' + EINZUG + 'Tipp: $OKM_TIPP"; fi',
             "  OKM_STATUS=fehler",
-            "  okm_zusammenfassung",
-            *(['  rm -f "$OKM_ZAEHLER"'] if self.mit_kontrolle else []),
             '  exit "$okm_rc"',
         ]
+
+    def fehler_ort(self) -> list[str]:
+        raise NotImplementedError
 
     def schritt(self, info: SchrittInfo) -> list[str]:
         b = info.block
@@ -170,7 +218,7 @@ class ShGenerator(Generator):
                 *(
                     [f"  exit {self.ABBRUCH_CODE}"]
                     if self.im_versuch
-                    else ["  OKM_STATUS=abbruch", "  okm_zusammenfassung", "  exit 2"]
+                    else ["  OKM_STATUS=abbruch", "  exit 2"]
                 ),
                 "fi",
             ]
@@ -183,9 +231,7 @@ class ShGenerator(Generator):
     def wenn_fehler(self, nr: int, versuch: list[str], sonst: list[str]) -> list[str]:
         rc = f"okm_rc_{nr}"
         weiterreichen = (
-            [f"  exit {self.ABBRUCH_CODE}"]
-            if self.im_versuch
-            else ["  OKM_STATUS=abbruch", "  okm_zusammenfassung", '  rm -f "$OKM_ZAEHLER"', "  exit 2"]
+            [f"  exit {self.ABBRUCH_CODE}"] if self.im_versuch else ["  OKM_STATUS=abbruch", "  exit 2"]
         )
         return [
             f"# ===== Versuche (Block {nr}) =====",
@@ -226,11 +272,8 @@ class ShGenerator(Generator):
         ]
 
     def abschluss(self, ir: ScriptIR) -> list[str]:
-        return [
-            "OKM_STATUS=fertig",
-            "okm_zusammenfassung",
-            *(['rm -f "$OKM_ZAEHLER"'] if self.mit_kontrolle else []),
-        ]
+        # Zusammenfassung, Aufräumen und Pause übernimmt okm_ende (EXIT-Trap)
+        return ["OKM_STATUS=fertig"]
 
 
 class BashGenerator(ShGenerator):
@@ -246,16 +289,22 @@ class BashGenerator(ShGenerator):
     def fehler_handler(self) -> list[str]:
         return [
             "okm_bei_fehler() {",
-            "  local okm_rc=$?",
+            "  local okm_rc=$1 okm_zeile=$2 okm_befehl=$3",
             *self._fehler_pruefungen(),
             "  trap - ERR",
             *self._fehler_ausgabe(),
             "}",
-            "trap okm_bei_fehler ERR",
+            "trap 'okm_bei_fehler $? $LINENO \"$BASH_COMMAND\"' ERR",
         ]
+
+    def fehler_ort(self) -> list[str]:
+        return [f'  okm_info "{EINZUG}Zeile $okm_zeile, Befehl: $okm_befehl"']
 
     def lies_antwort(self, prompt: str) -> str:
         return f"read -r -p {_lit(prompt)} okm_antwort || true"
+
+    def pause(self) -> list[str]:
+        return [f"  read -r -p {_lit('Drücke Enter zum Schließen …')} _ || true"]
 
 
 class ZshGenerator(ShGenerator):
@@ -266,16 +315,26 @@ class ZshGenerator(ShGenerator):
     errexit_an: ClassVar[str] = "setopt ERR_EXIT"
 
     def fehlerbehandlung(self) -> list[str]:
-        return ["setopt ERR_EXIT NO_UNSET PIPE_FAIL"]
+        # Kein NO_UNSET: zsh beendet sich bei einer nicht gesetzten Variable sofort – ohne EXIT-Trap,
+        # also ohne jede Meldung. Leer ist hier das kleinere Übel.
+        return ["setopt ERR_EXIT PIPE_FAIL"]
 
     def fehler_handler(self) -> list[str]:
+        # String-Trap statt TRAPZERR(): nur so liefert $LINENO die Zeile des fehlgeschlagenen Befehls
         return [
-            "TRAPZERR() {",
-            "  local okm_rc=$?",
+            "okm_bei_fehler() {",
+            "  local okm_rc=$1 okm_zeile=$2",
             *self._fehler_pruefungen(),
             *self._fehler_ausgabe(),
             "}",
+            "trap 'okm_bei_fehler $? $LINENO' ZERR",
         ]
+
+    def fehler_ort(self) -> list[str]:
+        return [f'  okm_info "{EINZUG}Zeile $okm_zeile"']
+
+    def pause(self) -> list[str]:
+        return [f"  read -r {_lit('okm_weiter?Drücke Enter zum Schließen …')} || true"]
 
     def lies_antwort(self, prompt: str) -> str:
         # zsh: "variable?Prompt"

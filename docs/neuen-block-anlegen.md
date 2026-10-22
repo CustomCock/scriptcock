@@ -92,6 +92,27 @@ Weitere Regeln, die beim Start geprüft werden:
   `admin_noetig: true` – das Script prüft dann am Anfang auf root). Achtung: Die Scripte
   laufen mit `set -e`; ein Befehl, der „nichts gefunden“ mit Fehlercode meldet (`grep`,
   `pgrep`), braucht `|| true` oder eine `if`-Abfrage.
+- **Prüf-Blöcke dürfen das Script nicht abbrechen**, nur weil das Ergebnis negativ ist (Ping ohne
+  Antwort, Dienst gestoppt oder unbekannt, Suche ohne Treffer). Den Befehl dafür in ein `if`
+  setzen bzw. den Exit-Code auswerten und das Ergebnis melden:
+
+  ```yaml
+    bash: |
+      okm_rc=0
+      systemctl --no-pager status {{ dienst }} || okm_rc=$?
+      case "$okm_rc" in
+        0) ;;
+        3) okm_warn 'Der Dienst ist vorhanden, läuft aber nicht.' ;;
+        *) okm_fehler "systemctl endete mit Exit-Code $okm_rc."; false ;;
+      esac
+  ```
+
+- Für Meldungen stehen in jedem Script Hilfsfunktionen bereit – Werte immer als Argument:
+  bash/zsh `okm_info`, `okm_ok`, `okm_warn`, `okm_fehler`; PowerShell `Write-OkmInfo`,
+  `Write-OkmOk`, `Write-OkmWarnung`, `Write-OkmFehler`. CMD: `echo Hinweis: …`.
+- `tipp:` (optional) erscheint bei einem Fehler unter der Fehlermeldung, z. B.
+  `tipp: Ist das Gerät eingeschaltet und im selben Netz?`
+- Keine Farbcodes (ANSI) in Templates – nur `Write-Host -ForegroundColor` in PowerShell.
 - Interne Variablen bitte mit `okm` beginnen (`$okmErgebnis`, `okm_arbeit`), damit sie nicht
   mit anderen Blöcken kollidieren.
 

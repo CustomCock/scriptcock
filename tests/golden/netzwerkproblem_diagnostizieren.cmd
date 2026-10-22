@@ -27,6 +27,8 @@ set "OKM_GESAMT=5"
 set "OKM_OK=0"
 set "OKM_SCHRITT=0"
 set "OKM_RC=0"
+rem /nopause: am Ende nicht auf eine Taste warten (Fernwartung/RMM)
+if /i "%~1"=="/nopause" set "OKM_KEINE_PAUSE=1"
 set "OKM_TIPP="
 echo(==============================================
 >>"%OKM_LOG%" echo(==============================================

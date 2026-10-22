@@ -1,5 +1,5 @@
 id: zertifikat_website
-version: 1
+version: 2
 name: Zertifikat einer Webseite prüfen
 kategorie: Sicherheit
 beschreibung: Zeigt Aussteller und Ablaufdatum des TLS-Zertifikats eines Servers – z. B. um abgelaufene Zertifikate zu finden.
@@ -16,36 +16,47 @@ parameter:
     standard: 443
 ziele:
   powershell: |
-    $okmTcp = New-Object System.Net.Sockets.TcpClient({{ host }}, {{ port }})
     try {
-        $okmSsl = New-Object System.Net.Security.SslStream($okmTcp.GetStream(), $false, { $true })
-        $okmSsl.AuthenticateAsClient({{ host }})
-        $okmZert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($okmSsl.RemoteCertificate)
-        $okmTage = [math]::Floor(($okmZert.NotAfter - (Get-Date)).TotalDays)
-        Write-Host ('Ausgestellt für: ' + $okmZert.Subject)
-        Write-Host ('Aussteller:      ' + $okmZert.Issuer)
-        Write-Host ('Gültig bis:      ' + $okmZert.NotAfter + ' (' + $okmTage + ' Tage)') -ForegroundColor $(if ($okmTage -lt 14) { 'Red' } elseif ($okmTage -lt 30) { 'Yellow' } else { 'Green' })
-        Write-Host ('Vertrauenswürdig: ' + $okmZert.Verify())
-    } finally {
-        $okmTcp.Close()
+        $okmTcp = New-Object System.Net.Sockets.TcpClient({{ host }}, {{ port }})
+    } catch {
+        $okmTcp = $null
+        Write-OkmWarnung ('Keine TLS-Verbindung – Server nicht erreichbar: ' + $_.Exception.Message)
+    }
+    if ($okmTcp) {
+        try {
+            $okmSsl = New-Object System.Net.Security.SslStream($okmTcp.GetStream(), $false, { $true })
+            $okmSsl.AuthenticateAsClient({{ host }})
+            $okmZert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2($okmSsl.RemoteCertificate)
+            $okmTage = [math]::Floor(($okmZert.NotAfter - (Get-Date)).TotalDays)
+            Write-Host ('Ausgestellt für: ' + $okmZert.Subject)
+            Write-Host ('Aussteller:      ' + $okmZert.Issuer)
+            Write-Host ('Gültig bis:      ' + $okmZert.NotAfter + ' (' + $okmTage + ' Tage)') -ForegroundColor $(if ($okmTage -lt 14) { 'Red' } elseif ($okmTage -lt 30) { 'Yellow' } else { 'Green' })
+            Write-Host ('Vertrauenswürdig: ' + $okmZert.Verify())
+        } catch {
+            Write-OkmWarnung ('Keine TLS-Verbindung: ' + $_.Exception.Message)
+        } finally {
+            $okmTcp.Close()
+        }
     }
   bash: |
     okm_host={{ host }}
     okm_port={{ port }}
     okm_zert="$(openssl s_client -connect "$okm_host:$okm_port" -servername "$okm_host" </dev/null 2>/dev/null || true)"
-    printf '%s\n' "$okm_zert" | openssl x509 -noout -subject -issuer -enddate
-    if printf '%s\n' "$okm_zert" | openssl x509 -noout -checkend 2592000 >/dev/null; then
-      printf '%s\n' 'Zertifikat ist noch mindestens 30 Tage gültig.'
+    if ! printf '%s\n' "$okm_zert" | openssl x509 -noout -subject -issuer -enddate 2>/dev/null; then
+      okm_warn "Keine TLS-Verbindung zu $okm_host:$okm_port – Server nicht erreichbar oder kein Zertifikat."
+    elif printf '%s\n' "$okm_zert" | openssl x509 -noout -checkend 2592000 >/dev/null; then
+      okm_ok 'Zertifikat ist noch mindestens 30 Tage gültig.'
     else
-      printf '%s\n' 'ACHTUNG: Zertifikat läuft in weniger als 30 Tagen ab (oder ist abgelaufen).'
+      okm_warn 'Zertifikat läuft in weniger als 30 Tagen ab (oder ist abgelaufen).'
     fi
   zsh: |
     okm_host={{ host }}
     okm_port={{ port }}
     okm_zert="$(openssl s_client -connect "$okm_host:$okm_port" -servername "$okm_host" </dev/null 2>/dev/null || true)"
-    printf '%s\n' "$okm_zert" | openssl x509 -noout -subject -issuer -enddate
-    if printf '%s\n' "$okm_zert" | openssl x509 -noout -checkend 2592000 >/dev/null; then
-      printf '%s\n' 'Zertifikat ist noch mindestens 30 Tage gültig.'
+    if ! printf '%s\n' "$okm_zert" | openssl x509 -noout -subject -issuer -enddate 2>/dev/null; then
+      okm_warn "Keine TLS-Verbindung zu $okm_host:$okm_port – Server nicht erreichbar oder kein Zertifikat."
+    elif printf '%s\n' "$okm_zert" | openssl x509 -noout -checkend 2592000 >/dev/null; then
+      okm_ok 'Zertifikat ist noch mindestens 30 Tage gültig.'
     else
-      printf '%s\n' 'ACHTUNG: Zertifikat läuft in weniger als 30 Tagen ab (oder ist abgelaufen).'
+      okm_warn 'Zertifikat läuft in weniger als 30 Tagen ab (oder ist abgelaufen).'
     fi

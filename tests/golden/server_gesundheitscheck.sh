@@ -18,6 +18,11 @@
 
 set -Eeuo pipefail
 
+# --nopause: am Ende nicht auf Enter warten (Fernwartung/RMM)
+OKM_KEINE_PAUSE=0
+for okm_arg in "$@"; do
+  if [ "$okm_arg" = --nopause ]; then OKM_KEINE_PAUSE=1; fi
+done
 OKM_LOG="${TMPDIR:-/tmp}/okm-script-$(date +%Y%m%d-%H%M%S).log"
 OKM_GESAMT=5
 OKM_OK=0
@@ -44,18 +49,56 @@ okm_zusammenfassung() {
   printf ' Protokoll: %s\n' "$OKM_LOG"
   okm_info '----------------------------------------------'
 }
-exec > >(tee -a "$OKM_LOG") 2>&1
-
+# Fenster/Terminal offen halten – nur wenn ein Mensch davor sitzt
+okm_pause() {
+  if [ "$OKM_KEINE_PAUSE" = 1 ] || [ ! -t 0 ]; then return 0; fi
+  read -r -p 'Drücke Enter zum Schließen …' _ || true
+}
 okm_bei_fehler() {
-  local okm_rc=$?
+  local okm_rc=$1 okm_zeile=$2 okm_befehl=$3
   trap - ERR
   okm_fehler "Schritt $OKM_SCHRITT: Befehl endete mit Exit-Code $okm_rc."
+  okm_info "      Zeile $okm_zeile, Befehl: $okm_befehl"
   if [ -n "$OKM_TIPP" ]; then okm_info "      Tipp: $OKM_TIPP"; fi
   OKM_STATUS=fehler
-  okm_zusammenfassung
   exit "$okm_rc"
 }
-trap okm_bei_fehler ERR
+trap 'okm_bei_fehler $? $LINENO "$BASH_COMMAND"' ERR
+
+# Zusammenfassung bei JEDEM Ende – auch bei Fehlern, die kein ERR auslösen
+# (z. B. nicht gesetzte Variable) oder einem Abbruch ohne Meldung.
+okm_ende() {
+  local okm_rc=$?
+  if [ "$OKM_STATUS" = laeuft ]; then
+    if [ "$okm_rc" -eq 0 ]; then
+      OKM_STATUS=fertig
+    else
+      okm_fehler "Script unerwartet beendet in Schritt $OKM_SCHRITT (Exit-Code $okm_rc)."
+      OKM_STATUS=fehler
+    fi
+  fi
+  okm_zusammenfassung
+  okm_pause
+  # Ausgabe schließen und kurz auf tee warten, sonst fehlen beim Schließen des Fensters
+  # die letzten Zeilen (höchstens 2 s – ein Hintergrundprozess darf nichts aufhalten)
+  exec 1>&- 2>&-
+  okm_i=0
+  while [ "$okm_i" -lt 20 ] && kill -0 "${OKM_TEE:-0}" 2>/dev/null; do
+    sleep 0.1
+    okm_i=$((okm_i + 1))
+  done
+  exit "$okm_rc"
+}
+trap okm_ende EXIT
+
+# Ausgabe zusätzlich ins Protokoll – über eine FIFO statt >(tee), damit das Script am Ende
+# auf tee warten kann (zsh verliert sonst die komplette Ausgabe, wenn das Fenster zugeht).
+OKM_TMPDIR="$(mktemp -d)"
+mkfifo -m 600 "$OKM_TMPDIR/ausgabe"
+tee -a "$OKM_LOG" < "$OKM_TMPDIR/ausgabe" &
+OKM_TEE=$!
+exec > "$OKM_TMPDIR/ausgabe" 2>&1
+rm -rf "$OKM_TMPDIR"
 
 okm_info '=============================================='
 okm_info ' okm Script-Baukasten · Server-Gesundheitscheck'
@@ -152,4 +195,3 @@ OKM_OK=$((OKM_OK + 1))
 okm_ok
 
 OKM_STATUS=fertig
-okm_zusammenfassung

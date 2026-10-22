@@ -72,6 +72,13 @@ function Exit-OkmScript {
     exit $Code
 }
 
+# Netz für alles, was kein Schritt abfängt: Meldung + Zusammenfassung statt stillem Ende
+trap {
+    Write-OkmFehler ('Unerwarteter Fehler: ' + $_.Exception.Message + ' (Zeile ' + $_.InvocationInfo.ScriptLineNumber + ')')
+    $script:OkmStatus = 'fehler'
+    Exit-OkmScript 1
+}
+
 Write-OkmInfo '=============================================='
 Write-OkmInfo ' okm Script-Baukasten · Software installieren'
 Write-OkmInfo ' Erstellt: 15.01.2026 09:30 · von pytest'
@@ -91,7 +98,7 @@ try {
     $OkmErfolgreich++
     Write-OkmOk
 } catch {
-    Write-OkmFehler $_.Exception.Message
+    Write-OkmFehler ($_.Exception.Message + ' (Zeile ' + $_.InvocationInfo.ScriptLineNumber + ')')
     Write-OkmInfo '      Tipp: Paket-ID im Software-Katalog prüfen. Ist das Programm schon installiert, meldet der Paketmanager ebenfalls einen Fehler.'
     $OkmStatus = 'fehler'
     Exit-OkmScript 1

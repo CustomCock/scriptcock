@@ -73,6 +73,13 @@ function Exit-OkmScript {
     exit $Code
 }
 
+# Netz für alles, was kein Schritt abfängt: Meldung + Zusammenfassung statt stillem Ende
+trap {
+    Write-OkmFehler ('Unerwarteter Fehler: ' + $_.Exception.Message + ' (Zeile ' + $_.InvocationInfo.ScriptLineNumber + ')')
+    $script:OkmStatus = 'fehler'
+    Exit-OkmScript 1
+}
+
 Write-OkmInfo '=============================================='
 Write-OkmInfo ' okm Script-Baukasten · Drucker einrichten'
 Write-OkmInfo ' Erstellt: 15.01.2026 09:30 · von pytest'
@@ -103,7 +110,7 @@ try {
     $OkmErfolgreich++
     Write-OkmOk
 } catch {
-    Write-OkmFehler $_.Exception.Message
+    Write-OkmFehler ($_.Exception.Message + ' (Zeile ' + $_.InvocationInfo.ScriptLineNumber + ')')
     Write-OkmInfo '      Tipp: Ist das Gerät eingeschaltet und im selben Netz? Manche Geräte und Firewalls antworten grundsätzlich nicht auf Ping.'
     $OkmStatus = 'fehler'
     Exit-OkmScript 1
@@ -132,7 +139,7 @@ try {
     $OkmErfolgreich++
     Write-OkmOk
 } catch {
-    Write-OkmFehler $_.Exception.Message
+    Write-OkmFehler ($_.Exception.Message + ' (Zeile ' + $_.InvocationInfo.ScriptLineNumber + ')')
     Write-OkmInfo '      Tipp: Prüfe, ob der Drucker per Ping erreichbar ist und ob der gewählte Treiber installiert ist.'
     $OkmStatus = 'fehler'
     Exit-OkmScript 1

@@ -2,6 +2,39 @@
 
 ## Fehlerbehebung Runde 1
 
+### 2. Scripte beenden sich ohne Meldung
+
+- **Ursachen (reproduziert):**
+  - bash: `set -u` (nicht gesetzte Variable) löst **kein** ERR-Trap aus – das Script endete ohne
+    Fehlermeldung und ohne Zusammenfassung.
+  - zsh: Mit `NO_UNSET` beendet sich zsh bei einer nicht gesetzten Variable sofort – nicht einmal
+    ein EXIT-Trap läuft.
+  - zsh: `exec > >(tee …)` – schließt sich das Terminal mit dem Scriptende (Doppelklick unter
+    macOS), geht die **gesamte** Ausgabe verloren (mit `script(1)` nachgestellt).
+  - Prüf-Blöcke brachen bei negativem Ergebnis ab: `dienst_status` bei unbekanntem Dienst,
+    `zertifikat_website` bei nicht erreichbarem Server; `dns_test` (zsh) meldete gar nichts,
+    weil `dscacheutil` auch ohne Treffer 0 liefert.
+  - PowerShell: Fehler außerhalb der Schritte hatten kein Netz; das Fenster von „Mit PowerShell
+    ausführen“ schloss sich sofort.
+- **Lösung:**
+  - bash/zsh: Zusammenfassung über `trap okm_ende EXIT` bei **jedem** Ende (Erfolg, Fehler,
+    Abbruch, unerwartetes Ende → „Script unerwartet beendet in Schritt …“). ERR-Trap mit Zeile
+    (`$LINENO`) und in bash dem Befehl (`$BASH_COMMAND`); zsh als String-Trap `ZERR`, weil
+    `$LINENO` in `TRAPZERR()` immer 0 ist. zsh ohne `NO_UNSET`.
+  - Protokoll über FIFO + Hintergrund-`tee`; am Ende wartet das Script höchstens 2 s auf `tee`.
+  - PowerShell: Fehlermeldung mit Zeile, globales `trap { … }` als Netz.
+  - Fenster offen halten: PowerShell (außer `-NoPause`, `-NonInteractive`, umgeleiteter Eingabe),
+    CMD (außer `/nopause`), bash/zsh nur wenn `[ -t 0 ]` und ohne `--nopause`.
+  - `dienst_status`, `zertifikat_website`, `dns_test` werten das Ergebnis aus und melden es mit
+    `okm_warn`/`Write-OkmWarnung` statt abzubrechen (Ansatz „Befehl im `if`“ statt eines neuen
+    YAML-Felds – so bleibt die Logik pro Ziel sichtbar und testbar). Doku in
+    `docs/neuen-block-anlegen.md`.
+- **Tests (`tests/test_abbruch.py`):** nicht gesetzte Variable, Fehler mit Schritt/Zeile/Befehl und
+  Zusammenfassung in Ausgabe **und** Protokoll, PowerShell mit Zeile + Trap, Ping ohne Antwort
+  läuft weiter (Attrappe im PATH), Dienst unbekannt/gestoppt, Zertifikat nicht erreichbar,
+  Pause nur im Terminal (`script(1)`) und nicht mit `--nopause`, CMD `/nopause`.
+- **Golden-Files** neu erzeugt (EXIT-Trap, FIFO, Pause – gewollt).
+
 ### 1. Unlesbare Ausgabe („Wirrwarr“)
 
 - **Ursache (reproduziert):** Jeder PowerShell-Schritt leitet seine Ausgabe durch `| Out-Host`,

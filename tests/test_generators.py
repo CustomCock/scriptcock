@@ -128,7 +128,7 @@ def test_fehlerbehandlung(registry: Registry) -> None:
     assert "Start-Transcript" in ps
     assert 'if not "%OKM_RC%"=="0" goto :okm_fehler' in erzeuge(registry, Ziel.CMD, [("systeminfo", {})]).text
     assert "set -Eeuo pipefail" in erzeuge(registry, Ziel.BASH, [("systeminfo", {})]).text
-    assert "setopt ERR_EXIT NO_UNSET PIPE_FAIL" in erzeuge(registry, Ziel.ZSH, [("systeminfo", {})]).text
+    assert "setopt ERR_EXIT PIPE_FAIL" in erzeuge(registry, Ziel.ZSH, [("systeminfo", {})]).text
 
 
 @pytest.mark.parametrize(

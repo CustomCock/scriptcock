@@ -1,5 +1,5 @@
 id: dns_test
-version: 1
+version: 2
 name: Namensauflösung (DNS) testen
 kategorie: Netzwerk
 beschreibung: Prüft, ob ein Name (z. B. eine Webseite) in eine IP-Adresse aufgelöst werden kann.
@@ -39,4 +39,16 @@ ziele:
     getent ahosts {{ name }} || printf '%s\n' 'Der Name kann NICHT aufgelöst werden.'
     {% endif %}
   zsh: |
-    dscacheutil -q host -a name {{ name }}
+    # dscacheutil endet auch ohne Treffer mit 0 – daher die Ausgabe prüfen
+    okm_name={{ name }}
+    okm_dns="$(dscacheutil -q host -a name "$okm_name")"
+    if [ -n "$okm_dns" ]; then
+      printf '%s\n' "$okm_dns"
+    else
+    {% if abbrechen %}
+      okm_fehler 'Der Name kann nicht aufgelöst werden.'
+      false
+    {% else %}
+      okm_warn 'Der Name kann NICHT aufgelöst werden.'
+    {% endif %}
+    fi

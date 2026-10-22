@@ -26,8 +26,13 @@
 # Generiert mit dem okm Script-Baukasten
 # ======================================================================
 
-setopt ERR_EXIT NO_UNSET PIPE_FAIL
+setopt ERR_EXIT PIPE_FAIL
 
+# --nopause: am Ende nicht auf Enter warten (Fernwartung/RMM)
+OKM_KEINE_PAUSE=0
+for okm_arg in "$@"; do
+  if [ "$okm_arg" = --nopause ]; then OKM_KEINE_PAUSE=1; fi
+done
 OKM_LOG="${TMPDIR:-/tmp}/okm-script-$(date +%Y%m%d-%H%M%S).log"
 OKM_OK=0
 OKM_NR=0
@@ -53,6 +58,11 @@ okm_zusammenfassung() {
   printf ' Protokoll: %s\n' "$OKM_LOG"
   okm_info '----------------------------------------------'
 }
+# Fenster/Terminal offen halten – nur wenn ein Mensch davor sitzt
+okm_pause() {
+  if [ "$OKM_KEINE_PAUSE" = 1 ] || [ ! -t 0 ]; then return 0; fi
+  read -r 'okm_weiter?Drücke Enter zum Schließen …' || true
+}
 # Für „Versuche“-Blöcke (Subshells): Schutz-Flag, Tiefe, Zählerdatei
 OKM_SCHUTZ=0
 OKM_VERSUCH=0
@@ -62,10 +72,8 @@ okm_geschafft() {
   OKM_OK=$((OKM_OK + 1))
   printf '%s' "$OKM_OK" > "$OKM_ZAEHLER"
 }
-exec > >(tee -a "$OKM_LOG") 2>&1
-
-TRAPZERR() {
-  local okm_rc=$?
+okm_bei_fehler() {
+  local okm_rc=$1 okm_zeile=$2
   # Rückgabewert eines „Versuche“-Blocks wertet das Script selbst aus
   if [ "$OKM_SCHUTZ" = 1 ]; then return 0; fi
   if [ "$OKM_VERSUCH" -gt 0 ]; then
@@ -73,12 +81,48 @@ TRAPZERR() {
     exit "$okm_rc"
   fi
   okm_fehler "Schritt $OKM_SCHRITT: Befehl endete mit Exit-Code $okm_rc."
+  okm_info "      Zeile $okm_zeile"
   if [ -n "$OKM_TIPP" ]; then okm_info "      Tipp: $OKM_TIPP"; fi
   OKM_STATUS=fehler
-  okm_zusammenfassung
-  rm -f "$OKM_ZAEHLER"
   exit "$okm_rc"
 }
+trap 'okm_bei_fehler $? $LINENO' ZERR
+
+# Zusammenfassung bei JEDEM Ende – auch bei Fehlern, die kein ERR auslösen
+# (z. B. nicht gesetzte Variable) oder einem Abbruch ohne Meldung.
+okm_ende() {
+  local okm_rc=$?
+  if [ "$OKM_STATUS" = laeuft ]; then
+    if [ "$okm_rc" -eq 0 ]; then
+      OKM_STATUS=fertig
+    else
+      okm_fehler "Script unerwartet beendet in Schritt $OKM_SCHRITT (Exit-Code $okm_rc)."
+      OKM_STATUS=fehler
+    fi
+  fi
+  okm_zusammenfassung
+  rm -f "$OKM_ZAEHLER"
+  okm_pause
+  # Ausgabe schließen und kurz auf tee warten, sonst fehlen beim Schließen des Fensters
+  # die letzten Zeilen (höchstens 2 s – ein Hintergrundprozess darf nichts aufhalten)
+  exec 1>&- 2>&-
+  okm_i=0
+  while [ "$okm_i" -lt 20 ] && kill -0 "${OKM_TEE:-0}" 2>/dev/null; do
+    sleep 0.1
+    okm_i=$((okm_i + 1))
+  done
+  exit "$okm_rc"
+}
+trap okm_ende EXIT
+
+# Ausgabe zusätzlich ins Protokoll – über eine FIFO statt >(tee), damit das Script am Ende
+# auf tee warten kann (zsh verliert sonst die komplette Ausgabe, wenn das Fenster zugeht).
+OKM_TMPDIR="$(mktemp -d)"
+mkfifo -m 600 "$OKM_TMPDIR/ausgabe"
+tee -a "$OKM_LOG" < "$OKM_TMPDIR/ausgabe" &
+OKM_TEE=$!
+exec > "$OKM_TMPDIR/ausgabe" 2>&1
+rm -rf "$OKM_TMPDIR"
 
 okm_info '=============================================='
 okm_info ' okm Script-Baukasten · Ablauf'
@@ -156,8 +200,6 @@ OKM_SCHUTZ=0
 OKM_OK="$(cat "$OKM_ZAEHLER")"
 if [ "$okm_rc_1" -eq 112 ]; then
   OKM_STATUS=abbruch
-  okm_zusammenfassung
-  rm -f "$OKM_ZAEHLER"
   exit 2
 fi
 if [ "$okm_rc_1" -ne 0 ]; then
@@ -188,7 +230,6 @@ if [ "$okm_rc_1" -ne 0 ]; then
     read -r 'okm_antwort?Zum Fortfahren JA eingeben (alles andere bricht ab): ' || true
     if [ "$okm_antwort" != "JA" ]; then
       OKM_STATUS=abbruch
-      okm_zusammenfassung
       exit 2
     fi
     if pkill -x 'notepad'; then
@@ -234,7 +275,12 @@ for ((okm_durchlauf_4 = 1; okm_durchlauf_4 <= 3; okm_durchlauf_4++)); do
     OKM_SCHRITT='7/8 (Dienst-Status prüfen)'
     OKM_TIPP=''
     okm_info '[7/8] Status von Dienst Spooler wird abgefragt ...'
-    launchctl print system/'Spooler' | grep -E '^\s*(state|pid|path) =' || true
+    okm_label='Spooler'
+    if okm_launchd="$(launchctl print "system/$okm_label" 2>/dev/null)"; then
+      printf '%s\n' "$okm_launchd" | grep -E '^\s*(state|pid|path) =' || true
+    else
+      okm_warn 'Diesen Dienst gibt es nicht (oder er ist nur für den angemeldeten Benutzer geladen).'
+    fi
     okm_geschafft
     okm_ok
 
@@ -245,8 +291,6 @@ for ((okm_durchlauf_4 = 1; okm_durchlauf_4 <= 3; okm_durchlauf_4++)); do
   OKM_OK="$(cat "$OKM_ZAEHLER")"
   if [ "$okm_rc_5" -eq 112 ]; then
     OKM_STATUS=abbruch
-    okm_zusammenfassung
-    rm -f "$OKM_ZAEHLER"
     exit 2
   fi
   if [ "$okm_rc_5" -ne 0 ]; then
@@ -268,5 +312,3 @@ okm_geschafft
 okm_ok
 
 OKM_STATUS=fertig
-okm_zusammenfassung
-rm -f "$OKM_ZAEHLER"

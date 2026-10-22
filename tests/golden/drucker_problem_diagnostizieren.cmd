@@ -25,6 +25,8 @@ set "OKM_GESAMT=3"
 set "OKM_OK=0"
 set "OKM_SCHRITT=0"
 set "OKM_RC=0"
+rem /nopause: am Ende nicht auf eine Taste warten (Fernwartung/RMM)
+if /i "%~1"=="/nopause" set "OKM_KEINE_PAUSE=1"
 set "OKM_TIPP="
 echo(==============================================
 >>"%OKM_LOG%" echo(==============================================
@@ -68,6 +70,10 @@ echo([2/3] Status von Dienst Spooler wird abgefragt ...
 (call )
 (
 sc query "Spooler"
+if errorlevel 1 (
+  echo Hinweis: Diesen Dienst gibt es nicht oder er lässt sich nicht abfragen.
+  cmd /c exit 0
+)
 ) >"%OKM_TMP%" 2>&1
 set "OKM_RC=%ERRORLEVEL%"
 type "%OKM_TMP%"
