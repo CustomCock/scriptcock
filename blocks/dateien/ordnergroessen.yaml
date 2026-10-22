@@ -1,0 +1,22 @@
+id: ordnergroessen
+version: 1
+name: Ordnergrößen anzeigen
+kategorie: Dateien
+beschreibung: Zeigt, wie viel Platz die Unterordner eines Ordners belegen – größte zuerst.
+risiko: gruen
+fortschritt: "Ordnergrößen in {{ pfad }} werden berechnet"
+parameter:
+  - id: pfad
+    label: Ordner
+    typ: pfad
+    beispiel: C:\Users
+ziele:
+  powershell: |
+    Get-ChildItem -LiteralPath {{ pfad }} -Directory -Force -ErrorAction SilentlyContinue | ForEach-Object {
+        $okmSumme = (Get-ChildItem -LiteralPath $_.FullName -Recurse -File -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+        [PSCustomObject]@{ 'Größe (GB)' = [math]::Round($okmSumme / 1GB, 2); Ordner = $_.FullName }
+    } | Sort-Object 'Größe (GB)' -Descending | Format-Table -AutoSize
+  bash: |
+    { du -xh --max-depth=1 {{ pfad }} 2>/dev/null || true; } | sort -rh
+  zsh: |
+    { du -xh -d 1 {{ pfad }} 2>/dev/null || true; } | sort -rh

@@ -57,6 +57,11 @@ GUELTIG: list[tuple[ParamTyp, Any, Any]] = [
     (ParamTyp.DRUCKERNAME, "Drucker-Empfang_2", "Drucker-Empfang_2"),
     (ParamTyp.BENUTZERNAME, "max.mustermann", "max.mustermann"),
     (ParamTyp.URL, "https://intranet.okm.local/a?b=c%20d", "https://intranet.okm.local/a?b=c%20d"),
+    (
+        ParamTyp.SHA256,
+        "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    ),
     (ParamTyp.JA_NEIN, "true", True),
     (ParamTyp.JA_NEIN, "nein", False),
     (ParamTyp.JA_NEIN, False, False),
@@ -111,6 +116,8 @@ UNGUELTIG: list[tuple[ParamTyp, Any]] = [
     (ParamTyp.URL, "https://a b.de"),
     (ParamTyp.URL, "https://x.de/'$(id)'"),
     (ParamTyp.URL, "https:///pfad"),
+    (ParamTyp.SHA256, "abc"),
+    (ParamTyp.SHA256, "g" * 64),
     (ParamTyp.JA_NEIN, "vielleicht"),
 ]
 

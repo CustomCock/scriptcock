@@ -1,0 +1,24 @@
+id: drucker_entfernen
+version: 1
+name: Drucker entfernen
+kategorie: Drucker
+beschreibung: Entfernt einen eingerichteten Drucker.
+risiko: gelb
+admin_noetig:
+  bash: true
+  zsh: true
+fortschritt: "Drucker {{ name }} wird entfernt"
+parameter:
+  - id: name
+    label: Druckername
+    typ: text_kurz
+    beispiel: Drucker-Empfang
+ziele:
+  powershell: |
+    Remove-Printer -Name {{ name }}{{ whatif }}
+  cmd: |
+    rundll32 printui.dll,PrintUIEntry /dl /n {{ name }}
+  bash: |
+    lpadmin -x {{ name }}
+  zsh: |
+    lpadmin -x {{ name }}

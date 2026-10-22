@@ -1,0 +1,64 @@
+id: datei_download
+version: 1
+name: Datei herunterladen
+kategorie: Allgemein
+beschreibung: Lädt eine Datei aus dem Intranet oder Internet herunter – optional mit Prüfung der SHA-256-Prüfsumme.
+hilfe: |
+  Ist eine Prüfsumme angegeben und stimmt sie nicht, wird die Datei gelöscht und der Schritt schlägt fehl.
+risiko: gelb
+fortschritt: "{{ url }} wird heruntergeladen"
+parameter:
+  - id: url
+    label: Adresse (URL)
+    typ: url
+    beispiel: https://intranet.okm.local/software/setup.exe
+  - id: ziel
+    label: Speichern unter (Datei)
+    typ: pfad
+    beispiel: C:\temp\setup.exe
+  - id: pruefsumme
+    label: Erwartete SHA-256-Prüfsumme (optional)
+    typ: sha256
+    pflicht: false
+ziele:
+  powershell: |
+    Invoke-WebRequest -Uri {{ url }} -OutFile {{ ziel }} -UseBasicParsing
+    {% if pruefsumme %}
+    $okmHash = (Get-FileHash -LiteralPath {{ ziel }} -Algorithm SHA256).Hash.ToLower()
+    if ($okmHash -ne {{ pruefsumme }}) {
+        Remove-Item -LiteralPath {{ ziel }} -Force
+        throw ('Prüfsumme stimmt nicht (' + $okmHash + ') – Datei wurde gelöscht.')
+    }
+    Write-Host 'Prüfsumme stimmt.' -ForegroundColor Green
+    {% endif %}
+    Write-Host ('Gespeichert: ' + {{ ziel }})
+  bash: |
+    if command -v curl >/dev/null 2>&1; then
+      curl -fL --retry 2 -o {{ ziel }} -- {{ url }}
+    else
+      wget -O {{ ziel }} -- {{ url }}
+    fi
+    {% if pruefsumme %}
+    okm_soll={{ pruefsumme }}
+    okm_datei={{ ziel }}
+    okm_ist="$(sha256sum -- "$okm_datei" | awk '{print $1}')"
+    if [ "$okm_ist" != "$okm_soll" ]; then
+      rm -f -- "$okm_datei"
+      printf 'Prüfsumme stimmt nicht (%s) – Datei wurde gelöscht.\n' "$okm_ist"
+      false
+    fi
+    printf '%s\n' 'Prüfsumme stimmt.'
+    {% endif %}
+  zsh: |
+    curl -fL --retry 2 -o {{ ziel }} {{ url }}
+    {% if pruefsumme %}
+    okm_soll={{ pruefsumme }}
+    okm_datei={{ ziel }}
+    okm_ist="$(shasum -a 256 "$okm_datei" | awk '{print $1}')"
+    if [ "$okm_ist" != "$okm_soll" ]; then
+      rm -f "$okm_datei"
+      printf 'Prüfsumme stimmt nicht (%s) – Datei wurde gelöscht.\n' "$okm_ist"
+      false
+    fi
+    printf '%s\n' 'Prüfsumme stimmt.'
+    {% endif %}

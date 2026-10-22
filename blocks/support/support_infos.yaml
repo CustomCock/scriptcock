@@ -1,0 +1,44 @@
+id: support_infos
+version: 1
+name: Support-Infos anzeigen
+kategorie: Support
+beschreibung: Zeigt alles, was der Support am Telefon fragt – Rechnername, Benutzer, IP-Adresse, Betriebssystem, Seriennummer und ggf. TeamViewer-/AnyDesk-ID.
+risiko: gruen
+fortschritt: Support-Infos werden gesammelt
+ziele:
+  powershell: |
+    $okmOs = Get-CimInstance -ClassName Win32_OperatingSystem
+    $okmIps = (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' }).IPAddress -join ', '
+    Write-Host ('Rechnername:     ' + $env:COMPUTERNAME)
+    Write-Host ('Benutzer:        ' + $env:USERDOMAIN + '\' + $env:USERNAME)
+    Write-Host ('IP-Adresse(n):   ' + $okmIps)
+    Write-Host ('Betriebssystem:  ' + $okmOs.Caption + ' (' + $okmOs.Version + ')')
+    Write-Host ('Seriennummer:    ' + (Get-CimInstance -ClassName Win32_BIOS).SerialNumber)
+    foreach ($okmSchluessel in 'HKLM:\SOFTWARE\TeamViewer', 'HKLM:\SOFTWARE\WOW6432Node\TeamViewer') {
+        $okmTv = (Get-ItemProperty -Path $okmSchluessel -ErrorAction SilentlyContinue).ClientID
+        if ($okmTv) { Write-Host ('TeamViewer-ID:   ' + $okmTv); break }
+    }
+    $okmAnyDesk = Join-Path $env:ProgramData 'AnyDesk\system.conf'
+    if (Test-Path -LiteralPath $okmAnyDesk) {
+        $okmAd = Select-String -LiteralPath $okmAnyDesk -Pattern '^ad\.anynet\.id=' | Select-Object -First 1
+        if ($okmAd) { Write-Host ('AnyDesk-ID:      ' + $okmAd.Line.Split('=')[1]) }
+    }
+  cmd: |
+    echo Rechnername:   %COMPUTERNAME%
+    echo Benutzer:      %USERDOMAIN%\%USERNAME%
+    ipconfig | findstr /C:"IPv4"
+    ver
+  bash: |
+    printf 'Rechnername:     %s\n' "$(hostname)"
+    printf 'Benutzer:        %s\n' "$(id -un)"
+    printf 'IP-Adresse(n):   %s\n' "$(hostname -I 2>/dev/null || true)"
+    if [ -r /etc/os-release ]; then
+      printf 'Betriebssystem:  %s\n' "$(. /etc/os-release && printf '%s' "$PRETTY_NAME")"
+    fi
+    printf 'Kernel:          %s\n' "$(uname -r)"
+  zsh: |
+    printf 'Rechnername:     %s\n' "$(scutil --get ComputerName)"
+    printf 'Benutzer:        %s\n' "$(id -un)"
+    printf 'IP-Adresse(n):   %s\n' "$(ipconfig getifaddr en0 || true) $(ipconfig getifaddr en1 || true)"
+    printf 'Betriebssystem:  macOS %s\n' "$(sw_vers -productVersion)"
+    printf 'Seriennummer:    %s\n' "$(ioreg -rd1 -c IOPlatformExpertDevice | awk -F'"' '/IOPlatformSerialNumber/ {print $4}')"

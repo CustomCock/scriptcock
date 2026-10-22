@@ -1,0 +1,33 @@
+id: update_status
+version: 1
+name: Update-Status anzeigen
+kategorie: Updates
+beschreibung: Zeigt die zuletzt installierten Updates und welche Updates noch ausstehen.
+hilfe: |
+  Windows: Die Suche nach ausstehenden Updates kann einige Minuten dauern.
+  Linux: Paketquellen werden nicht aktualisiert – die Liste bezieht sich auf den letzten Abgleich.
+risiko: gruen
+fortschritt: Update-Status wird ermittelt
+ziele:
+  powershell: |
+    Write-Host 'Zuletzt installierte Updates:'
+    Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 10 | Format-Table HotFixID, Description, InstalledOn -AutoSize
+    Write-Host 'Suche ausstehende Updates …'
+    $okmSuche = (New-Object -ComObject Microsoft.Update.Session).CreateUpdateSearcher()
+    $okmOffen = $okmSuche.Search("IsInstalled=0 and IsHidden=0").Updates
+    if ($okmOffen.Count -eq 0) {
+        Write-Host 'Keine ausstehenden Updates.' -ForegroundColor Green
+    } else {
+        Write-Host ($okmOffen.Count.ToString() + ' ausstehende Updates:') -ForegroundColor Yellow
+        foreach ($okmUpdate in $okmOffen) { Write-Host (' - ' + $okmUpdate.Title) }
+    }
+  bash: |
+    if command -v apt >/dev/null 2>&1; then
+      apt list --upgradable 2>/dev/null
+    elif command -v dnf >/dev/null 2>&1; then
+      dnf -q check-update || [ $? -eq 100 ]
+    else
+      printf '%s\n' 'Kein unterstützter Paketmanager (apt, dnf) gefunden.'
+    fi
+  zsh: |
+    softwareupdate --list 2>&1 || true

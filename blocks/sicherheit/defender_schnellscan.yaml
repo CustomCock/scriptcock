@@ -1,0 +1,14 @@
+id: defender_schnellscan
+version: 1
+name: Defender-Schnellscan
+kategorie: Sicherheit
+beschreibung: Startet einen Schnellscan mit Microsoft Defender. Nur sinnvoll, wenn Defender der aktive Virenschutz ist.
+risiko: gelb
+admin_noetig: true
+fortschritt: Defender-Schnellscan läuft
+ziele:
+  powershell: |
+    Start-MpScan -ScanType QuickScan
+    Get-MpThreatDetection -ErrorAction SilentlyContinue | Select-Object -First 10 | Format-Table InitialDetectionTime, ThreatID, ActionSuccess -AutoSize
+  cmd: |
+    "%ProgramFiles%\Windows Defender\MpCmdRun.exe" -Scan -ScanType 1

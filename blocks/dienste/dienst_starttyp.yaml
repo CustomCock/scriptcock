@@ -1,0 +1,54 @@
+id: dienst_starttyp
+version: 1
+name: Starttyp eines Dienstes ändern
+kategorie: Dienste
+beschreibung: Legt fest, ob ein Dienst automatisch, manuell oder gar nicht startet.
+risiko: gelb
+admin_noetig: true
+fortschritt: "Starttyp von {{ dienst }} wird geändert"
+parameter:
+  - id: dienst
+    label: Dienstname
+    typ: dienstname
+    beispiel: Spooler
+  - id: starttyp
+    label: Starttyp
+    typ: auswahl
+    standard: automatisch
+    optionen:
+      - wert: automatisch
+        label: Automatisch (startet mit dem System)
+      - wert: manuell
+        label: Manuell (nur bei Bedarf)
+      - wert: deaktiviert
+        label: Deaktiviert
+ziele:
+  powershell: |
+    {% if starttyp.wert == 'manuell' %}
+    Set-Service -Name {{ dienst }} -StartupType Manual{{ whatif }}
+    {% elif starttyp.wert == 'deaktiviert' %}
+    Set-Service -Name {{ dienst }} -StartupType Disabled{{ whatif }}
+    {% else %}
+    Set-Service -Name {{ dienst }} -StartupType Automatic{{ whatif }}
+    {% endif %}
+    Get-Service -Name {{ dienst }} | Format-Table Name, Status, StartType -AutoSize
+  cmd: |
+    {% if starttyp.wert == 'manuell' %}
+    sc config {{ dienst }} start= demand
+    {% elif starttyp.wert == 'deaktiviert' %}
+    sc config {{ dienst }} start= disabled
+    {% else %}
+    sc config {{ dienst }} start= auto
+    {% endif %}
+  bash: |
+    {% if starttyp.wert == 'manuell' %}
+    systemctl disable {{ dienst }}
+    {% elif starttyp.wert == 'deaktiviert' %}
+    systemctl disable {{ dienst }}
+    systemctl mask {{ dienst }}
+    {% else %}
+    systemctl unmask {{ dienst }}
+    systemctl enable {{ dienst }}
+    {% endif %}
+hinweise:
+  bash: "Linux: „Manuell“ = disable, „Deaktiviert“ = disable + mask (kann dann gar nicht mehr gestartet werden)."

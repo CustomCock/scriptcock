@@ -1,0 +1,14 @@
+id: wlan_profile
+version: 1
+name: Gespeicherte WLAN-Profile
+kategorie: Netzwerk
+beschreibung: Listet alle auf diesem Rechner gespeicherten WLAN-Netze.
+risiko: gruen
+fortschritt: WLAN-Profile werden aufgelistet
+ziele:
+  powershell: |
+    netsh.exe wlan show profiles
+    if ($LASTEXITCODE -ne 0) { Write-Host 'Kein WLAN-Adapter gefunden.'; $global:LASTEXITCODE = 0 }
+  cmd: |
+    netsh wlan show profiles
+    cmd /c exit 0

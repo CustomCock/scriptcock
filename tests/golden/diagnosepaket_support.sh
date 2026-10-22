@@ -40,6 +40,7 @@ printf '%s\n' '[1/3] Systeminformationen werden gesammelt …'
 printf 'Rechnername:    %s\n' "$(hostname)"
 printf 'Betriebssystem: %s\n' "$(grep -m1 '^PRETTY_NAME=' /etc/os-release | cut -d= -f2- | tr -d '"')"
 printf 'Kernel:         %s\n' "$(uname -r)"
+printf 'Prozessor:     %s (%s Threads)\n' "$(awk -F: '/model name/ {print $2; exit}' /proc/cpuinfo)" "$(nproc)"
 printf 'Laufzeit:       %s\n' "$(uptime -p)"
 free -h
 OKM_OK=$((OKM_OK + 1))

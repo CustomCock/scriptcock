@@ -159,7 +159,7 @@ def test_erneut_oeffnen_vorbelegt(reg: Registry, db: Datenbank) -> None:
     assert 'value="zsh" data-anzeige="macOS (zsh)"\n          checked' in seite or re.search(
         r'value="zsh"[^>]*checked', seite
     )
-    assert seite.count('name="schritt"') == 4
+    assert seite.count('name="schritt"') == 7
     assert 'value="server01.okm.local"' in seite and 'value="8443"' in seite
     # Fremde private Scripte lassen sich nicht öffnen
     assert als(reg, db, "bernd").get(f"/baukasten?aus={sid}").status_code == 404

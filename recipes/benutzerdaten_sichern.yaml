@@ -1,0 +1,21 @@
+id: benutzerdaten_sichern
+name: Benutzerdaten sichern
+kategorie: Datensicherung
+beschreibung: Kopiert Desktop, Dokumente, Bilder, Downloads usw. des angemeldeten Benutzers in einen Ordner – z. B. vor einer Neuinstallation.
+schlagworte: [sicherung, backup, neuinstallation, pc-tausch, umzug, daten]
+felder:
+  - id: ziel_windows
+    label: Wohin soll gesichert werden? (z. B. USB-Laufwerk)
+    typ: pfad
+    beispiel: D:\Sicherung
+  - id: ziel_unix
+    label: Wohin soll gesichert werden? (z. B. USB-Laufwerk)
+    typ: pfad
+    beispiel: /media/usb/Sicherung
+schritte:
+  - block: benutzerdaten_sichern
+    parameter: {ziel: $ziel_windows}
+    nur_fuer: [powershell, cmd]
+  - block: benutzerdaten_sichern
+    parameter: {ziel: $ziel_unix}
+    nur_fuer: [bash, zsh]

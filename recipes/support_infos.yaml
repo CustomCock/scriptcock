@@ -1,0 +1,9 @@
+id: support_infos
+name: Support-Infos anzeigen
+kategorie: Support
+beschreibung: Zeigt Rechnername, Benutzer, IP-Adresse, Betriebssystem, Seriennummer und ggf. TeamViewer-/AnyDesk-ID – alles, was der Support am Telefon fragt.
+schlagworte: [support, hotline, rechnername, ip, teamviewer, anydesk, fernwartung, hilfe]
+schritte:
+  - block: support_infos
+  - block: meldung
+    parameter: {text: Diese Angaben bitte dem Support durchgeben., pause: true}

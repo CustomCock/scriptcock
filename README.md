@@ -33,10 +33,11 @@ Die Anwendung **erzeugt** Scripte, sie führt sie **nicht** selbst aus.
   „Hat funktioniert ✓“ markieren und **erneut öffnen und anpassen** (aus der gespeicherten
   Zwischenrepräsentation – mit Hinweis, wenn sich Bausteine seitdem geändert haben).
 - **Verwaltung für Admins:** Rezept-Vorschläge von Nutzern freigeben oder ablehnen.
-- **24 Bausteine**, z. B. Systeminfo, Ping, Traceroute, Port prüfen, Netzlaufwerk, Drucker per IP,
-  Dienste, Prozesse, Windows-Update-Reset, SetupDiag, Diagnosepaket, Software installieren.
-- **8 Rezepte**, z. B. „Drucker einrichten“, „Netzwerkproblem diagnostizieren“,
-  „Diagnosepaket für den Support“, „Windows Update reparieren“.
+- **140 Bausteine** in den Bereichen Inventar, Netzwerk, Drucker, Dateien, Benutzer, Dienste,
+  Updates, Speicher, Sicherheit, Fehleranalyse, Leistung, Office, Support, Linux-Server und macOS.
+- **21 Rezepte**, z. B. „Netzwerkproblem diagnostizieren“, „PC ist langsam“, „Support-Infos“,
+  „Sicherheits-Schnellprüfung“, „Server-Gesundheitscheck“, „Drucker einrichten“.
+  Umsetzungsstand der Vorlagen-Ideen: [docs/vorlagen-status.md](docs/vorlagen-status.md).
 - Jedes Script hat Kopfkommentar, Fehlerbehandlung, Protokolldatei, Fortschrittsanzeige,
   Admin-Prüfung, Abschlusszusammenfassung; rote (destruktive) Schritte fragen nach „JA“.
 - Modus **„Nur simulieren“** (Dry-Run).

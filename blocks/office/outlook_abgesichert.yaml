@@ -1,0 +1,13 @@
+id: outlook_abgesichert
+version: 1
+name: Outlook im abgesicherten Modus starten
+kategorie: Office
+beschreibung: Startet Outlook ohne Add-Ins. Läuft Outlook so stabil, ist meist ein Add-In schuld.
+risiko: gruen
+fortschritt: Outlook wird im abgesicherten Modus gestartet
+ziele:
+  powershell: |
+    if (Get-Process -Name OUTLOOK -ErrorAction SilentlyContinue) { throw 'Outlook läuft noch – bitte zuerst schließen.' }
+    Start-Process -FilePath 'outlook.exe' -ArgumentList '/safe'
+  cmd: |
+    start "" outlook.exe /safe

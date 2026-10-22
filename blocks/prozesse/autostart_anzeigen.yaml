@@ -1,0 +1,21 @@
+id: autostart_anzeigen
+version: 1
+name: Autostart-Einträge anzeigen
+kategorie: Prozesse
+beschreibung: Zeigt Programme, die beim Anmelden bzw. Systemstart automatisch gestartet werden.
+risiko: gruen
+fortschritt: Autostart-Einträge werden gelesen
+ziele:
+  powershell: |
+    Get-CimInstance -ClassName Win32_StartupCommand | Sort-Object Name |
+        Format-Table Name, Command, Location, User -AutoSize -Wrap
+  bash: |
+    printf '%s\n' 'Aktivierte Systemdienste:'
+    systemctl list-unit-files --type=service --state=enabled --no-pager
+    printf '\n%s\n' 'Desktop-Autostart:'
+    ls -1 /etc/xdg/autostart "$HOME/.config/autostart" 2>/dev/null || true
+  zsh: |
+    for okm_ordner in /Library/LaunchAgents /Library/LaunchDaemons "$HOME/Library/LaunchAgents"; do
+      printf '\n%s:\n' "$okm_ordner"
+      ls -1 "$okm_ordner" 2>/dev/null || true
+    done

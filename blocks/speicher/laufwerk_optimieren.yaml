@@ -1,0 +1,20 @@
+id: laufwerk_optimieren
+version: 1
+name: Laufwerk optimieren (TRIM/Defragmentierung)
+kategorie: Speicher
+beschreibung: Führt bei SSDs TRIM und bei Festplatten eine Defragmentierung aus.
+risiko: gelb
+admin_noetig: true
+fortschritt: "Laufwerk wird optimiert"
+parameter:
+  - id: laufwerk
+    label: Laufwerk (Windows)
+    typ: laufwerksbuchstabe
+    standard: C
+ziele:
+  powershell: |
+    Optimize-Volume -DriveLetter ({{ laufwerk }}.TrimEnd(':')) -Verbose{{ whatif }}
+  cmd: |
+    defrag {{ laufwerk }} /O
+  bash: |
+    fstrim -av

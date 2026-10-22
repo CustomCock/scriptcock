@@ -1,0 +1,63 @@
+id: benutzerdaten_sichern
+version: 1
+name: Benutzerdaten sichern
+kategorie: Datensicherung
+beschreibung: Kopiert Desktop, Dokumente, Bilder (und unter Windows die Favoriten) des angemeldeten Benutzers in einen Sicherungsordner.
+hilfe: |
+  Im Zielordner wird ein Unterordner „Benutzername_Datum“ (CMD: „Benutzername_Sicherung“) angelegt. Vorhandenes wird nicht gelöscht.
+  Windows: OneDrive-umgeleitete Ordner werden in PowerShell richtig gefunden; CMD nimmt die Standardpfade im Benutzerprofil.
+risiko: gelb
+fortschritt: "Benutzerdaten werden nach {{ ziel }} gesichert"
+parameter:
+  - id: ziel
+    label: Sicherungsziel (Ordner)
+    typ: pfad
+    beispiel: D:\Sicherung
+ziele:
+  powershell: |
+    $okmZiel = Join-Path {{ ziel }} ($env:USERNAME + '_' + (Get-Date -Format 'yyyy-MM-dd_HHmm'))
+    $okmOrdner = [ordered]@{
+        Desktop   = [Environment]::GetFolderPath('Desktop')
+        Dokumente = [Environment]::GetFolderPath('MyDocuments')
+        Bilder    = [Environment]::GetFolderPath('MyPictures')
+        Favoriten = [Environment]::GetFolderPath('Favorites')
+    }
+    foreach ($okmEintrag in $okmOrdner.GetEnumerator()) {
+        if (-not $okmEintrag.Value -or -not (Test-Path -LiteralPath $okmEintrag.Value)) { continue }
+        Write-Host ('Sichere ' + $okmEintrag.Key + ' …')
+        robocopy.exe $okmEintrag.Value (Join-Path $okmZiel $okmEintrag.Key) /E /R:1 /W:1 /NP /NFL /NDL /XJ
+        if ($LASTEXITCODE -ge 8) { throw ('Robocopy-Fehler bei ' + $okmEintrag.Key) }
+        $global:LASTEXITCODE = 0
+    }
+    Write-Host ('Gesichert nach: ' + $okmZiel) -ForegroundColor Green
+  cmd: |
+    robocopy "%USERPROFILE%\Desktop" {{ ziel }}\%USERNAME%_Sicherung\Desktop /E /R:1 /W:1 /NP /NFL /NDL /XJ
+    if errorlevel 8 (cmd /c exit 1) else (cmd /c exit 0)
+    robocopy "%USERPROFILE%\Documents" {{ ziel }}\%USERNAME%_Sicherung\Dokumente /E /R:1 /W:1 /NP /NFL /NDL /XJ
+    if errorlevel 8 (cmd /c exit 1) else (cmd /c exit 0)
+    robocopy "%USERPROFILE%\Pictures" {{ ziel }}\%USERNAME%_Sicherung\Bilder /E /R:1 /W:1 /NP /NFL /NDL /XJ
+    if errorlevel 8 (cmd /c exit 1) else (cmd /c exit 0)
+    robocopy "%USERPROFILE%\Favorites" {{ ziel }}\%USERNAME%_Sicherung\Favoriten /E /R:1 /W:1 /NP /NFL /NDL /XJ
+    if errorlevel 8 (cmd /c exit 1) else (cmd /c exit 0)
+  bash: |
+    okm_ziel={{ ziel }}
+    okm_ziel="$okm_ziel/$(id -un)_$(date +%Y-%m-%d_%H%M)"
+    mkdir -p -- "$okm_ziel"
+    for okm_typ in DESKTOP DOCUMENTS PICTURES; do
+      okm_quelle="$(xdg-user-dir "$okm_typ" 2>/dev/null || true)"
+      if [ -z "$okm_quelle" ] || [ "$okm_quelle" = "$HOME" ] || [ ! -d "$okm_quelle" ]; then continue; fi
+      printf 'Sichere %s …\n' "$okm_quelle"
+      cp -a -- "$okm_quelle" "$okm_ziel/"
+    done
+    printf 'Gesichert nach: %s\n' "$okm_ziel"
+  zsh: |
+    okm_ziel={{ ziel }}
+    okm_ziel="$okm_ziel/$(id -un)_$(date +%Y-%m-%d_%H%M)"
+    mkdir -p "$okm_ziel"
+    for okm_ordner in Desktop Documents Pictures; do
+      if [ -d "$HOME/$okm_ordner" ]; then
+        printf 'Sichere %s …\n' "$okm_ordner"
+        cp -a "$HOME/$okm_ordner" "$okm_ziel/"
+      fi
+    done
+    printf 'Gesichert nach: %s\n' "$okm_ziel"

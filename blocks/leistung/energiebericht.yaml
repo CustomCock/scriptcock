@@ -1,0 +1,17 @@
+id: energiebericht
+version: 1
+name: Energiebericht erstellen
+kategorie: Leistung
+beschreibung: Beobachtet den Rechner 60 Sekunden lang und erstellt einen Bericht über Energieprobleme (powercfg /energy) auf dem Desktop.
+risiko: gruen
+admin_noetig: true
+fortschritt: Energiebericht wird erstellt (60 Sekunden)
+ziele:
+  powershell: |
+    $okmDatei = Join-Path ([Environment]::GetFolderPath('Desktop')) 'energie-bericht.html'
+    powercfg.exe /energy /output $okmDatei /duration 60
+    Write-Host ('Bericht: ' + $okmDatei)
+    $global:LASTEXITCODE = 0
+  cmd: |
+    powercfg /energy /output "%USERPROFILE%\Desktop\energie-bericht.html" /duration 60
+    echo Bericht: %USERPROFILE%\Desktop\energie-bericht.html

@@ -1,0 +1,16 @@
+id: lokale_benutzer
+version: 1
+name: Lokale Benutzerkonten anzeigen
+kategorie: Sicherheit
+beschreibung: Listet die lokalen Benutzerkonten dieses Rechners auf (ohne Systemkonten unter Linux/macOS).
+risiko: gruen
+fortschritt: Lokale Benutzer werden aufgelistet
+ziele:
+  powershell: |
+    Get-LocalUser | Format-Table Name, Enabled, LastLogon, PasswordLastSet, Description -AutoSize
+  cmd: |
+    net user
+  bash: |
+    awk -F: '$3 >= 1000 && $3 < 65534 { printf "%-20s UID %-6s %s\n", $1, $3, $7 }' /etc/passwd
+  zsh: |
+    dscl . -list /Users UniqueID | awk '$2 >= 500 { print $1 }'

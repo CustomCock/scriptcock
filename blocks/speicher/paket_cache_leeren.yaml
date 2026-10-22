@@ -1,0 +1,27 @@
+id: paket_cache_leeren
+version: 1
+name: Paket-Cache leeren
+kategorie: Speicher
+beschreibung: Löscht heruntergeladene Installationspakete (apt/dnf bzw. Homebrew), die nicht mehr gebraucht werden.
+risiko: gelb
+admin_noetig:
+  bash: true
+fortschritt: Paket-Cache wird geleert
+ziele:
+  bash: |
+    if command -v apt-get >/dev/null 2>&1; then
+      apt-get clean
+      apt-get -y autoremove
+    elif command -v dnf >/dev/null 2>&1; then
+      dnf clean all
+    else
+      printf '%s\n' 'Kein unterstützter Paketmanager gefunden.'
+    fi
+  zsh: |
+    if command -v brew >/dev/null 2>&1; then
+      brew cleanup
+    else
+      printf '%s\n' 'Homebrew ist nicht installiert – nichts zu tun.'
+    fi
+hinweise:
+  zsh: Homebrew verweigert root – das Script NICHT mit sudo starten.

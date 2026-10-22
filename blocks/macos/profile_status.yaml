@@ -1,0 +1,12 @@
+id: profile_status
+version: 1
+name: "macOS: MDM- und Konfigurationsprofile"
+kategorie: macOS
+beschreibung: Zeigt, ob der Mac in einer Geräteverwaltung (MDM) angemeldet ist und welche Profile installiert sind.
+risiko: gruen
+admin_noetig: true
+fortschritt: Profile werden gelesen
+ziele:
+  zsh: |
+    profiles status -type enrollment
+    profiles list

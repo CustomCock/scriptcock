@@ -1,0 +1,17 @@
+id: absturz_analyse
+name: Absturz-Analyse
+kategorie: Diagnose
+beschreibung: Sucht Bluescreens, unerwartete Neustarts und abstürzende Programme bzw. Kernel- und Systemfehler.
+hilfe: Das Script ändert nichts am Rechner.
+schlagworte: [absturz, bluescreen, bsod, neustart, friert ein, crash, abgestürzt]
+schritte:
+  - block: bluescreen_analyse
+    nur_fuer: [powershell]
+  - block: unerwartete_neustarts
+    nur_fuer: [powershell]
+  - block: absturzende_programme
+    nur_fuer: [powershell]
+  - block: kernel_fehler
+    nur_fuer: [bash]
+  - block: systemlog_fehler
+    nur_fuer: [bash]

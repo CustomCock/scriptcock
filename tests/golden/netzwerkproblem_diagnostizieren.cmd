@@ -3,7 +3,7 @@ chcp 65001 >nul
 setlocal EnableExtensions DisableDelayedExpansion
 rem ======================================================================
 rem Titel:             Netzwerkproblem diagnostizieren
-rem Beschreibung:      Zeigt die Netzwerkeinstellungen und prüft Schritt für Schritt, ob ein Server erreichbar ist (Ping, Traceroute, Port).
+rem Beschreibung:      Prüft Schritt für Schritt Netzwerkeinstellungen, Router, Internet, Namensauflösung und ob ein bestimmter Server erreichbar ist (Ping, Traceroute, Port).
 rem Erstellt von:      pytest
 rem Erstellt am:       15.01.2026 09:30:00
 rem Baukasten-Version: 0.1.0
@@ -11,7 +11,9 @@ rem Zielsystem:        Windows Eingabeaufforderung (CMD)
 rem Enthaltene Schritte:
 rem    1. IP-Konfiguration anzeigen [Risiko: gruen]
 rem    2. Ping auf Ziel [Risiko: gruen]
-rem    3. Traceroute [Risiko: gruen]
+rem    3. Namensauflösung (DNS) testen [Risiko: gruen]
+rem    4. Ping auf Ziel [Risiko: gruen]
+rem    5. Traceroute [Risiko: gruen]
 rem
 rem Generiert mit dem okm Script-Baukasten
 rem ======================================================================
@@ -21,18 +23,18 @@ for /f "delims=" %%T in ('powershell -NoProfile -NonInteractive -Command "Get-Da
 if not defined OKM_TS set "OKM_TS=%RANDOM%"
 set "OKM_LOG=%TEMP%\okm-script-%OKM_TS%.log"
 set "OKM_TMP=%TEMP%\okm-script-%OKM_TS%.tmp"
-set "OKM_GESAMT=3"
+set "OKM_GESAMT=5"
 set "OKM_OK=0"
 set "OKM_SCHRITT=0"
 echo(okm Script-Baukasten: Netzwerkproblem diagnostizieren
 >>"%OKM_LOG%" echo(okm Script-Baukasten: Netzwerkproblem diagnostizieren
 
 rem --------------------------------------------------------------------
-rem Schritt 1/3: IP-Konfiguration anzeigen (Risiko: gruen)
+rem Schritt 1/5: IP-Konfiguration anzeigen (Risiko: gruen)
 rem --------------------------------------------------------------------
 set "OKM_SCHRITT=1"
-echo([1/3] IP-Konfiguration wird angezeigt ...
->>"%OKM_LOG%" echo([1/3] IP-Konfiguration wird angezeigt ...
+echo([1/5] IP-Konfiguration wird angezeigt ...
+>>"%OKM_LOG%" echo([1/5] IP-Konfiguration wird angezeigt ...
 (call )
 (
 ipconfig /all
@@ -44,11 +46,48 @@ if "%OKM_RC%"=="1" goto :okm_fehler
 set /a OKM_OK+=1 >nul
 
 rem --------------------------------------------------------------------
-rem Schritt 2/3: Ping auf Ziel (Risiko: gruen)
+rem Schritt 2/5: Ping auf Ziel (Risiko: gruen)
 rem --------------------------------------------------------------------
 set "OKM_SCHRITT=2"
-echo([2/3] Ping auf intranet.okm.local ^(4x^) ...
->>"%OKM_LOG%" echo([2/3] Ping auf intranet.okm.local ^(4x^) ...
+echo([2/5] Ping auf 1.1.1.1 ^(2x^) ...
+>>"%OKM_LOG%" echo([2/5] Ping auf 1.1.1.1 ^(2x^) ...
+(call )
+(
+ping -n 2 "1.1.1.1"
+if errorlevel 1 (
+  echo Hinweis: Das Ziel hat nicht vollständig geantwortet.
+  cmd /c exit 0
+)
+) >"%OKM_TMP%" 2>&1
+if errorlevel 1 (set "OKM_RC=1") else if not errorlevel 0 (set "OKM_RC=1") else (set "OKM_RC=0")
+type "%OKM_TMP%"
+type "%OKM_TMP%" >>"%OKM_LOG%"
+if "%OKM_RC%"=="1" goto :okm_fehler
+set /a OKM_OK+=1 >nul
+
+rem --------------------------------------------------------------------
+rem Schritt 3/5: Namensauflösung (DNS) testen (Risiko: gruen)
+rem --------------------------------------------------------------------
+set "OKM_SCHRITT=3"
+echo([3/5] DNS-Auflösung von www.microsoft.com wird geprüft ...
+>>"%OKM_LOG%" echo([3/5] DNS-Auflösung von www.microsoft.com wird geprüft ...
+(call )
+(
+nslookup "www.microsoft.com"
+cmd /c exit 0
+) >"%OKM_TMP%" 2>&1
+if errorlevel 1 (set "OKM_RC=1") else if not errorlevel 0 (set "OKM_RC=1") else (set "OKM_RC=0")
+type "%OKM_TMP%"
+type "%OKM_TMP%" >>"%OKM_LOG%"
+if "%OKM_RC%"=="1" goto :okm_fehler
+set /a OKM_OK+=1 >nul
+
+rem --------------------------------------------------------------------
+rem Schritt 4/5: Ping auf Ziel (Risiko: gruen)
+rem --------------------------------------------------------------------
+set "OKM_SCHRITT=4"
+echo([4/5] Ping auf intranet.okm.local ^(4x^) ...
+>>"%OKM_LOG%" echo([4/5] Ping auf intranet.okm.local ^(4x^) ...
 (call )
 (
 ping -n 4 "intranet.okm.local"
@@ -64,11 +103,11 @@ if "%OKM_RC%"=="1" goto :okm_fehler
 set /a OKM_OK+=1 >nul
 
 rem --------------------------------------------------------------------
-rem Schritt 3/3: Traceroute (Risiko: gruen)
+rem Schritt 5/5: Traceroute (Risiko: gruen)
 rem --------------------------------------------------------------------
-set "OKM_SCHRITT=3"
-echo([3/3] Traceroute zu intranet.okm.local ...
->>"%OKM_LOG%" echo([3/3] Traceroute zu intranet.okm.local ...
+set "OKM_SCHRITT=5"
+echo([5/5] Traceroute zu intranet.okm.local ...
+>>"%OKM_LOG%" echo([5/5] Traceroute zu intranet.okm.local ...
 (call )
 (
 tracert -d -h 30 "intranet.okm.local"

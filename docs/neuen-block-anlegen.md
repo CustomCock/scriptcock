@@ -66,6 +66,15 @@ Text direkt an einen Platzhalter zu hängen, funktioniert in allen Shells
 (`ipp://{{ ip }}/ipp/print` → `ipp://'10.0.0.5'/ipp/print`; die Shell setzt das zu einem
 Wort zusammen). In CMD z. B. `taskkill /IM {{ name }}.exe`.
 
+Brauchst du einen Wert innerhalb von Anführungszeichen (z. B. in `"$( … )"`), weise ihn zuerst
+einer Variablen zu und verwende dann die Variable:
+
+```yaml
+  bash: |
+    okm_url={{ dienst }}
+    okm_ip="$(curl -fsS "$okm_url")"
+```
+
 Weitere Regeln, die beim Start geprüft werden:
 
 - Nur deklarierte Parameter als Platzhalter; `{{ whatif }}` gibt es nur in PowerShell.
@@ -108,6 +117,7 @@ Weitere Regeln, die beim Start geprüft werden:
 | `druckername` | Buchstaben, Ziffern, `_ . -` (keine Leerzeichen) | `Drucker-Empfang` |
 | `benutzername` | Buchstaben, Ziffern, `_ . -` (max. 20) | `max.mustermann` |
 | `url` | nur `http://` und `https://` | `https://intranet.okm.local` |
+| `sha256` | 64 Hex-Zeichen (wird kleingeschrieben) | `e3b0c442…b855` |
 | `auswahl` | einer der Werte aus `optionen` | siehe unten |
 | `ja_nein` | Ja/Nein, im Template als Bedingung | `true` |
 

@@ -1,0 +1,8 @@
+id: update_status
+name: Update-Status prüfen
+kategorie: Updates
+beschreibung: Zeigt die zuletzt installierten und die noch ausstehenden Updates.
+schlagworte: [update, patch, windows update, aktualisierung, apt, softwareupdate]
+schritte:
+  - block: update_status
+  - block: uptime_neustart

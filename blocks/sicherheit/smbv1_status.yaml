@@ -1,0 +1,14 @@
+id: smbv1_status
+version: 1
+name: SMBv1-Status
+kategorie: Sicherheit
+beschreibung: Prüft, ob das veraltete und unsichere Protokoll SMBv1 noch aktiviert ist.
+risiko: gruen
+admin_noetig: true
+fortschritt: SMBv1-Status wird geprüft
+ziele:
+  powershell: |
+    $okmServer = (Get-SmbServerConfiguration).EnableSMB1Protocol
+    $okmFeature = Get-WindowsOptionalFeature -Online -FeatureName SMB1Protocol -ErrorAction SilentlyContinue
+    Write-Host ('SMBv1-Server aktiviert: ' + $okmServer) -ForegroundColor $(if ($okmServer) { 'Red' } else { 'Green' })
+    if ($okmFeature) { Write-Host ('Windows-Feature SMB1Protocol: ' + $okmFeature.State) }

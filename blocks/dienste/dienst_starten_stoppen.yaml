@@ -1,0 +1,51 @@
+id: dienst_starten_stoppen
+version: 1
+name: Dienst starten oder stoppen
+kategorie: Dienste
+beschreibung: Startet oder stoppt einen Systemdienst.
+hilfe: |
+  Windows: Dienstname aus services.msc (Feld „Dienstname“). Linux: systemd-Unit. macOS: launchd-Label.
+risiko: gelb
+admin_noetig: true
+fortschritt: "Dienst {{ dienst }} wird {{ 'gestartet' if aktion == 'starten' else 'gestoppt' }}"
+parameter:
+  - id: dienst
+    label: Dienstname
+    typ: dienstname
+    beispiel: Spooler
+  - id: aktion
+    label: Aktion
+    typ: auswahl
+    standard: starten
+    optionen:
+      - wert: starten
+        label: Starten
+      - wert: stoppen
+        label: Stoppen
+ziele:
+  powershell: |
+    {% if aktion.wert == 'stoppen' %}
+    Stop-Service -Name {{ dienst }} -Force{{ whatif }}
+    {% else %}
+    Start-Service -Name {{ dienst }}{{ whatif }}
+    {% endif %}
+    Get-Service -Name {{ dienst }} | Format-Table Name, Status -AutoSize
+  cmd: |
+    {% if aktion.wert == 'stoppen' %}
+    net stop {{ dienst }}
+    {% else %}
+    net start {{ dienst }}
+    {% endif %}
+  bash: |
+    {% if aktion.wert == 'stoppen' %}
+    systemctl stop {{ dienst }}
+    {% else %}
+    systemctl start {{ dienst }}
+    {% endif %}
+    systemctl is-active {{ dienst }} || true
+  zsh: |
+    {% if aktion.wert == 'stoppen' %}
+    launchctl kill TERM system/{{ dienst }}
+    {% else %}
+    launchctl kickstart system/{{ dienst }}
+    {% endif %}

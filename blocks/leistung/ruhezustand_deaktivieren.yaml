@@ -1,0 +1,13 @@
+id: ruhezustand_deaktivieren
+version: 1
+name: Ruhezustand deaktivieren
+kategorie: Leistung
+beschreibung: Schaltet den Ruhezustand ab und löscht die Datei hiberfil.sys (gibt mehrere GB frei). Damit ist auch der Schnellstart aus.
+risiko: gelb
+admin_noetig: true
+fortschritt: Ruhezustand wird deaktiviert
+ziele:
+  powershell: |
+    powercfg.exe /hibernate off
+  cmd: |
+    powercfg /hibernate off

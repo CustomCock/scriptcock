@@ -1,0 +1,12 @@
+id: update_log_export
+version: 1
+name: Windows-Update-Log exportieren
+kategorie: Updates
+beschreibung: Erzeugt das lesbare Windows-Update-Protokoll (WindowsUpdate.log) auf dem Desktop.
+risiko: gruen
+fortschritt: Windows-Update-Log wird erzeugt
+ziele:
+  powershell: |
+    $okmDatei = Join-Path ([Environment]::GetFolderPath('Desktop')) 'WindowsUpdate.log'
+    Get-WindowsUpdateLog -LogPath $okmDatei | Out-Null
+    Write-Host ('Protokoll: ' + $okmDatei)

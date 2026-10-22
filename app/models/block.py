@@ -50,6 +50,7 @@ class ParamTyp(StrEnum):
     DRUCKERNAME = "druckername"
     BENUTZERNAME = "benutzername"
     URL = "url"
+    SHA256 = "sha256"
     AUSWAHL = "auswahl"
     JA_NEIN = "ja_nein"
 

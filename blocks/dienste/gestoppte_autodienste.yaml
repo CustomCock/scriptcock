@@ -1,0 +1,19 @@
+id: gestoppte_autodienste
+version: 1
+name: Gestoppte automatische Dienste finden
+kategorie: Dienste
+beschreibung: Zeigt Dienste, die automatisch starten sollten, aber gerade nicht laufen.
+hilfe: |
+  Einige Dienste (z. B. „Verzögerter Start“ oder Trigger-Dienste) beenden sich absichtlich wieder – nicht jeder Treffer ist ein Fehler.
+risiko: gruen
+fortschritt: Gestoppte automatische Dienste werden gesucht
+ziele:
+  powershell: |
+    $okmDienste = Get-CimInstance -ClassName Win32_Service -Filter "StartMode='Auto' AND State<>'Running'"
+    if ($okmDienste) {
+        $okmDienste | Sort-Object DisplayName | Format-Table Name, DisplayName, State, ExitCode -AutoSize -Wrap
+    } else {
+        Write-Host 'Alle automatischen Dienste laufen.' -ForegroundColor Green
+    }
+  bash: |
+    systemctl --failed --no-pager

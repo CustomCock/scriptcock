@@ -1,0 +1,36 @@
+id: seriennummer
+version: 1
+name: Seriennummer und Modell
+kategorie: Inventar
+beschreibung: Zeigt Hersteller, Modell, Seriennummer und BIOS-/Firmware-Version – z. B. für Garantieanfragen beim Hersteller.
+hilfe: |
+  Linux: Die Seriennummer ist nur mit Administratorrechten lesbar; ohne erscheint ein Hinweis.
+  Windows CMD: Die Seriennummer zeigt nur die PowerShell-Variante (CMD hat dafür kein Bordmittel mehr).
+risiko: gruen
+fortschritt: Hardware-Daten werden gelesen
+ziele:
+  powershell: |
+    $okmCs = Get-CimInstance -ClassName Win32_ComputerSystem
+    $okmBios = Get-CimInstance -ClassName Win32_BIOS
+    [PSCustomObject]@{
+        Hersteller     = $okmCs.Manufacturer
+        Modell         = $okmCs.Model
+        Seriennummer   = $okmBios.SerialNumber
+        'BIOS-Version' = $okmBios.SMBIOSBIOSVersion
+        'BIOS-Datum'   = $okmBios.ReleaseDate
+    } | Format-List
+  cmd: |
+    reg query "HKLM\HARDWARE\DESCRIPTION\System\BIOS" /v SystemManufacturer
+    reg query "HKLM\HARDWARE\DESCRIPTION\System\BIOS" /v SystemProductName
+    reg query "HKLM\HARDWARE\DESCRIPTION\System\BIOS" /v BIOSVersion
+    echo Hinweis: Die Seriennummer zeigt die PowerShell-Variante dieses Bausteins.
+  bash: |
+    for okm_feld in sys_vendor product_name product_serial bios_version bios_date; do
+      okm_wert="$(cat "/sys/class/dmi/id/$okm_feld" 2>/dev/null || printf '%s' '(nur als root lesbar)')"
+      printf '%-15s %s\n' "$okm_feld:" "$okm_wert"
+    done
+  zsh: |
+    printf 'Modell:         %s\n' "$(sysctl -n hw.model)"
+    printf 'Seriennummer:   %s\n' "$(ioreg -c IOPlatformExpertDevice -d 2 | awk -F'"' '/IOPlatformSerialNumber/ {print $4}')"
+    printf 'Prozessor:      %s\n' "$(sysctl -n machdep.cpu.brand_string)"
+    sw_vers

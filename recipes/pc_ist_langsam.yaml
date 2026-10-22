@@ -1,0 +1,12 @@
+id: pc_ist_langsam
+name: PC ist langsam
+kategorie: Leistung
+beschreibung: Sucht die typischen Bremsen – CPU- und Speicherlast, volle Festplatte, lange Laufzeit, Autostart-Programme und Festplatten-Gesundheit.
+hilfe: Das Script ändert nichts am Rechner. Am Ende stehen Tipps, was helfen kann.
+schlagworte: [langsam, hängt, träge, performance, leistung, ruckelt, lüfter]
+schritte:
+  - block: pc_langsam_check
+  - block: top_prozesse
+  - block: festplattenbelegung
+  - block: autostart_anzeigen
+  - block: smart_status

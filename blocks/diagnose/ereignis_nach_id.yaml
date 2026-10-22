@@ -1,0 +1,36 @@
+id: ereignis_nach_id
+version: 1
+name: Ereignisprotokoll nach ID durchsuchen
+kategorie: Diagnose
+beschreibung: Sucht Einträge mit einer bestimmten Ereignis-ID im gewählten Windows-Protokoll.
+risiko: gruen
+admin_noetig: true
+fortschritt: "Ereignis-ID {{ ereignis_id }} wird gesucht"
+parameter:
+  - id: protokoll
+    label: Protokoll
+    typ: auswahl
+    standard: System
+    optionen:
+      - wert: System
+        label: System
+      - wert: Application
+        label: Anwendung
+      - wert: Security
+        label: Sicherheit (braucht Adminrechte)
+  - id: ereignis_id
+    label: Ereignis-ID
+    typ: zahl
+    min: 1
+    max: 65535
+    beispiel: 41
+  - id: stunden
+    label: Zeitraum (Stunden)
+    typ: zahl
+    min: 1
+    max: 8760
+    standard: 168
+ziele:
+  powershell: |
+    $okmTreffer = Get-WinEvent -FilterHashtable @{ LogName = {{ protokoll }}; Id = {{ ereignis_id }}; StartTime = (Get-Date).AddHours(-{{ stunden }}) } -MaxEvents 200 -ErrorAction SilentlyContinue
+    if ($okmTreffer) { $okmTreffer | Format-Table TimeCreated, Id, ProviderName, Message -AutoSize -Wrap } else { Write-Host 'Keine passenden Einträge gefunden.' }

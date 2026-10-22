@@ -1,0 +1,19 @@
+id: onedrive_reset
+version: 1
+name: OneDrive zurücksetzen
+kategorie: Office
+beschreibung: Setzt den OneDrive-Client zurück (Synchronisierung wird neu aufgebaut). Dateien bleiben erhalten.
+hilfe: |
+  Nach dem Zurücksetzen startet OneDrive meist nach ein bis zwei Minuten selbst neu. Danach dauert der Abgleich eine Weile.
+risiko: gelb
+fortschritt: OneDrive wird zurückgesetzt
+ziele:
+  powershell: |
+    $okmOneDrive = @(
+        (Join-Path $env:LOCALAPPDATA 'Microsoft\OneDrive\onedrive.exe'),
+        (Join-Path $env:ProgramFiles 'Microsoft OneDrive\onedrive.exe'),
+        (Join-Path ${env:ProgramFiles(x86)} 'Microsoft OneDrive\onedrive.exe')
+    ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    if (-not $okmOneDrive) { throw 'OneDrive wurde nicht gefunden.' }
+    Start-Process -FilePath $okmOneDrive -ArgumentList '/reset' -Wait
+    Write-Host 'OneDrive wurde zurückgesetzt.'

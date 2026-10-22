@@ -1,0 +1,28 @@
+id: top_prozesse
+version: 1
+name: Top-Ressourcenverbraucher
+kategorie: Prozesse
+beschreibung: Zeigt die zehn Programme mit der höchsten CPU-Last und dem höchsten Arbeitsspeicherverbrauch.
+risiko: gruen
+fortschritt: Prozesse werden nach Last sortiert
+ziele:
+  powershell: |
+    Write-Host 'Nach CPU-Zeit:'
+    Get-Process | Sort-Object CPU -Descending | Select-Object -First 10 |
+        Format-Table ProcessName, Id, @{ Name = 'CPU (s)'; Expression = { [math]::Round($_.CPU) } }, @{ Name = 'RAM (MB)'; Expression = { [math]::Round($_.WorkingSet64 / 1MB) } } -AutoSize
+    Write-Host 'Nach Arbeitsspeicher:'
+    Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 10 |
+        Format-Table ProcessName, Id, @{ Name = 'RAM (MB)'; Expression = { [math]::Round($_.WorkingSet64 / 1MB) } } -AutoSize
+  cmd: |
+    echo Programme mit mehr als 200 MB Arbeitsspeicher:
+    tasklist /FI "MEMUSAGE gt 200000"
+  bash: |
+    printf '%s\n' 'Nach CPU:'
+    ps -eo pid,user,%cpu,%mem,comm --sort=-%cpu | awk 'NR <= 11'
+    printf '\n%s\n' 'Nach Arbeitsspeicher:'
+    ps -eo pid,user,%cpu,%mem,comm --sort=-%mem | awk 'NR <= 11'
+  zsh: |
+    printf '%s\n' 'Nach CPU:'
+    ps -Ao pid,user,%cpu,%mem,comm -r | awk 'NR <= 11'
+    printf '\n%s\n' 'Nach Arbeitsspeicher:'
+    ps -Ao pid,user,%cpu,%mem,comm -m | awk 'NR <= 11'

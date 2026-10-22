@@ -1,0 +1,25 @@
+id: zeit_pruefen
+version: 1
+name: Uhrzeit und Zeitzone prüfen
+kategorie: Inventar
+beschreibung: Zeigt Datum, Uhrzeit, Zeitzone und die Zeitsynchronisation – wichtig bei Anmelde- und Zertifikatsproblemen.
+risiko: gruen
+fortschritt: Uhrzeit und Zeitzone werden geprüft
+ziele:
+  powershell: |
+    Write-Host ('Jetzt:    ' + (Get-Date).ToString('dd.MM.yyyy HH:mm:ss'))
+    Write-Host ('Zeitzone: ' + (Get-TimeZone).DisplayName)
+    w32tm.exe /query /status 2>$null
+    $global:LASTEXITCODE = 0
+  cmd: |
+    echo Jetzt: %DATE% %TIME%
+    tzutil /g
+    echo.
+    w32tm /query /status
+    cmd /c exit 0
+  bash: |
+    date
+    if command -v timedatectl >/dev/null 2>&1; then timedatectl; fi
+  zsh: |
+    date
+    printf 'Zeitzone: %s\n' "$(readlink /etc/localtime | sed 's|.*/zoneinfo/||')"

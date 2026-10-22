@@ -1,0 +1,30 @@
+id: windows11_check
+version: 1
+name: Windows-11-Kompatibilität prüfen
+kategorie: Inventar
+beschreibung: Prüft TPM 2.0, Secure Boot, Arbeitsspeicher, Festplattengröße und zeigt den Prozessor an.
+hilfe: |
+  Ob der Prozessor offiziell unterstützt wird, kann das Script nicht prüfen – bitte das Modell
+  mit der Microsoft-Liste der unterstützten Prozessoren vergleichen.
+risiko: gruen
+admin_noetig: true
+fortschritt: Windows-11-Voraussetzungen werden geprüft
+ziele:
+  powershell: |
+    function Write-OkmPruefpunkt([string]$Name, [bool]$Ok, [string]$Wert) {
+        $okmFarbe = if ($Ok) { 'Green' } else { 'Red' }
+        $okmText = if ($Ok) { 'OK    ' } else { 'FEHLT ' }
+        Write-Host ($okmText + $Name + ': ' + $Wert) -ForegroundColor $okmFarbe
+    }
+    $okmTpm = Get-CimInstance -Namespace 'root/cimv2/security/microsofttpm' -ClassName Win32_Tpm -ErrorAction SilentlyContinue
+    $okmTpmVersion = if ($okmTpm) { ($okmTpm.SpecVersion -split ',')[0].Trim() } else { 'nicht gefunden' }
+    Write-OkmPruefpunkt 'TPM 2.0' ($okmTpmVersion -like '2.*') $okmTpmVersion
+    try { $okmSecureBoot = Confirm-SecureBootUEFI } catch { $okmSecureBoot = $false }
+    Write-OkmPruefpunkt 'Secure Boot' $okmSecureBoot ($(if ($okmSecureBoot) { 'aktiv' } else { 'aus oder kein UEFI' }))
+    $okmRam = [math]::Round((Get-CimInstance -ClassName Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 1)
+    Write-OkmPruefpunkt 'Arbeitsspeicher >= 4 GB' ($okmRam -ge 4) ($okmRam.ToString() + ' GB')
+    $okmDisk = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DeviceID='C:'"
+    $okmDiskGb = [math]::Round($okmDisk.Size / 1GB)
+    Write-OkmPruefpunkt 'Systemlaufwerk >= 64 GB' ($okmDiskGb -ge 64) ($okmDiskGb.ToString() + ' GB')
+    $okmCpu = Get-CimInstance -ClassName Win32_Processor | Select-Object -First 1
+    Write-Host ('INFO  Prozessor: ' + $okmCpu.Name.Trim() + ' – bitte mit der Microsoft-Liste abgleichen')

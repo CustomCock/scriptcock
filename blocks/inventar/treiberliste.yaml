@@ -1,0 +1,15 @@
+id: treiberliste
+version: 1
+name: Treiberliste
+kategorie: Inventar
+beschreibung: Listet installierte Gerätetreiber mit Version und Datum.
+risiko: gruen
+fortschritt: Treiber werden aufgelistet
+ziele:
+  powershell: |
+    Get-CimInstance -ClassName Win32_PnPSignedDriver |
+        Where-Object { $_.DeviceName } |
+        Sort-Object DeviceName |
+        Format-Table DeviceName, DriverVersion, @{ Name = 'Datum'; Expression = { if ($_.DriverDate) { $_.DriverDate.ToString('dd.MM.yyyy') } } }, Manufacturer -AutoSize -Wrap
+  cmd: |
+    driverquery /fo table

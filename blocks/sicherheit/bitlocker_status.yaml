@@ -1,0 +1,13 @@
+id: bitlocker_status
+version: 1
+name: BitLocker-Status
+kategorie: Sicherheit
+beschreibung: Zeigt für jedes Laufwerk, ob es mit BitLocker verschlüsselt ist. Wiederherstellungsschlüssel werden nicht angezeigt.
+risiko: gruen
+admin_noetig: true
+fortschritt: BitLocker-Status wird gelesen
+ziele:
+  powershell: |
+    Get-BitLockerVolume | Format-Table MountPoint, VolumeStatus, ProtectionStatus, EncryptionPercentage, EncryptionMethod -AutoSize
+  cmd: |
+    manage-bde -status

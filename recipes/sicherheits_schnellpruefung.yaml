@@ -1,0 +1,22 @@
+id: sicherheits_schnellpruefung
+name: Sicherheits-Schnellprüfung
+kategorie: Sicherheit
+beschreibung: Prüft die wichtigsten Schutzmechanismen (Firewall, Virenschutz, Verschlüsselung, Admin-Konten) und zeigt Auffälligkeiten.
+hilfe: Das Script ändert nichts am Rechner.
+schlagworte: [sicherheit, firewall, virenschutz, bitlocker, filevault, admin, check, ampel]
+schritte:
+  - block: sicherheits_schnellcheck
+    nur_fuer: [powershell]
+  - block: virenschutz_status
+    nur_fuer: [powershell]
+  - block: firewall_status
+    nur_fuer: [cmd, bash, zsh]
+  - block: bitlocker_status
+    nur_fuer: [cmd]
+  - block: filevault_status
+    nur_fuer: [zsh]
+  - block: gatekeeper_sip
+    nur_fuer: [zsh]
+  - block: ssh_haertung
+    nur_fuer: [bash]
+  - block: lokale_admins

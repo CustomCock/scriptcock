@@ -1,0 +1,12 @@
+id: freigaben_auflisten
+version: 1
+name: Freigaben auflisten
+kategorie: Dateien
+beschreibung: Zeigt alle Ordner, die dieser Rechner im Netzwerk freigibt.
+risiko: gruen
+fortschritt: Freigaben werden aufgelistet
+ziele:
+  powershell: |
+    Get-SmbShare | Sort-Object Name | Format-Table Name, Path, Description -AutoSize -Wrap
+  cmd: |
+    net share

@@ -20,6 +20,21 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 | `paket_installieren` | powershell/cmd | winget meldet „bereits installiert“ mit einem Fehlercode – der Schritt gilt dann als fehlgeschlagen. Ggf. `winget list --id` vorschalten. |
 | `traceroute` | bash | Weder `traceroute` noch `tracepath` sind auf Debian standardmäßig installiert; der Block meldet das nur. |
 | `temp_aufraeumen` | cmd | `forfiles` meldet „keine Dateien gefunden“ als Fehler; der Block setzt den Fehlercode daher immer auf 0 und kann echte Fehler nicht erkennen. |
+| `virenschutz_status`, `sicherheits_schnellcheck` | powershell | Auswertung von `productState` (SecurityCenter2) ist nicht offiziell dokumentiert (Byte 2 = aktiv, Byte 3 = Signaturen). Mit Defender **und** ESET prüfen. |
+| `office_version` | powershell | Zuordnung Kanal-GUID → Name; je nach Installation steht der Kanal in `UpdateChannel` oder nur in `CDNBaseUrl`. |
+| `teams_cache_leeren` | powershell | Cache-Pfad des neuen Teams (`MSTeams_8wekyb3d8bbwe`) auf aktuellem Client prüfen. |
+| `onedrive_reset` | powershell | Prüft drei typische Installationspfade; Firmen-Installationen „pro Computer“ ggf. an anderem Ort. |
+| `boot_dauer` | powershell | Startdauer aus `Properties[5]` von Ereignis 100 (Diagnostics-Performance) – Index prüfen. |
+| `fehlgeschlagene_anmeldungen` | powershell/bash | Feld-Indizes von Ereignis 4625 (5 = Konto, 10 = Anmeldetyp, 19 = IP); Linux braucht persistentes Journal bzw. sshd-Meldungen im Journal. |
+| `dism_sfc` | powershell/cmd | `sfc` schreibt UTF-16 – im Protokoll erscheinen Leerzeichen zwischen den Zeichen. |
+| `update_status` | powershell | Die COM-Suche nach Updates dauert mitunter Minuten und folgt WSUS, falls konfiguriert. |
+| `winget_upgrade_alle` | powershell/cmd | winget ist im SYSTEM-Kontext (z. B. Fernwartung als Dienst) nicht verfügbar. |
+| `support_infos` | cmd | Keine Seriennummer (wmic ist abgekündigt). AnyDesk-ID nur bei Standard-Installation unter `ProgramData`. |
+| `bildschirm_sperren` | bash/zsh | `loginctl lock-session` funktioniert nur in einer grafischen Sitzung; macOS sperrt nur bei passender Einstellung. |
+| `benutzer_deaktivieren`, `passwort_zuruecksetzen` | zsh | `pwpolicy -disableuser` bzw. `dscl . -passwd` auf aktuellem macOS prüfen (SecureToken/FileVault). |
+| `energieplan` | powershell/cmd | Modern-Standby-Geräte haben nur „Ausbalanciert“ – `/setactive` schlägt dann fehl. |
+| `smart_status` | zsh | Zeigt nur `disk0`. |
+| `neustart_countdown` | bash | `shutdown -r +N` – Meldung erscheint nur in Terminal-Sitzungen (wall). |
 | alle | cmd | Ausgaben eines Schritts erscheinen erst nach seinem Ende (Umleitung in eine Temp-Datei, weil CMD kein `tee` hat). Interaktive Blöcke (`interaktiv: true`) laufen ohne Umleitung und werden daher nicht vollständig protokolliert. |
 | alle | powershell | Native Programme, die Fehler über stderr melden, aber Exit-Code 0 liefern, werden nicht als Fehler erkannt. |
 
@@ -28,6 +43,9 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 - **Port erreichbar prüfen** und **Drucker per IP** gibt es für CMD nicht (kein Bordmittel ohne PowerShell).
 - **Netzlaufwerk** gibt es für Linux nicht (abhängig von Desktop/fstab/cifs-utils).
 - Die macOS-Blöcke sind ohne Mac-Testgerät nur per `zsh -n` geprüft.
+- BitLocker-Wiederherstellungsschlüssel, Passwort-Generator, Office-Schnellreparatur, ESET-Status
+  u. a.: siehe [vorlagen-status.md](vorlagen-status.md) („Bewusst nicht umgesetzt“).
+- Der Neustart mit Vorwarnung fehlt für macOS (kein Countdown mit Meldung per Bordmittel).
 
 ## Freier Baukasten
 
@@ -63,4 +81,4 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 
 ## Phasen
 
-- Phase 5 (LLM-Integration) ist laut Auftrag nur vorzubereiten: `docs/llm-integration.md` fehlt noch.
+- Phase 5 (LLM-Integration) ist zurückgestellt: `docs/llm-integration.md` fehlt noch.

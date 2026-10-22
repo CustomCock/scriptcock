@@ -1,0 +1,28 @@
+id: smart_status
+version: 1
+name: Festplatten-Gesundheit (SMART)
+kategorie: Speicher
+beschreibung: Zeigt den Gesundheitszustand der eingebauten Festplatten bzw. SSDs.
+hilfe: |
+  Linux: Für Details muss smartmontools installiert sein (apt install smartmontools).
+risiko: gruen
+admin_noetig:
+  bash: true
+fortschritt: Festplatten-Gesundheit wird geprüft
+ziele:
+  powershell: |
+    Get-PhysicalDisk | Format-Table FriendlyName, MediaType, HealthStatus, OperationalStatus, @{ Name = 'Größe (GB)'; Expression = { [math]::Round($_.Size / 1GB) } } -AutoSize
+  bash: |
+    lsblk -d -o NAME,MODEL,SIZE,ROTA,TYPE
+    if command -v smartctl >/dev/null 2>&1; then
+      for okm_disk in /dev/sd? /dev/nvme?n1; do
+        if [ -e "$okm_disk" ]; then
+          printf '\n%s:\n' "$okm_disk"
+          smartctl -H "$okm_disk" || true
+        fi
+      done
+    else
+      printf '\n%s\n' 'smartctl ist nicht installiert (Paket smartmontools) – nur Basisinfos angezeigt.'
+    fi
+  zsh: |
+    diskutil info disk0 | grep -E 'Device / Media Name|SMART Status|Solid State' || true

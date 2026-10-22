@@ -1,0 +1,12 @@
+id: dsregcmd_status
+version: 1
+name: Entra-ID-/Azure-AD-Status
+kategorie: Office
+beschreibung: Zeigt, ob der Rechner in Entra ID (Azure AD) bzw. der Domäne angemeldet ist und ob ein gültiges Anmelde-Token (PRT) vorliegt – hilft bei Anmeldeproblemen in Office/Teams.
+risiko: gruen
+fortschritt: Geräte-Registrierung wird geprüft
+ziele:
+  powershell: |
+    dsregcmd.exe /status | Select-String -Pattern 'AzureAdJoined|DomainJoined|WorkplaceJoined|EnterpriseJoined|TenantName|AzureAdPrt |DeviceAuthStatus' | ForEach-Object { $_.Line.Trim() }
+  cmd: |
+    dsregcmd /status

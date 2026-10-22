@@ -1,0 +1,51 @@
+id: software_liste
+version: 1
+name: Installierte Software auflisten
+kategorie: Inventar
+beschreibung: Listet installierte Programme mit Version (und unter Windows Hersteller und Installationsdatum) auf.
+hilfe: |
+  Mit Suchbegriff werden nur passende Programme angezeigt, z. B. "Office" oder "Chrome".
+  Linux: Pakete aus dpkg (Debian/Ubuntu) bzw. rpm (Fedora/RHEL). macOS: Programme im Ordner /Applications.
+risiko: gruen
+fortschritt: Installierte Software wird gelesen
+parameter:
+  - id: suche
+    label: Nur Programme mit diesem Namensteil (optional)
+    typ: text_kurz
+    pflicht: false
+    beispiel: Office
+ziele:
+  powershell: |
+    $okmPfade = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*',
+        'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
+    $okmSoftware = Get-ItemProperty -Path $okmPfade -ErrorAction SilentlyContinue |
+        Where-Object { $_.DisplayName -and -not $_.SystemComponent }
+    {% if suche %}
+    $okmSoftware = $okmSoftware | Where-Object { $_.DisplayName -like ('*' + {{ suche }} + '*') }
+    {% endif %}
+    $okmSoftware | Sort-Object DisplayName -Unique |
+        Format-Table @{ Name = 'Name'; Expression = { $_.DisplayName } }, @{ Name = 'Version'; Expression = { $_.DisplayVersion } },
+            @{ Name = 'Hersteller'; Expression = { $_.Publisher } }, @{ Name = 'Installiert'; Expression = { $_.InstallDate } } -AutoSize -Wrap
+  bash: |
+    if command -v dpkg-query >/dev/null 2>&1; then
+      okm_liste="$(dpkg-query -W -f='${Package}\t${Version}\n')"
+    elif command -v rpm >/dev/null 2>&1; then
+      okm_liste="$(rpm -qa --qf '%{NAME}\t%{VERSION}-%{RELEASE}\n' | sort)"
+    else
+      okm_liste="$(printf '%s\n' 'Kein unterstützter Paketmanager gefunden.')"
+    fi
+    {% if suche %}
+    printf '%s\n' "$okm_liste" | grep -i -F -- {{ suche }} || printf '%s\n' 'Kein passendes Paket gefunden.'
+    {% else %}
+    printf '%s\n' "$okm_liste"
+    {% endif %}
+  zsh: |
+    for okm_app in /Applications/*.app; do
+      okm_version="$(defaults read "$okm_app/Contents/Info" CFBundleShortVersionString 2>/dev/null || printf '%s' '?')"
+      printf '%-45s %s\n' "$(basename "$okm_app" .app)" "$okm_version"
+    {% if suche %}
+    done | grep -i -F -- {{ suche }} || printf '%s\n' 'Kein passendes Programm gefunden.'
+    {% else %}
+    done
+    {% endif %}

@@ -1,0 +1,15 @@
+id: unerwartete_neustarts
+version: 1
+name: Unerwartete Neustarts
+kategorie: Diagnose
+beschreibung: Zeigt, wann der Rechner zuletzt unerwartet ausgegangen ist (Stromausfall, Absturz, Aus-Knopf).
+risiko: gruen
+fortschritt: Unerwartete Neustarts werden gesucht
+ziele:
+  powershell: |
+    $okmEreignisse = Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 41, 6008 } -MaxEvents 30 -ErrorAction SilentlyContinue
+    if ($okmEreignisse) {
+        $okmEreignisse | Format-Table TimeCreated, Id, Message -AutoSize -Wrap
+    } else {
+        Write-Host 'Keine unerwarteten Neustarts gefunden.' -ForegroundColor Green
+    }

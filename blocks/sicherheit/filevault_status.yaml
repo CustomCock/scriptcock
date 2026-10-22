@@ -1,0 +1,10 @@
+id: filevault_status
+version: 1
+name: "macOS: FileVault-Status"
+kategorie: Sicherheit
+beschreibung: Zeigt, ob die Festplattenverschlüsselung FileVault eingeschaltet ist.
+risiko: gruen
+fortschritt: FileVault-Status wird gelesen
+ziele:
+  zsh: |
+    fdesetup status

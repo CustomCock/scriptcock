@@ -1,0 +1,11 @@
+id: gatekeeper_sip
+version: 1
+name: "macOS: Gatekeeper und Systemintegritätsschutz"
+kategorie: Sicherheit
+beschreibung: Zeigt, ob Gatekeeper (nur geprüfte Apps) und der Systemintegritätsschutz (SIP) aktiv sind.
+risiko: gruen
+fortschritt: Gatekeeper und SIP werden geprüft
+ziele:
+  zsh: |
+    spctl --status || true
+    csrutil status

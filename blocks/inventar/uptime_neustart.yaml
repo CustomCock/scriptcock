@@ -1,0 +1,37 @@
+id: uptime_neustart
+version: 1
+name: Letzter Neustart und ausstehender Neustart
+kategorie: Inventar
+beschreibung: Zeigt, wann der Rechner zuletzt gestartet wurde und ob ein Neustart aussteht (z. B. nach Updates).
+risiko: gruen
+fortschritt: Startzeit und ausstehende Neustarts werden geprüft
+ziele:
+  powershell: |
+    $okmStart = (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime
+    $okmLaufzeit = (Get-Date) - $okmStart
+    Write-Host ('Letzter Start: ' + $okmStart.ToString('dd.MM.yyyy HH:mm') + ' (vor ' + $okmLaufzeit.Days + ' Tagen)')
+    $okmGruende = @()
+    if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') { $okmGruende += 'Windows-Komponenten' }
+    if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') { $okmGruende += 'Windows Update' }
+    if (Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager' -Name PendingFileRenameOperations -ErrorAction SilentlyContinue) { $okmGruende += 'Ausstehende Dateioperationen' }
+    if ($okmGruende) {
+        Write-Host ('Neustart ausstehend: JA (' + ($okmGruende -join ', ') + ')') -ForegroundColor Yellow
+    } else {
+        Write-Host 'Neustart ausstehend: nein' -ForegroundColor Green
+    }
+  cmd: |
+    systeminfo | findstr /B /C:"Systemstartzeit" /C:"System Boot Time"
+    reg query "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired" >nul 2>&1 && echo Neustart ausstehend: JA ^(Windows Update^) || echo Neustart ausstehend laut Windows Update: nein
+  bash: |
+    printf 'Letzter Start: %s (%s)\n' "$(uptime -s)" "$(uptime -p)"
+    if [ -f /var/run/reboot-required ]; then
+      printf '%s\n' 'Neustart ausstehend: JA'
+      cat /var/run/reboot-required.pkgs 2>/dev/null || true
+    elif command -v needs-restarting >/dev/null 2>&1; then
+      needs-restarting -r || true
+    else
+      printf '%s\n' 'Neustart ausstehend: nein'
+    fi
+  zsh: |
+    printf 'Letzter Start: %s\n' "$(sysctl -n kern.boottime)"
+    uptime

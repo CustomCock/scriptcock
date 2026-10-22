@@ -1,0 +1,20 @@
+id: drucker_liste
+version: 1
+name: Installierte Drucker auflisten
+kategorie: Drucker
+beschreibung: Zeigt alle eingerichteten Drucker mit Anschluss, Treiber und Standarddrucker.
+risiko: gruen
+fortschritt: Drucker werden aufgelistet
+ziele:
+  powershell: |
+    Get-CimInstance -ClassName Win32_Printer | Sort-Object Name |
+        Format-Table Name, PortName, DriverName, @{ Name = 'Standard'; Expression = { if ($_.Default) { 'ja' } else { '' } } }, Shared -AutoSize -Wrap
+  cmd: |
+    reg query "HKCU\Software\Microsoft\Windows NT\CurrentVersion\Devices"
+    reg query "HKCU\Software\Microsoft\Windows NT\CurrentVersion\Windows" /v Device
+  bash: |
+    lpstat -p -d || printf '%s\n' 'Keine Drucker eingerichtet (oder CUPS nicht installiert).'
+    lpstat -v || true
+  zsh: |
+    lpstat -p -d || printf '%s\n' 'Keine Drucker eingerichtet.'
+    lpstat -v || true

@@ -1,0 +1,19 @@
+id: lauschende_ports
+version: 1
+name: Lauschende Ports
+kategorie: Netzwerk
+beschreibung: Zeigt, welche Programme auf welchen Ports auf Verbindungen warten.
+risiko: gruen
+fortschritt: Lauschende Ports werden ermittelt
+ziele:
+  powershell: |
+    Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
+        Select-Object LocalAddress, LocalPort,
+            @{ Name = 'Programm'; Expression = { (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName } } |
+        Sort-Object LocalPort | Format-Table -AutoSize
+  cmd: |
+    netstat -ano -p tcp
+  bash: |
+    ss -tulnp
+  zsh: |
+    lsof -nP -iTCP -sTCP:LISTEN || printf '%s\n' 'Keine lauschenden Ports gefunden.'

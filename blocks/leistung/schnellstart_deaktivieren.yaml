@@ -1,0 +1,14 @@
+id: schnellstart_deaktivieren
+version: 1
+name: Schnellstart deaktivieren
+kategorie: Leistung
+beschreibung: Schaltet den Windows-Schnellstart aus. Hilft, wenn „Herunterfahren“ Probleme nicht behebt oder Updates hängen.
+risiko: gelb
+admin_noetig: true
+fortschritt: Schnellstart wird deaktiviert
+ziele:
+  powershell: |
+    Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power' -Name HiberbootEnabled -Value 0 -Type DWord{{ whatif }}
+    Write-Host 'Schnellstart deaktiviert (wirkt ab dem nächsten Herunterfahren).'
+  cmd: |
+    reg add "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power" /v HiberbootEnabled /t REG_DWORD /d 0 /f

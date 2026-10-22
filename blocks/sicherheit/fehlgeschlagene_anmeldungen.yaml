@@ -1,0 +1,28 @@
+id: fehlgeschlagene_anmeldungen
+version: 1
+name: Fehlgeschlagene Anmeldungen
+kategorie: Sicherheit
+beschreibung: Zeigt die letzten fehlgeschlagenen Anmeldeversuche (falsches Passwort, gesperrtes Konto …).
+risiko: gruen
+admin_noetig: true
+fortschritt: "Fehlgeschlagene Anmeldungen der letzten {{ stunden }} Stunden werden gesucht"
+parameter:
+  - id: stunden
+    label: Zeitraum (Stunden)
+    typ: zahl
+    min: 1
+    max: 720
+    standard: 24
+ziele:
+  powershell: |
+    $okmFehl = Get-WinEvent -FilterHashtable @{ LogName = 'Security'; Id = 4625; StartTime = (Get-Date).AddHours(-{{ stunden }}) } -MaxEvents 200 -ErrorAction SilentlyContinue
+    if ($okmFehl) {
+        $okmFehl | ForEach-Object {
+            [pscustomobject]@{ Zeit = $_.TimeCreated; Konto = $_.Properties[5].Value; Quelle = $_.Properties[19].Value; Anmeldetyp = $_.Properties[10].Value }
+        } | Format-Table -AutoSize
+        Write-Host ($okmFehl.Count.ToString() + ' fehlgeschlagene Anmeldungen.')
+    } else {
+        Write-Host 'Keine fehlgeschlagenen Anmeldungen gefunden.' -ForegroundColor Green
+    }
+  bash: |
+    journalctl --since=-{{ stunden }}h --no-pager -q | grep -E 'Failed password|authentication failure|Invalid user' || printf '%s\n' 'Keine fehlgeschlagenen Anmeldungen gefunden.'

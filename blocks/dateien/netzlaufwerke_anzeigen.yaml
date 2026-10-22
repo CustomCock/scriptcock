@@ -1,0 +1,14 @@
+id: netzlaufwerke_anzeigen
+version: 1
+name: Netzlaufwerke anzeigen
+kategorie: Dateien
+beschreibung: Zeigt alle verbundenen Netzlaufwerke bzw. eingebundenen Netzwerkfreigaben.
+risiko: gruen
+fortschritt: Netzlaufwerke werden aufgelistet
+ziele:
+  powershell: |
+    net.exe use
+  cmd: |
+    net use
+  zsh: |
+    mount | grep -E 'smbfs|afpfs|nfs' || printf '%s\n' 'Keine Netzwerkfreigaben eingebunden.'

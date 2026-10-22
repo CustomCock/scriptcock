@@ -1,0 +1,18 @@
+id: raid_status
+version: 1
+name: "Linux: RAID- und ZFS-Status"
+kategorie: Linux-Server
+beschreibung: Zeigt den Zustand von Software-RAIDs (mdadm) und ZFS-Pools.
+risiko: gruen
+fortschritt: RAID-/ZFS-Status wird gelesen
+ziele:
+  bash: |
+    if [ -r /proc/mdstat ]; then
+      printf '%s\n' '-- Software-RAID (mdstat) --'
+      cat /proc/mdstat
+    fi
+    if command -v zpool >/dev/null 2>&1; then
+      printf '\n%s\n' '-- ZFS --'
+      zpool status -x
+      zpool list
+    fi

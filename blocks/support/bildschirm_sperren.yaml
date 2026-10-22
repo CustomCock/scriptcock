@@ -1,0 +1,18 @@
+id: bildschirm_sperren
+version: 1
+name: Bildschirm sperren
+kategorie: Support
+beschreibung: Sperrt sofort den Bildschirm – z. B. am Ende eines Scripts, das während einer Pause läuft.
+risiko: gelb
+fortschritt: Bildschirm wird gesperrt
+ziele:
+  powershell: |
+    rundll32.exe user32.dll,LockWorkStation
+  cmd: |
+    rundll32.exe user32.dll,LockWorkStation
+  bash: |
+    loginctl lock-session
+  zsh: |
+    pmset displaysleepnow
+hinweise:
+  zsh: "macOS sperrt dabei nur, wenn „Passwort sofort nach Ruhezustand verlangen“ eingestellt ist."

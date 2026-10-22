@@ -1,0 +1,37 @@
+id: browser_cache_leeren
+version: 1
+name: Browser-Cache leeren
+kategorie: Speicher
+beschreibung: Löscht den Zwischenspeicher von Edge, Chrome und Firefox. Lesezeichen, Passwörter und Anmeldungen bleiben erhalten.
+hilfe: |
+  Alle Browser müssen vorher geschlossen sein – sonst bricht der Schritt mit einem Hinweis ab.
+risiko: rot
+fortschritt: Browser-Caches werden geleert
+ziele:
+  powershell: |
+    $okmOffen = Get-Process -Name msedge, chrome, firefox -ErrorAction SilentlyContinue
+    if ($okmOffen) { throw ('Bitte zuerst alle Browser schließen: ' + (($okmOffen.ProcessName | Sort-Object -Unique) -join ', ')) }
+    $okmMuster = @(
+        (Join-Path $env:LOCALAPPDATA 'Microsoft\Edge\User Data\*\Cache'),
+        (Join-Path $env:LOCALAPPDATA 'Microsoft\Edge\User Data\*\Code Cache'),
+        (Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data\*\Cache'),
+        (Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data\*\Code Cache'),
+        (Join-Path $env:LOCALAPPDATA 'Mozilla\Firefox\Profiles\*\cache2')
+    )
+    foreach ($okmOrdner in (Get-Item -Path $okmMuster -ErrorAction SilentlyContinue)) {
+        Write-Host ('Leere ' + $okmOrdner.FullName)
+        Get-ChildItem -LiteralPath $okmOrdner.FullName -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue{{ whatif }}
+    }
+    Write-Host 'Browser-Caches geleert.'
+  bash: |
+    if pgrep -x -i 'chrome|chromium|firefox|msedge' >/dev/null 2>&1; then
+      printf '%s\n' 'Bitte zuerst alle Browser schließen.'
+      false
+    fi
+    for okm_ordner in "$HOME/.cache/google-chrome" "$HOME/.cache/chromium" "$HOME/.cache/microsoft-edge" "$HOME/.cache/mozilla/firefox"; do
+      if [ -d "$okm_ordner" ]; then
+        printf 'Leere %s\n' "$okm_ordner"
+        find "$okm_ordner" -mindepth 1 -delete 2>/dev/null || true
+      fi
+    done
+    printf '%s\n' 'Browser-Caches geleert.'

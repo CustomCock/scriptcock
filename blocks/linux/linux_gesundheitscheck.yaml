@@ -1,0 +1,22 @@
+id: linux_gesundheitscheck
+version: 1
+name: "Linux: Server-Gesundheitscheck"
+kategorie: Linux-Server
+beschreibung: Kompakter Überblick über einen Linux-Server – Last, Speicher, Platten, Inodes, fehlgeschlagene Dienste, ausstehender Neustart.
+risiko: gruen
+fortschritt: Server-Gesundheit wird geprüft
+ziele:
+  bash: |
+    printf '== %s ==\n' "$(hostname -f 2>/dev/null || hostname)"
+    uptime
+    printf '\n%s\n' '-- Arbeitsspeicher --'
+    free -h
+    printf '\n%s\n' '-- Speicherplatz --'
+    df -hP -x tmpfs -x devtmpfs -x squashfs -x overlay
+    printf '\n%s\n' '-- Inodes --'
+    df -iP -x tmpfs -x devtmpfs -x squashfs -x overlay
+    printf '\n%s\n' '-- Fehlgeschlagene Dienste --'
+    systemctl --failed --no-pager --no-legend || true
+    if [ -f /var/run/reboot-required ]; then
+      printf '\n%s\n' 'Neustart ausstehend (Updates).'
+    fi

@@ -1,0 +1,36 @@
+id: grosse_dateien
+version: 1
+name: Große Dateien finden
+kategorie: Dateien
+beschreibung: Listet die größten Dateien in einem Ordner (inklusive Unterordnern) ab einer Mindestgröße.
+risiko: gruen
+fortschritt: "Große Dateien in {{ pfad }} werden gesucht"
+parameter:
+  - id: pfad
+    label: Ordner
+    typ: pfad
+    beispiel: C:\Users
+  - id: min_mb
+    label: Mindestgröße (MB)
+    typ: zahl
+    min: 1
+    max: 1000000
+    standard: 500
+  - id: anzahl
+    label: Anzahl Treffer
+    typ: zahl
+    min: 1
+    max: 500
+    standard: 20
+ziele:
+  powershell: |
+    Get-ChildItem -LiteralPath {{ pfad }} -Recurse -File -Force -ErrorAction SilentlyContinue |
+        Where-Object { $_.Length -ge ({{ min_mb }} * 1MB) } |
+        Sort-Object Length -Descending | Select-Object -First {{ anzahl }} |
+        Format-Table @{ Name = 'Größe (MB)'; Expression = { [math]::Round($_.Length / 1MB) }; Align = 'Right' }, FullName -AutoSize -Wrap
+  bash: |
+    { find {{ pfad }} -xdev -type f -size +{{ min_mb }}M -printf '%s\t%p\n' 2>/dev/null || true; } |
+      sort -rn | awk -F'\t' -v n={{ anzahl }} 'NR <= n { printf "%8d MB  %s\n", $1 / 1048576, $2 }'
+  zsh: |
+    { find {{ pfad }} -xdev -type f -size +{{ min_mb }}M -exec stat -f '%z%t%N' {} + 2>/dev/null || true; } |
+      sort -rn | awk -F'\t' -v n={{ anzahl }} 'NR <= n { printf "%8d MB  %s\n", $1 / 1048576, $2 }'

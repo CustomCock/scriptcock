@@ -1,0 +1,15 @@
+id: office_update_erzwingen
+version: 1
+name: Office-Update starten
+kategorie: Office
+beschreibung: Startet sofort die Suche nach Office-Updates und installiert sie (Klick-und-Los). Office-Programme werden ggf. zum Schließen aufgefordert.
+risiko: gelb
+fortschritt: Office-Update wird gestartet
+ziele:
+  powershell: |
+    $okmClient = Join-Path $env:CommonProgramFiles 'Microsoft Shared\ClickToRun\OfficeC2RClient.exe'
+    if (-not (Test-Path -LiteralPath $okmClient)) { throw 'Kein Klick-und-Los-Office gefunden.' }
+    Start-Process -FilePath $okmClient -ArgumentList '/update user'
+    Write-Host 'Office-Update gestartet – der Fortschritt erscheint in einem eigenen Fenster.'
+  cmd: |
+    "%CommonProgramFiles%\Microsoft Shared\ClickToRun\OfficeC2RClient.exe" /update user

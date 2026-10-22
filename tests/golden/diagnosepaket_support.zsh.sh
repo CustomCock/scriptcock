@@ -37,6 +37,7 @@ OKM_SCHRITT='1/3 (Systeminfo anzeigen)'
 printf '%s\n' '[1/3] Systeminformationen werden gesammelt …'
 printf 'Rechnername:    %s\n' "$(scutil --get ComputerName 2>/dev/null || hostname)"
 sw_vers
+printf 'Prozessor:      %s\n' "$(sysctl -n machdep.cpu.brand_string)"
 printf 'RAM gesamt:     %s GB\n' "$(( $(sysctl -n hw.memsize) / 1073741824 ))"
 printf 'Laufzeit:      %s\n' "$(uptime)"
 OKM_OK=$((OKM_OK + 1))

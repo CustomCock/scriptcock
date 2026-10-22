@@ -1,0 +1,23 @@
+id: netzlaufwerk_trennen
+version: 1
+name: Netzlaufwerk trennen
+kategorie: Dateien
+beschreibung: Trennt ein verbundenes Netzlaufwerk (Windows) bzw. wirft eine Freigabe aus (macOS).
+risiko: gelb
+fortschritt: Netzlaufwerk wird getrennt
+parameter:
+  - id: laufwerk
+    label: Laufwerksbuchstabe (Windows)
+    typ: laufwerksbuchstabe
+    beispiel: Z
+  - id: einhaengepunkt
+    label: Einhängepunkt (macOS)
+    typ: pfad_unix
+    beispiel: /Volumes/abteilung
+ziele:
+  powershell: |
+    net.exe use {{ laufwerk }} /delete /y
+  cmd: |
+    net use {{ laufwerk }} /delete /y
+  zsh: |
+    diskutil unmount {{ einhaengepunkt }}

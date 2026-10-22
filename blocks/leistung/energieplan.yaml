@@ -1,0 +1,34 @@
+id: energieplan
+version: 1
+name: Energieplan wählen
+kategorie: Leistung
+beschreibung: Zeigt den aktiven Energieplan und stellt auf Wunsch einen anderen ein.
+risiko: gelb
+fortschritt: Energieplan wird eingestellt
+parameter:
+  - id: plan
+    label: Energieplan
+    typ: auswahl
+    standard: anzeigen
+    optionen:
+      - wert: anzeigen
+        label: Nur anzeigen
+      - wert: 381b4222-f694-41f0-9685-ff5bb260df2e
+        label: Ausbalanciert
+      - wert: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c
+        label: Höchstleistung
+      - wert: a1841308-3541-4fab-bc81-f71556f20b4a
+        label: Energiesparmodus
+ziele:
+  powershell: |
+    {% if plan.wert != 'anzeigen' %}
+    powercfg.exe /setactive {{ plan }}
+    {% endif %}
+    powercfg.exe /getactivescheme
+  cmd: |
+    {% if plan.wert != 'anzeigen' %}
+    powercfg /setactive {{ plan }}
+    {% endif %}
+    powercfg /getactivescheme
+hinweise:
+  powershell: Auf manchen Geräten (Modern Standby) gibt es nur den Plan „Ausbalanciert“.

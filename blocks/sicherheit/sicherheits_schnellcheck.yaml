@@ -1,0 +1,28 @@
+id: sicherheits_schnellcheck
+version: 1
+name: Sicherheits-Schnellcheck (Ampel)
+kategorie: Sicherheit
+beschreibung: Prüft auf einen Blick Firewall, Virenschutz, BitLocker, Updates, UAC, SMBv1 und Remotedesktop und zeigt eine Ampel.
+risiko: gruen
+admin_noetig: true
+fortschritt: Sicherheits-Schnellcheck läuft
+ziele:
+  powershell: |
+    function Write-OkmAmpel([string]$Punkt, [string]$Status, [string]$Text) {
+        $okmFarbe = @{ 'OK' = 'Green'; 'WARN' = 'Yellow'; 'FEHLER' = 'Red' }[$Status]
+        Write-Host ('[{0,-6}] {1,-22} {2}' -f $Status, $Punkt, $Text) -ForegroundColor $okmFarbe
+    }
+    $okmAus = @(Get-NetFirewallProfile | Where-Object { -not $_.Enabled } | ForEach-Object { $_.Name })
+    if ($okmAus.Count -eq 0) { Write-OkmAmpel 'Firewall' 'OK' 'alle Profile an' } else { Write-OkmAmpel 'Firewall' 'FEHLER' ('aus: ' + ($okmAus -join ', ')) }
+    $okmAv = @(Get-CimInstance -Namespace 'root\SecurityCenter2' -ClassName AntiVirusProduct -ErrorAction SilentlyContinue | Where-Object { ('{0:x6}' -f [int]$_.productState).Substring(2, 2) -in @('10', '11') })
+    if ($okmAv.Count -gt 0) { Write-OkmAmpel 'Virenschutz' 'OK' (($okmAv.displayName) -join ', ') } else { Write-OkmAmpel 'Virenschutz' 'FEHLER' 'kein aktiver Virenschutz gemeldet' }
+    $okmBl = Get-BitLockerVolume -MountPoint $env:SystemDrive -ErrorAction SilentlyContinue
+    if ($okmBl -and $okmBl.ProtectionStatus -eq 'On') { Write-OkmAmpel 'BitLocker' 'OK' ($env:SystemDrive + ' verschlüsselt') } else { Write-OkmAmpel 'BitLocker' 'WARN' ($env:SystemDrive + ' nicht geschützt') }
+    $okmLetztes = Get-HotFix | Where-Object { $_.InstalledOn } | Sort-Object InstalledOn -Descending | Select-Object -First 1
+    $okmAlter = if ($okmLetztes) { [math]::Floor(((Get-Date) - $okmLetztes.InstalledOn).TotalDays) } else { 999 }
+    if ($okmAlter -le 35) { Write-OkmAmpel 'Updates' 'OK' ('letztes Update vor ' + $okmAlter + ' Tagen') } else { Write-OkmAmpel 'Updates' 'WARN' ('letztes Update vor ' + $okmAlter + ' Tagen') }
+    $okmUac = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System').EnableLUA
+    if ($okmUac -eq 1) { Write-OkmAmpel 'Benutzerkontensteuerung' 'OK' 'an' } else { Write-OkmAmpel 'Benutzerkontensteuerung' 'FEHLER' 'aus' }
+    if ((Get-SmbServerConfiguration).EnableSMB1Protocol) { Write-OkmAmpel 'SMBv1' 'FEHLER' 'aktiviert' } else { Write-OkmAmpel 'SMBv1' 'OK' 'deaktiviert' }
+    $okmRdp = (Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server').fDenyTSConnections -eq 0
+    if ($okmRdp) { Write-OkmAmpel 'Remotedesktop' 'WARN' 'erlaubt – nur wenn gewollt' } else { Write-OkmAmpel 'Remotedesktop' 'OK' 'gesperrt' }

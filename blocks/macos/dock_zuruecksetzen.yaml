@@ -1,0 +1,11 @@
+id: dock_zuruecksetzen
+version: 1
+name: "macOS: Dock zurücksetzen"
+kategorie: macOS
+beschreibung: Setzt das Dock auf die Standardeinstellungen zurück (eigene Symbole im Dock gehen verloren).
+risiko: gelb
+fortschritt: Dock wird zurückgesetzt
+ziele:
+  zsh: |
+    defaults delete com.apple.dock
+    killall Dock

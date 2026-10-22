@@ -1,0 +1,42 @@
+id: dns_test
+version: 1
+name: Namensauflösung (DNS) testen
+kategorie: Netzwerk
+beschreibung: Prüft, ob ein Name (z. B. eine Webseite) in eine IP-Adresse aufgelöst werden kann.
+risiko: gruen
+fortschritt: "DNS-Auflösung von {{ name }} wird geprüft"
+parameter:
+  - id: name
+    label: Name
+    typ: hostname
+    beispiel: www.okm.de
+  - id: abbrechen
+    label: Script abbrechen, wenn der Name nicht aufgelöst werden kann
+    typ: ja_nein
+    pflicht: false
+    standard: false
+ziele:
+  powershell: |
+    $okmAntwort = Resolve-DnsName -Name {{ name }} -ErrorAction SilentlyContinue
+    if ($okmAntwort) {
+        $okmAntwort | Where-Object { $_.IPAddress } | Format-Table Name, Type, IPAddress -AutoSize
+    } else {
+    {% if abbrechen %}
+        throw 'Der Name kann nicht aufgelöst werden.'
+    {% else %}
+        Write-Host 'Der Name kann NICHT aufgelöst werden.' -ForegroundColor Yellow
+    {% endif %}
+    }
+  cmd: |
+    nslookup {{ name }}
+    {% if not abbrechen %}
+    cmd /c exit 0
+    {% endif %}
+  bash: |
+    {% if abbrechen %}
+    getent ahosts {{ name }}
+    {% else %}
+    getent ahosts {{ name }} || printf '%s\n' 'Der Name kann NICHT aufgelöst werden.'
+    {% endif %}
+  zsh: |
+    dscacheutil -q host -a name {{ name }}

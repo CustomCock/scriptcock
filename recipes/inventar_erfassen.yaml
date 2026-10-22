@@ -1,0 +1,15 @@
+id: inventar_erfassen
+name: Seriennummer und Inventar erfassen
+kategorie: Inventar
+beschreibung: Sammelt Seriennummer, Hardware, Betriebssystem, Lizenzstatus und installierte Programme für die Inventarisierung.
+schlagworte: [inventar, seriennummer, hardware, lizenz, software, asset]
+schritte:
+  - block: seriennummer
+  - block: systeminfo
+  - block: windows_version
+    nur_fuer: [powershell, cmd]
+  - block: windows_lizenz
+    nur_fuer: [powershell, cmd]
+  - block: uptime_neustart
+  - block: software_liste
+    nur_fuer: [powershell, bash, zsh]

@@ -1,0 +1,16 @@
+id: routing_tabelle
+version: 1
+name: Routing-Tabelle
+kategorie: Netzwerk
+beschreibung: Zeigt die aktuellen Netzwerk-Routen (wohin welcher Verkehr geschickt wird).
+risiko: gruen
+fortschritt: Routing-Tabelle wird gelesen
+ziele:
+  powershell: |
+    Get-NetRoute -AddressFamily IPv4 | Sort-Object DestinationPrefix | Format-Table DestinationPrefix, NextHop, RouteMetric, InterfaceAlias -AutoSize
+  cmd: |
+    route print -4
+  bash: |
+    ip route show
+  zsh: |
+    netstat -rn -f inet

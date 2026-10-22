@@ -1,0 +1,33 @@
+id: gateway_ping
+version: 1
+name: Standard-Gateway anpingen
+kategorie: Netzwerk
+beschreibung: Ermittelt den Router (Standard-Gateway) und prüft, ob er antwortet – der erste Schritt bei „kein Netz“.
+risiko: gruen
+fortschritt: Standard-Gateway wird geprüft
+ziele:
+  powershell: |
+    $okmGateway = (Get-NetRoute -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | Sort-Object RouteMetric | Select-Object -First 1).NextHop
+    if (-not $okmGateway) {
+        Write-Host 'Kein Standard-Gateway gefunden – keine Netzwerkverbindung?' -ForegroundColor Yellow
+    } else {
+        Write-Host ('Standard-Gateway: ' + $okmGateway)
+        ping.exe -n 4 $okmGateway
+        if ($LASTEXITCODE -ne 0) { Write-Host 'Hinweis: Das Gateway antwortet nicht.' -ForegroundColor Yellow; $global:LASTEXITCODE = 0 }
+    }
+  bash: |
+    okm_gateway="$(ip route show default | awk '{print $3; exit}')"
+    if [ -z "$okm_gateway" ]; then
+      printf '%s\n' 'Kein Standard-Gateway gefunden – keine Netzwerkverbindung?'
+    else
+      printf 'Standard-Gateway: %s\n' "$okm_gateway"
+      ping -c 4 "$okm_gateway" || printf '%s\n' 'Hinweis: Das Gateway antwortet nicht.'
+    fi
+  zsh: |
+    okm_gateway="$(route -n get default 2>/dev/null | awk '/gateway:/ {print $2}')"
+    if [ -z "$okm_gateway" ]; then
+      printf '%s\n' 'Kein Standard-Gateway gefunden – keine Netzwerkverbindung?'
+    else
+      printf 'Standard-Gateway: %s\n' "$okm_gateway"
+      ping -c 4 "$okm_gateway" || printf '%s\n' 'Hinweis: Das Gateway antwortet nicht.'
+    fi

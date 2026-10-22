@@ -1,0 +1,17 @@
+id: arp_tabelle
+version: 1
+name: ARP-Tabelle (Geräte im lokalen Netz)
+kategorie: Netzwerk
+beschreibung: Zeigt Geräte im lokalen Netz, mit denen der Rechner zuletzt Kontakt hatte (IP- und MAC-Adresse).
+risiko: gruen
+fortschritt: ARP-Tabelle wird gelesen
+ziele:
+  powershell: |
+    Get-NetNeighbor -AddressFamily IPv4 | Where-Object { $_.State -ne 'Unreachable' -and $_.State -ne 'Permanent' } |
+        Sort-Object IPAddress | Format-Table IPAddress, LinkLayerAddress, State, InterfaceAlias -AutoSize
+  cmd: |
+    arp -a
+  bash: |
+    ip neigh show
+  zsh: |
+    arp -a

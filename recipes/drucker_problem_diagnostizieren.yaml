@@ -1,0 +1,24 @@
+id: drucker_problem_diagnostizieren
+name: Drucker-Problem diagnostizieren
+kategorie: Drucker
+beschreibung: Prüft, ob der Drucker im Netz erreichbar ist, ob der Druckdienst läuft und welche Drucker eingerichtet sind.
+hilfe: Das Script ändert nichts. Hängen Druckaufträge, hilft danach das Rezept „Druckwarteschlange neu starten“.
+schlagworte: [drucker, druckt nicht, offline, scanner, netzwerkdrucker]
+felder:
+  - id: drucker_ip
+    label: IP-Adresse oder Name des Druckers
+    typ: ip_oder_hostname
+    beispiel: 192.168.1.50
+schritte:
+  - block: ping
+    parameter: {ziel: $drucker_ip, anzahl: 2}
+  - block: druckerport_pruefen
+    parameter: {ip: $drucker_ip}
+    nur_fuer: [powershell, bash, zsh]
+  - block: dienst_status
+    parameter: {dienst: Spooler}
+    nur_fuer: [powershell, cmd]
+  - block: dienst_status
+    parameter: {dienst: cups}
+    nur_fuer: [bash]
+  - block: drucker_liste

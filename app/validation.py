@@ -251,6 +251,16 @@ def _prozessname(text: str, p: ParameterDef) -> str:
     return result
 
 
+def _sha256(text: str, p: ParameterDef) -> str:
+    wert = text.replace(" ", "").lower()
+    if not re.fullmatch(r"[0-9a-f]{64}", wert):
+        raise ValidierungsFehler(
+            "Das ist keine gültige SHA-256-Prüfsumme (64 Zeichen 0–9 und a–f), "
+            "z. B. e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        )
+    return wert
+
+
 def _url(text: str, p: ParameterDef) -> str:
     fehler = ValidierungsFehler(
         "Das ist keine gültige Internetadresse. Sie muss mit http:// oder https:// beginnen, "
@@ -319,6 +329,7 @@ _TEXT_PRUEFER: dict[ParamTyp, Any] = {
         "Leerzeichen (höchstens 20 Zeichen), z. B. max.mustermann",
     ),
     ParamTyp.URL: _url,
+    ParamTyp.SHA256: _sha256,
     ParamTyp.AUSWAHL: _auswahl,
 }
 

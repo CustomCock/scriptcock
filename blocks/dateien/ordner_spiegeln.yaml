@@ -1,0 +1,43 @@
+id: ordner_spiegeln
+version: 1
+name: Ordner spiegeln
+kategorie: Dateien
+beschreibung: Macht den Zielordner zu einer exakten Kopie der Quelle – Dateien, die es in der Quelle nicht gibt, werden im Ziel GELÖSCHT.
+hilfe: |
+  Windows: robocopy /MIR mit Protokoll. Linux/macOS: rsync --delete (rsync muss installiert sein).
+  Zuerst mit „Nur simulieren“ prüfen, was passieren würde!
+risiko: rot
+fortschritt: "{{ quelle }} wird nach {{ ziel }} gespiegelt"
+parameter:
+  - id: quelle
+    label: Quellordner
+    typ: pfad
+    beispiel: C:\Daten
+  - id: ziel
+    label: Zielordner
+    typ: pfad
+    beispiel: D:\Spiegel
+ziele:
+  powershell: |
+    $okmLogDatei = Join-Path $env:TEMP ('okm-spiegeln-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log')
+    robocopy.exe {{ quelle }} {{ ziel }} /MIR /R:1 /W:1 /NP /XJ ('/LOG+:' + $okmLogDatei) /TEE
+    if ($LASTEXITCODE -lt 8) { $global:LASTEXITCODE = 0 }
+    Write-Host ('Robocopy-Protokoll: ' + $okmLogDatei)
+  cmd: |
+    robocopy {{ quelle }} {{ ziel }} /MIR /R:1 /W:1 /NP /XJ
+    if errorlevel 8 (cmd /c exit 1) else (cmd /c exit 0)
+  bash: |
+    rsync -a --delete --human-readable --stats -- {{ quelle }}/ {{ ziel }}/
+  zsh: |
+    rsync -a --delete --stats {{ quelle }}/ {{ ziel }}/
+dry_run:
+  powershell: |
+    robocopy.exe {{ quelle }} {{ ziel }} /MIR /L /NP /XJ
+    if ($LASTEXITCODE -lt 8) { $global:LASTEXITCODE = 0 }
+  cmd: |
+    robocopy {{ quelle }} {{ ziel }} /MIR /L /NP /XJ
+    if errorlevel 8 (cmd /c exit 1) else (cmd /c exit 0)
+  bash: |
+    rsync -a --delete --dry-run --itemize-changes -- {{ quelle }}/ {{ ziel }}/
+  zsh: |
+    rsync -a --delete --dry-run --itemize-changes {{ quelle }}/ {{ ziel }}/

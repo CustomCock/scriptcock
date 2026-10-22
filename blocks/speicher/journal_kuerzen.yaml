@@ -1,0 +1,20 @@
+id: journal_kuerzen
+version: 1
+name: Systemprotokoll (Journal) kürzen
+kategorie: Speicher
+beschreibung: Löscht Einträge des systemd-Journals, die älter als die angegebene Anzahl Tage sind.
+risiko: rot
+admin_noetig: true
+fortschritt: "Journal-Einträge älter als {{ tage }} Tage werden gelöscht"
+parameter:
+  - id: tage
+    label: Einträge behalten (Tage)
+    typ: zahl
+    min: 1
+    max: 3650
+    standard: 30
+ziele:
+  bash: |
+    journalctl --disk-usage
+    journalctl --vacuum-time={{ tage }}d
+    journalctl --disk-usage

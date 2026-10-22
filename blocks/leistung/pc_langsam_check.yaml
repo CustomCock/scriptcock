@@ -1,0 +1,38 @@
+id: pc_langsam_check
+version: 1
+name: „PC ist langsam“-Check
+kategorie: Leistung
+beschreibung: Prüft die häufigsten Ursachen für einen langsamen Rechner (CPU, Arbeitsspeicher, freier Speicherplatz, Laufzeit seit dem letzten Neustart) und gibt Tipps.
+risiko: gruen
+fortschritt: Rechner wird auf typische Bremsen geprüft
+ziele:
+  powershell: |
+    $okmOs = Get-CimInstance -ClassName Win32_OperatingSystem
+    $okmCpu = [math]::Round((Get-CimInstance -ClassName Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average)
+    $okmRamFrei = [math]::Round($okmOs.FreePhysicalMemory / $okmOs.TotalVisibleMemorySize * 100)
+    $okmLaufwerk = Get-CimInstance -ClassName Win32_LogicalDisk -Filter ("DeviceID='" + $env:SystemDrive + "'")
+    $okmPlatz = [math]::Round($okmLaufwerk.FreeSpace / $okmLaufwerk.Size * 100)
+    $okmTage = [math]::Floor(((Get-Date) - $okmOs.LastBootUpTime).TotalDays)
+    Write-Host ('CPU-Last:            ' + $okmCpu + ' %') -ForegroundColor $(if ($okmCpu -gt 80) { 'Red' } else { 'Green' })
+    Write-Host ('Freier Arbeitsspeicher: ' + $okmRamFrei + ' % von ' + [math]::Round($okmOs.TotalVisibleMemorySize / 1MB) + ' GB') -ForegroundColor $(if ($okmRamFrei -lt 15) { 'Red' } else { 'Green' })
+    Write-Host ('Freier Platz ' + $env:SystemDrive + '      ' + $okmPlatz + ' %') -ForegroundColor $(if ($okmPlatz -lt 10) { 'Red' } else { 'Green' })
+    Write-Host ('Letzter Neustart:    vor ' + $okmTage + ' Tagen') -ForegroundColor $(if ($okmTage -gt 7) { 'Yellow' } else { 'Green' })
+    Write-Host 'Größte Verbraucher (Arbeitsspeicher):'
+    Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 5 | Format-Table ProcessName, @{ Name = 'RAM (MB)'; Expression = { [math]::Round($_.WorkingSet64 / 1MB) } } -AutoSize
+    if ($okmTage -gt 7) { Write-Host 'Tipp: Rechner neu starten – er läuft seit über einer Woche.' -ForegroundColor Yellow }
+    if ($okmPlatz -lt 10) { Write-Host 'Tipp: Speicherplatz freigeben (Rezept „Speicherplatz freigeben“).' -ForegroundColor Yellow }
+    if ($okmRamFrei -lt 15) { Write-Host 'Tipp: Nicht benötigte Programme und Browser-Tabs schließen.' -ForegroundColor Yellow }
+  bash: |
+    printf 'Last (1/5/15 min): %s   CPU-Kerne: %s\n' "$(cut -d ' ' -f 1-3 /proc/loadavg)" "$(nproc)"
+    free -h
+    df -h /
+    uptime -p 2>/dev/null || uptime
+    printf '\n%s\n' 'Größte Verbraucher:'
+    ps -eo pid,%cpu,%mem,comm --sort=-%mem | awk 'NR <= 6'
+  zsh: |
+    printf 'Last (1/5/15 min): %s   CPU-Kerne: %s\n' "$(sysctl -n vm.loadavg)" "$(sysctl -n hw.ncpu)"
+    memory_pressure | tail -n 1 || true
+    df -h /
+    uptime
+    printf '\n%s\n' 'Größte Verbraucher:'
+    ps -Ao pid,%cpu,%mem,comm -m | awk 'NR <= 6'

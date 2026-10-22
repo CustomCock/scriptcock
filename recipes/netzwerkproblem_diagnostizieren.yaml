@@ -1,9 +1,9 @@
 id: netzwerkproblem_diagnostizieren
 name: Netzwerkproblem diagnostizieren
 kategorie: Netzwerk
-beschreibung: Zeigt die Netzwerkeinstellungen und prüft Schritt für Schritt, ob ein Server erreichbar ist (Ping, Traceroute, Port).
+beschreibung: Prüft Schritt für Schritt Netzwerkeinstellungen, Router, Internet, Namensauflösung und ob ein bestimmter Server erreichbar ist (Ping, Traceroute, Port).
 hilfe: Das Script ändert nichts am Rechner. Die Ausgabe kann an den Support weitergegeben werden.
-schlagworte: [internet, netzwerk, verbindung, ping, langsam, keine verbindung, wlan, lan]
+schlagworte: [internet, netzwerk, verbindung, ping, langsam, keine verbindung, wlan, lan, dns, router]
 felder:
   - id: ziel
     label: Welcher Server ist nicht erreichbar?
@@ -15,6 +15,12 @@ felder:
     standard: 443
 schritte:
   - block: ip_konfiguration
+  - block: gateway_ping
+    nur_fuer: [powershell, bash, zsh]
+  - block: ping
+    parameter: {ziel: 1.1.1.1, anzahl: 2}
+  - block: dns_test
+    parameter: {name: www.microsoft.com}
   - block: ping
     parameter: {ziel: $ziel, anzahl: 4}
   - block: traceroute

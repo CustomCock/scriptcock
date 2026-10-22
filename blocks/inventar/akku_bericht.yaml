@@ -1,0 +1,20 @@
+id: akku_bericht
+version: 1
+name: Akkuzustand (Laptop)
+kategorie: Inventar
+beschreibung: Zeigt den Zustand des Akkus – ursprüngliche und aktuelle Kapazität sowie Ladezyklen.
+hilfe: |
+  Windows: Erzeugt einen ausführlichen Akku-Bericht als HTML-Datei auf dem Desktop.
+  Auf Rechnern ohne Akku meldet der Schritt einen Fehler.
+risiko: gruen
+fortschritt: Akkubericht wird erstellt
+ziele:
+  powershell: |
+    $okmDatei = Join-Path ([Environment]::GetFolderPath('Desktop')) 'akku-bericht.html'
+    powercfg.exe /batteryreport /output $okmDatei
+    Write-Host ('Bericht: ' + $okmDatei)
+  cmd: |
+    powercfg /batteryreport /output "%USERPROFILE%\Desktop\akku-bericht.html"
+  zsh: |
+    pmset -g batt
+    ioreg -r -c AppleSmartBattery | grep -E '"(CycleCount|DesignCapacity|AppleRawMaxCapacity|MaxCapacity|DesignCycleCount9C)" =' || printf '%s\n' 'Kein Akku gefunden.'

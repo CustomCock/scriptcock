@@ -1,0 +1,31 @@
+id: dateien_durchsuchen
+version: 1
+name: Text in Dateien suchen
+kategorie: Allgemein
+beschreibung: Sucht einen Begriff in allen Textdateien eines Ordners (inklusive Unterordnern).
+risiko: gruen
+fortschritt: "Suche nach {{ begriff }} in {{ pfad }}"
+parameter:
+  - id: pfad
+    label: Ordner
+    typ: pfad
+    beispiel: C:\Daten\Protokolle
+  - id: begriff
+    label: Suchbegriff
+    typ: text_kurz
+    beispiel: Fehler
+ziele:
+  powershell: |
+    $okmTreffer = Get-ChildItem -LiteralPath {{ pfad }} -Recurse -File -ErrorAction SilentlyContinue |
+        Select-String -SimpleMatch -Pattern {{ begriff }} -ErrorAction SilentlyContinue | Select-Object -First 500
+    if ($okmTreffer) { $okmTreffer | Format-Table Path, LineNumber, Line -AutoSize -Wrap } else { Write-Host 'Nichts gefunden.' }
+  cmd: |
+    findstr /S /I /N /C:{{ begriff }} {{ pfad }}\*
+    if errorlevel 1 (
+      echo Nichts gefunden.
+      cmd /c exit 0
+    )
+  bash: |
+    grep -rIn -F -- {{ begriff }} {{ pfad }} || printf '%s\n' 'Nichts gefunden.'
+  zsh: |
+    grep -rIn -F -- {{ begriff }} {{ pfad }} || printf '%s\n' 'Nichts gefunden.'

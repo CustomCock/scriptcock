@@ -104,7 +104,9 @@ def cmd_lint(inhalt: bytes) -> list[str]:
             continue
         for arg in re.findall(r'"([^"]*)"', zeile):
             ohne = re.sub(r"%%", "", arg)
-            ohne = re.sub(r"%(OKM_[A-Z]+|TEMP|SystemRoot|RANDOM|COMPUTERNAME)%", "", ohne)
+            # Absichtliche Umgebungsvariablen im Template (%USERPROFILE%, %OKM_LOG% …) sind erlaubt;
+            # gesucht werden einzelne % aus Parameterwerten (die müssten %% sein).
+            ohne = re.sub(r"%[A-Za-z_][A-Za-z0-9_]*%", "", ohne)
             if "%" in ohne and not zeile.lstrip().lower().startswith(("rem", "for /f")):
                 probleme.append(f"Zeile {nr}: einzelnes % in Argument: {zeile}")
     return probleme

@@ -1,0 +1,31 @@
+id: ip_erneuern
+version: 1
+name: IP-Adresse erneuern (DHCP)
+kategorie: Netzwerk
+beschreibung: Gibt die per DHCP bezogene IP-Adresse frei und holt eine neue.
+hilfe: |
+  Die Netzwerkverbindung ist dabei kurz unterbrochen – nicht über eine Fernwartung ausführen,
+  die über genau diese Verbindung läuft!
+risiko: gelb
+admin_noetig:
+  powershell: false
+  cmd: false
+  zsh: true
+fortschritt: IP-Adresse wird erneuert
+parameter:
+  - id: schnittstelle
+    label: Netzwerkschnittstelle (nur macOS)
+    typ: text_kurz
+    standard: en0
+ziele:
+  powershell: |
+    ipconfig.exe /release
+    ipconfig.exe /renew
+  cmd: |
+    ipconfig /release
+    ipconfig /renew
+  zsh: |
+    ipconfig set {{ schnittstelle }} DHCP
+    ipconfig getifaddr {{ schnittstelle }} || printf '%s\n' 'Noch keine Adresse erhalten.'
+hinweise:
+  zsh: "Schnittstelle meist en0 (WLAN bzw. integriertes Ethernet). Liste: networksetup -listallhardwareports"

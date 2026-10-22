@@ -1,0 +1,23 @@
+id: geplante_aufgaben
+version: 1
+name: Geplante Aufgaben anzeigen
+kategorie: Prozesse
+beschreibung: Zeigt eigene (nicht von Microsoft stammende) geplante Aufgaben bzw. Cronjobs und Timer.
+risiko: gruen
+fortschritt: Geplante Aufgaben werden gelesen
+ziele:
+  powershell: |
+    Get-ScheduledTask | Where-Object { $_.TaskPath -notlike '\Microsoft\*' } |
+        Sort-Object TaskPath, TaskName | Format-Table TaskName, TaskPath, State -AutoSize -Wrap
+  cmd: |
+    schtasks /query /fo table
+  bash: |
+    printf '%s\n' 'Cronjobs des Benutzers:'
+    crontab -l 2>/dev/null || printf '%s\n' '(keine)'
+    printf '\n%s\n' 'systemd-Timer:'
+    systemctl list-timers --all --no-pager
+  zsh: |
+    printf '%s\n' 'Cronjobs des Benutzers:'
+    crontab -l 2>/dev/null || printf '%s\n' '(keine)'
+    printf '\n%s\n' 'Eigene LaunchAgents:'
+    ls -1 "$HOME/Library/LaunchAgents" 2>/dev/null || printf '%s\n' '(keine)'

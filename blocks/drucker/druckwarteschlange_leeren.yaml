@@ -1,0 +1,26 @@
+id: druckwarteschlange_leeren
+version: 1
+name: Druckwarteschlange leeren
+kategorie: Drucker
+beschreibung: Löscht alle hängenden Druckaufträge. Unter Windows wird dazu der Druckdienst kurz angehalten.
+hilfe: |
+  Alle wartenden Aufträge aller Drucker gehen verloren und müssen neu gedruckt werden.
+risiko: gelb
+admin_noetig: true
+fortschritt: Druckwarteschlange wird geleert
+ziele:
+  powershell: |
+    Stop-Service -Name Spooler -Force{{ whatif }}
+    Get-ChildItem -Path (Join-Path $env:SystemRoot 'System32\spool\PRINTERS') -File -ErrorAction SilentlyContinue | Remove-Item -Force{{ whatif }}
+    Start-Service -Name Spooler{{ whatif }}
+    Write-Host 'Druckwarteschlange geleert.'
+  cmd: |
+    net stop spooler
+    del /Q /F "%SystemRoot%\System32\spool\PRINTERS\*.*"
+    net start spooler
+  bash: |
+    cancel -a
+    printf '%s\n' 'Alle Druckaufträge wurden gelöscht.'
+  zsh: |
+    cancel -a
+    printf '%s\n' 'Alle Druckaufträge wurden gelöscht.'

@@ -1,0 +1,28 @@
+id: benutzer_zu_gruppe
+version: 1
+name: Benutzer zu lokaler Gruppe hinzufügen
+kategorie: Benutzer
+beschreibung: Nimmt einen Benutzer in eine lokale Gruppe auf.
+risiko: rot
+admin_noetig: true
+fortschritt: "Benutzer {{ benutzer }} wird zur Gruppe {{ gruppe }} hinzugefügt"
+parameter:
+  - id: benutzer
+    label: Benutzername
+    typ: benutzername
+    beispiel: max.mustermann
+  - id: gruppe
+    label: Gruppe
+    typ: text_kurz
+    beispiel: Remotedesktopbenutzer
+    hilfe: Windows-Gruppennamen sind sprachabhängig (z. B. „Remotedesktopbenutzer“ / „Remote Desktop Users“).
+ziele:
+  powershell: |
+    Add-LocalGroupMember -Group {{ gruppe }} -Member {{ benutzer }}{{ whatif }}
+  cmd: |
+    net localgroup {{ gruppe }} {{ benutzer }} /add
+  bash: |
+    usermod -aG {{ gruppe }} {{ benutzer }}
+    id {{ benutzer }}
+  zsh: |
+    dseditgroup -o edit -a {{ benutzer }} -t user {{ gruppe }}

@@ -1,0 +1,26 @@
+id: wlan_info
+version: 1
+name: WLAN-Infos
+kategorie: Netzwerk
+beschreibung: Zeigt das verbundene WLAN mit Signalstärke, Kanal und Frequenzband.
+hilfe: |
+  macOS zeigt den WLAN-Namen je nach Version nur mit Ortungsdienst-Freigabe an.
+risiko: gruen
+fortschritt: WLAN-Verbindung wird gelesen
+ziele:
+  powershell: |
+    netsh.exe wlan show interfaces
+    if ($LASTEXITCODE -ne 0) { Write-Host 'Kein WLAN-Adapter gefunden.'; $global:LASTEXITCODE = 0 }
+  cmd: |
+    netsh wlan show interfaces
+    cmd /c exit 0
+  bash: |
+    if command -v nmcli >/dev/null 2>&1; then
+      nmcli -f IN-USE,SSID,SIGNAL,CHAN,FREQ,SECURITY device wifi list
+    elif command -v iw >/dev/null 2>&1; then
+      iw dev
+    else
+      printf '%s\n' 'Weder nmcli noch iw ist installiert.'
+    fi
+  zsh: |
+    system_profiler SPAirPortDataType

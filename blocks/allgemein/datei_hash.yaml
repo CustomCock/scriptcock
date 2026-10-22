@@ -1,0 +1,21 @@
+id: datei_hash
+version: 1
+name: Prüfsumme (SHA-256) einer Datei
+kategorie: Allgemein
+beschreibung: Berechnet die SHA-256-Prüfsumme einer Datei, z. B. um einen Download mit der Herstellerangabe zu vergleichen.
+risiko: gruen
+fortschritt: "Prüfsumme von {{ datei }} wird berechnet"
+parameter:
+  - id: datei
+    label: Datei
+    typ: pfad
+    beispiel: C:\Users\Public\Downloads\setup.exe
+ziele:
+  powershell: |
+    Get-FileHash -LiteralPath {{ datei }} -Algorithm SHA256 | Format-List Algorithm, Hash, Path
+  cmd: |
+    certutil -hashfile {{ datei }} SHA256
+  bash: |
+    sha256sum -- {{ datei }}
+  zsh: |
+    shasum -a 256 {{ datei }}

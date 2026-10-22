@@ -1,0 +1,29 @@
+id: oeffentliche_ip
+version: 1
+name: Öffentliche IP anzeigen
+kategorie: Netzwerk
+beschreibung: Zeigt die IP-Adresse, mit der der Rechner im Internet auftritt (über einen Abfragedienst).
+hilfe: |
+  Fragt standardmäßig api.ipify.org ab. Der Dienst lässt sich ändern (muss nur die IP als Text zurückgeben).
+risiko: gruen
+fortschritt: Öffentliche IP wird abgefragt
+parameter:
+  - id: dienst
+    label: Abfragedienst
+    typ: url
+    standard: https://api.ipify.org
+ziele:
+  powershell: |
+    $okmIp = Invoke-RestMethod -Uri {{ dienst }} -UseBasicParsing -TimeoutSec 15
+    Write-Host ('Öffentliche IP: ' + $okmIp)
+  bash: |
+    okm_url={{ dienst }}
+    if command -v curl >/dev/null 2>&1; then
+      okm_ip="$(curl -fsS --max-time 15 "$okm_url")"
+    else
+      okm_ip="$(wget -qO- --timeout=15 "$okm_url")"
+    fi
+    printf 'Öffentliche IP: %s\n' "$okm_ip"
+  zsh: |
+    okm_url={{ dienst }}
+    printf 'Öffentliche IP: %s\n' "$(curl -fsS --max-time 15 "$okm_url")"

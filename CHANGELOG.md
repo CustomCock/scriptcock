@@ -1,5 +1,25 @@
 # Changelog
 
+## Vorlagen – 116 neue Bausteine, 13 neue Rezepte
+
+- **Bausteine (jetzt 140)** aus der Ideensammlung, zuerst die ★-Vorlagen der Kategorien
+  1, 2, 4, 5, 8, 9, 11, 13, 14, 21: Inventar (Seriennummer, Software, Lizenz, Windows-11-Check,
+  Akku, Treiber …), Netzwerk (Gateway, DNS, öffentliche IP, MTU, WLAN, Ports, Proxy …),
+  Drucker, Dateien & Freigaben, Dienste & Prozesse, Updates (Status, DISM+SFC, winget, apt/dnf,
+  macOS), Speicher & Bereinigung, Sicherheit (Virenschutz, BitLocker/FileVault, Ampel-Check,
+  Zertifikate, Incident-Erstsicherung …), Fehleranalyse (Bluescreens, Abstürze, Startdauer),
+  Performance, Office/Entra ID, Support-Infos, lokale Benutzer, Linux-Server, macOS.
+- **Neue Rezepte:** PC ist langsam, Support-Infos, Inventar erfassen, Windows-11-Tauglichkeit,
+  Drucker-Problem diagnostizieren, Sicherheits-Schnellprüfung, Update-Status, Systemdateien
+  reparieren, Benutzerdaten sichern, Server-Gesundheitscheck, Incident-Erstsicherung,
+  Absturz-Analyse, Office-Probleme. „Netzwerkproblem diagnostizieren“ prüft jetzt zusätzlich
+  Router, Internet und DNS.
+- `systeminfo` (Version 2) zeigt zusätzlich Prozessor, Kerne und Build.
+- Neuer Parametertyp `sha256` (für die Hash-Prüfung beim Datei-Download).
+- CMD-Regelprüfung erlaubt Umgebungsvariablen wie `%USERPROFILE%` in Anführungszeichen.
+- Übersicht über umgesetzte, zurückgestellte und bewusst ausgelassene Vorlagen:
+  `docs/vorlagen-status.md`; ungeprüfte Befehle in `docs/offene-punkte.md`.
+
 ## UI-Überarbeitung – Dark Theme & Übersicht
 
 - **Komplett dunkles Design** in okm-Farben (Schwarz, Rot, Sandgelb) mit neuem Design-System

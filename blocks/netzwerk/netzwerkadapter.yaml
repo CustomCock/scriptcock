@@ -1,0 +1,21 @@
+id: netzwerkadapter
+version: 1
+name: Netzwerkadapter-Übersicht
+kategorie: Netzwerk
+beschreibung: Zeigt alle Netzwerkkarten mit Status, Geschwindigkeit und MAC-Adresse.
+risiko: gruen
+fortschritt: Netzwerkadapter werden aufgelistet
+ziele:
+  powershell: |
+    Get-NetAdapter | Sort-Object Name | Format-Table Name, InterfaceDescription, Status, LinkSpeed, MacAddress -AutoSize -Wrap
+  cmd: |
+    netsh interface show interface
+    getmac /v /fo table
+  bash: |
+    ip -brief link
+    for okm_karte in /sys/class/net/*; do
+      okm_name="$(basename "$okm_karte")"
+      printf '%-16s Geschwindigkeit: %s Mbit/s\n' "$okm_name" "$(cat "$okm_karte/speed" 2>/dev/null || printf '%s' '-')"
+    done
+  zsh: |
+    networksetup -listallhardwareports

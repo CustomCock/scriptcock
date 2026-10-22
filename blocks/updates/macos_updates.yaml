@@ -1,0 +1,11 @@
+id: macos_updates
+version: 1
+name: "macOS: Softwareupdates installieren"
+kategorie: Updates
+beschreibung: Installiert alle verfügbaren macOS-Softwareupdates. Neu gestartet wird nicht automatisch.
+risiko: gelb
+admin_noetig: true
+fortschritt: macOS-Updates werden installiert
+ziele:
+  zsh: |
+    softwareupdate --install --all

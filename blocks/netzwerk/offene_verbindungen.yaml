@@ -1,0 +1,21 @@
+id: offene_verbindungen
+version: 1
+name: Offene Netzwerkverbindungen
+kategorie: Netzwerk
+beschreibung: Zeigt aktive TCP-Verbindungen mit dem zugehörigen Programm.
+hilfe: |
+  Linux/macOS: Ohne Administratorrechte werden nur die eigenen Programme angezeigt.
+risiko: gruen
+fortschritt: Aktive Verbindungen werden ermittelt
+ziele:
+  powershell: |
+    Get-NetTCPConnection -State Established -ErrorAction SilentlyContinue |
+        Select-Object LocalAddress, LocalPort, RemoteAddress, RemotePort,
+            @{ Name = 'Programm'; Expression = { (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName } } |
+        Sort-Object Programm | Format-Table -AutoSize
+  cmd: |
+    netstat -ano -p tcp
+  bash: |
+    ss -tnp state established
+  zsh: |
+    lsof -nP -iTCP -sTCP:ESTABLISHED || printf '%s\n' 'Keine Verbindungen gefunden.'

@@ -247,15 +247,15 @@ def test_nutzer_reichen_vorschlag_ein(reg: Registry, tmp_path: Path) -> None:
         [
             ("ziel", "bash"),
             ("schritt", f"{uid}:systeminfo"),
-            ("rezept_name", "Infos"),
+            ("rezept_name", "Mein Testvorschlag"),
             ("rezept_kategorie", "System"),
             ("rezept_beschreibung", "Zeigt Infos."),
         ],
     )
-    assert "Vorschlag „Infos“ eingereicht" in r.text
+    assert "Vorschlag „Mein Testvorschlag“ eingereicht" in r.text
     # Noch nicht sichtbar
-    assert "Infos" not in c.get("/rezepte?ziel=bash").text
-    assert not any(r.name == "Infos" for r in reg.rezepte.values())
+    assert "Mein Testvorschlag" not in c.get("/rezepte?ziel=bash").text
+    assert not any(r.name == "Mein Testvorschlag" for r in reg.rezepte.values())
 
 
 def test_als_rezept_speichern_und_neu_laden(reg: Registry, tmp_path: Path) -> None:

@@ -1,0 +1,8 @@
+id: incident_erstsicherung
+name: Incident-Erstsicherung
+kategorie: Sicherheit
+beschreibung: Sichert bei einem Verdacht auf Schadsoftware oder Einbruch flüchtige Spuren in einen Ordner auf dem Desktop – bevor der Rechner vom Netz geht.
+hilfe: Nur auf Anweisung der IT-Sicherheit ausführen. Rechner danach NICHT ausschalten, sondern nur das Netzwerkkabel ziehen bzw. WLAN trennen.
+schlagworte: [incident, vorfall, virus, schadsoftware, hack, forensik, sicherheitsvorfall]
+schritte:
+  - block: incident_erstsicherung

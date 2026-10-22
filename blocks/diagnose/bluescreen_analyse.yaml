@@ -1,0 +1,19 @@
+id: bluescreen_analyse
+version: 1
+name: Bluescreen-Analyse
+kategorie: Diagnose
+beschreibung: Zeigt die letzten Bluescreens (BugCheck-Codes) und vorhandene Minidump-Dateien.
+hilfe: |
+  Den BugCheck-Code (z. B. 0x0000007e) kann man beim Hersteller oder bei Microsoft nachschlagen.
+risiko: gruen
+fortschritt: Bluescreens werden gesucht
+ziele:
+  powershell: |
+    $okmBsod = Get-WinEvent -FilterHashtable @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-WER-SystemErrorReporting'; Id = 1001 } -MaxEvents 20 -ErrorAction SilentlyContinue
+    if ($okmBsod) {
+        $okmBsod | Format-Table TimeCreated, Message -AutoSize -Wrap
+    } else {
+        Write-Host 'Keine Bluescreens im Ereignisprotokoll gefunden.' -ForegroundColor Green
+    }
+    $okmDumps = Get-ChildItem -Path (Join-Path $env:SystemRoot 'Minidump') -Filter '*.dmp' -ErrorAction SilentlyContinue
+    if ($okmDumps) { $okmDumps | Sort-Object LastWriteTime -Descending | Format-Table Name, LastWriteTime, Length -AutoSize }

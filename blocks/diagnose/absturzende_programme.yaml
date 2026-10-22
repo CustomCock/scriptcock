@@ -1,0 +1,24 @@
+id: absturzende_programme
+version: 1
+name: Abstürzende Programme
+kategorie: Diagnose
+beschreibung: Zeigt, welche Programme in den letzten Tagen abgestürzt sind – gruppiert und nach Häufigkeit sortiert.
+risiko: gruen
+fortschritt: "Programmabstürze der letzten {{ tage }} Tage werden ausgewertet"
+parameter:
+  - id: tage
+    label: Zeitraum (Tage)
+    typ: zahl
+    min: 1
+    max: 90
+    standard: 14
+ziele:
+  powershell: |
+    $okmAbstuerze = Get-WinEvent -FilterHashtable @{ LogName = 'Application'; Id = 1000; StartTime = (Get-Date).AddDays(-{{ tage }}) } -ErrorAction SilentlyContinue
+    if ($okmAbstuerze) {
+        $okmAbstuerze | Group-Object { $_.Properties[0].Value } | Sort-Object Count -Descending |
+            Format-Table @{ Name = 'Programm'; Expression = { $_.Name } }, @{ Name = 'Abstürze'; Expression = { $_.Count } },
+                @{ Name = 'Zuletzt'; Expression = { ($_.Group | Sort-Object TimeCreated -Descending | Select-Object -First 1).TimeCreated } } -AutoSize
+    } else {
+        Write-Host 'Keine Programmabstürze gefunden.' -ForegroundColor Green
+    }

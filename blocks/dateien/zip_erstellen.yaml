@@ -1,0 +1,25 @@
+id: zip_erstellen
+version: 1
+name: ZIP-Archiv erstellen
+kategorie: Dateien
+beschreibung: Packt einen Ordner oder eine Datei in ein ZIP-Archiv.
+hilfe: |
+  Linux: braucht das Programm zip (Debian/Ubuntu: apt install zip).
+risiko: gelb
+fortschritt: "{{ quelle }} wird nach {{ ziel }} gepackt"
+parameter:
+  - id: quelle
+    label: Ordner oder Datei
+    typ: pfad
+    beispiel: C:\Daten\Projekt
+  - id: ziel
+    label: ZIP-Datei
+    typ: pfad
+    beispiel: C:\Daten\Projekt.zip
+ziele:
+  powershell: |
+    Compress-Archive -LiteralPath {{ quelle }} -DestinationPath {{ ziel }} -Force{{ whatif }}
+  bash: |
+    zip -r -q -- {{ ziel }} {{ quelle }}
+  zsh: |
+    ditto -c -k --keepParent {{ quelle }} {{ ziel }}

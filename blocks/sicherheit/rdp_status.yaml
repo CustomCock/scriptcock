@@ -1,0 +1,17 @@
+id: rdp_status
+version: 1
+name: Remotedesktop-Status
+kategorie: Sicherheit
+beschreibung: Zeigt, ob Remotedesktop-Verbindungen auf diesen Rechner erlaubt sind und ob NLA verlangt wird.
+risiko: gruen
+fortschritt: Remotedesktop-Einstellungen werden gelesen
+ziele:
+  powershell: |
+    $okmTs = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server'
+    $okmNla = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp'
+    Write-Host ('Remotedesktop erlaubt:  ' + ($okmTs.fDenyTSConnections -eq 0))
+    Write-Host ('NLA erforderlich:       ' + ($okmNla.UserAuthentication -eq 1))
+    Write-Host ('Port:                   ' + $okmNla.PortNumber)
+  cmd: |
+    echo fDenyTSConnections 0x0 = Remotedesktop erlaubt, 0x1 = gesperrt:
+    reg query "HKLM\SYSTEM\CurrentControlSet\Control\Terminal Server" /v fDenyTSConnections

@@ -1,0 +1,15 @@
+id: swap_nutzung
+version: 1
+name: Auslagerungsspeicher (Swap) anzeigen
+kategorie: Leistung
+beschreibung: Zeigt, wie stark der Auslagerungsspeicher genutzt wird – hohe Nutzung deutet auf zu wenig Arbeitsspeicher hin.
+risiko: gruen
+fortschritt: Swap-Nutzung wird gelesen
+ziele:
+  powershell: |
+    Get-CimInstance -ClassName Win32_PageFileUsage | Format-Table Name, AllocatedBaseSize, CurrentUsage, PeakUsage -AutoSize
+  bash: |
+    free -h
+    swapon --show || true
+  zsh: |
+    sysctl vm.swapusage

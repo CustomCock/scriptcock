@@ -1,0 +1,15 @@
+id: wlan_report
+version: 1
+name: WLAN-Diagnosebericht
+kategorie: Netzwerk
+beschreibung: Erstellt den Windows-WLAN-Bericht der letzten drei Tage (Verbindungsabbrüche, Fehler) als HTML-Datei.
+risiko: gruen
+admin_noetig: true
+fortschritt: WLAN-Bericht wird erstellt
+ziele:
+  powershell: |
+    netsh.exe wlan show wlanreport
+    Write-Host ('Bericht: ' + (Join-Path $env:ProgramData 'Microsoft\Windows\WlanReport\wlan-report-latest.html'))
+  cmd: |
+    netsh wlan show wlanreport
+    echo Bericht: %ProgramData%\Microsoft\Windows\WlanReport\wlan-report-latest.html

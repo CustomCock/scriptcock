@@ -1,0 +1,40 @@
+id: druckerport_pruefen
+version: 1
+name: Drucker-Erreichbarkeit prüfen
+kategorie: Drucker
+beschreibung: Prüft Ping und die Druckanschlüsse 9100 (RAW), 631 (IPP) und 515 (LPD) eines Netzwerkdruckers.
+risiko: gruen
+fortschritt: "Drucker {{ ip }} wird geprüft"
+parameter:
+  - id: ip
+    label: IP-Adresse oder Name des Druckers
+    typ: ip_oder_hostname
+    beispiel: 192.168.1.50
+ziele:
+  powershell: |
+    $okmErreichbar = Test-Connection -ComputerName {{ ip }} -Count 2 -Quiet
+    Write-Host ('Ping: ' + $(if ($okmErreichbar) { 'antwortet' } else { 'keine Antwort' }))
+    foreach ($okmPort in 9100, 631, 515) {
+        $okmTest = Test-NetConnection -ComputerName {{ ip }} -Port $okmPort -WarningAction SilentlyContinue
+        Write-Host ('Port ' + $okmPort + ': ' + $(if ($okmTest.TcpTestSucceeded) { 'offen' } else { 'geschlossen' }))
+    }
+  bash: |
+    okm_drucker={{ ip }}
+    if ping -c 2 "$okm_drucker" >/dev/null 2>&1; then printf '%s\n' 'Ping: antwortet'; else printf '%s\n' 'Ping: keine Antwort'; fi
+    for okm_port in 9100 631 515; do
+      if timeout 3 bash -c 'exec 3<>"/dev/tcp/$1/$2"' okm "$okm_drucker" "$okm_port" 2>/dev/null; then
+        printf 'Port %s: offen\n' "$okm_port"
+      else
+        printf 'Port %s: geschlossen\n' "$okm_port"
+      fi
+    done
+  zsh: |
+    okm_drucker={{ ip }}
+    if ping -c 2 "$okm_drucker" >/dev/null 2>&1; then printf '%s\n' 'Ping: antwortet'; else printf '%s\n' 'Ping: keine Antwort'; fi
+    for okm_port in 9100 631 515; do
+      if nc -z -G 3 "$okm_drucker" "$okm_port" 2>/dev/null; then
+        printf 'Port %s: offen\n' "$okm_port"
+      else
+        printf 'Port %s: geschlossen\n' "$okm_port"
+      fi
+    done

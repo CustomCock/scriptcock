@@ -1,0 +1,17 @@
+id: windows_version
+version: 1
+name: Windows-Version (Feature-Update)
+kategorie: Inventar
+beschreibung: Zeigt Produktname, Feature-Update-Version (z. B. 23H2, 24H2) und genaue Build-Nummer.
+risiko: gruen
+fortschritt: Windows-Version wird gelesen
+ziele:
+  powershell: |
+    Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' |
+        Format-List ProductName, DisplayVersion, CurrentBuild, UBR, EditionID
+    Write-Host 'Hinweis: Windows 11 meldet unter ProductName teils noch "Windows 10" – maßgeblich ist die Build-Nummer (ab 22000 = Windows 11).'
+  cmd: |
+    reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion" /v ProductName
+    reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion" /v DisplayVersion
+    reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion" /v CurrentBuild
+    reg query "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion" /v UBR

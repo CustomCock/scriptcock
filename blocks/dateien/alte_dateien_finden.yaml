@@ -1,0 +1,31 @@
+id: alte_dateien_finden
+version: 1
+name: Alte Dateien finden
+kategorie: Dateien
+beschreibung: Listet Dateien, die seit einer bestimmten Anzahl Tage nicht mehr geändert wurden. Es wird nichts gelöscht.
+risiko: gruen
+fortschritt: "Dateien älter als {{ tage }} Tage werden gesucht"
+parameter:
+  - id: pfad
+    label: Ordner
+    typ: pfad
+    beispiel: C:\Daten
+  - id: tage
+    label: Älter als (Tage)
+    typ: zahl
+    min: 1
+    max: 10000
+    standard: 365
+ziele:
+  powershell: |
+    $okmGrenze = (Get-Date).AddDays(-{{ tage }})
+    Get-ChildItem -LiteralPath {{ pfad }} -Recurse -File -Force -ErrorAction SilentlyContinue |
+        Where-Object { $_.LastWriteTime -lt $okmGrenze } |
+        Sort-Object LastWriteTime | Format-Table @{ Name = 'Geändert'; Expression = { $_.LastWriteTime.ToString('dd.MM.yyyy') } }, FullName -AutoSize -Wrap
+  cmd: |
+    forfiles /P {{ pfad }} /S /D -{{ tage }} /C "cmd /c if @isdir==FALSE echo @fdate @path"
+    cmd /c exit 0
+  bash: |
+    find {{ pfad }} -type f -mtime +{{ tage }} -printf '%TY-%Tm-%Td  %p\n' 2>/dev/null || true
+  zsh: |
+    find {{ pfad }} -type f -mtime +{{ tage }} -print 2>/dev/null || true

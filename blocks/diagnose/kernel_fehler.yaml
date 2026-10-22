@@ -1,0 +1,10 @@
+id: kernel_fehler
+version: 1
+name: "Kernel-/Hardware-Meldungen (dmesg)"
+kategorie: Diagnose
+beschreibung: Zeigt Warnungen und Fehler des Linux-Kernels seit dem letzten Start (z. B. Festplatten-, Speicher- oder Treiberprobleme).
+risiko: gruen
+fortschritt: Kernel-Meldungen werden gelesen
+ziele:
+  bash: |
+    journalctl -k -b -p warning --no-pager || dmesg --level=err,warn

@@ -1,0 +1,10 @@
+id: inodes
+version: 1
+name: "Linux: Inode-Belegung"
+kategorie: Linux-Server
+beschreibung: Zeigt die Inode-Belegung je Dateisystem. Volle Inodes verhindern neue Dateien, obwohl noch Platz frei ist.
+risiko: gruen
+fortschritt: Inode-Belegung wird gelesen
+ziele:
+  bash: |
+    df -iP -x tmpfs -x devtmpfs -x squashfs

@@ -1,0 +1,35 @@
+id: mtu_test
+version: 1
+name: MTU ermitteln
+kategorie: Netzwerk
+beschreibung: Findet die größte Paketgröße, die ohne Zerlegung zum Ziel durchgeht – hilfreich bei VPN-Problemen.
+hilfe: |
+  Ergebnis = größte funktionierende Nutzlast + 28 Byte (IP- und ICMP-Kopf). Normal sind 1500.
+risiko: gruen
+fortschritt: "MTU zu {{ ziel }} wird ermittelt"
+parameter:
+  - id: ziel
+    label: Ziel (IP-Adresse oder Rechnername)
+    typ: ip_oder_hostname
+    standard: 1.1.1.1
+ziele:
+  powershell: |
+    $okmMtu = 0
+    for ($okmGroesse = 1472; $okmGroesse -ge 1000; $okmGroesse -= 8) {
+        ping.exe -n 1 -w 1000 -f -l $okmGroesse {{ ziel }} | Out-Null
+        if ($LASTEXITCODE -eq 0) { $okmMtu = $okmGroesse + 28; break }
+    }
+    $global:LASTEXITCODE = 0
+    if ($okmMtu) { Write-Host ('MTU: ' + $okmMtu) } else { Write-Host 'Keine Antwort – Ziel nicht erreichbar oder ICMP gesperrt.' -ForegroundColor Yellow }
+  bash: |
+    okm_mtu=0
+    for okm_groesse in $(seq 1472 -8 1000); do
+      if ping -c 1 -W 1 -M 'do' -s "$okm_groesse" {{ ziel }} >/dev/null 2>&1; then okm_mtu=$((okm_groesse + 28)); break; fi
+    done
+    if [ "$okm_mtu" -gt 0 ]; then printf 'MTU: %s\n' "$okm_mtu"; else printf '%s\n' 'Keine Antwort – Ziel nicht erreichbar oder ICMP gesperrt.'; fi
+  zsh: |
+    okm_mtu=0
+    for okm_groesse in $(seq 1472 -8 1000); do
+      if ping -c 1 -t 1 -D -s "$okm_groesse" {{ ziel }} >/dev/null 2>&1; then okm_mtu=$((okm_groesse + 28)); break; fi
+    done
+    if [ "$okm_mtu" -gt 0 ]; then printf 'MTU: %s\n' "$okm_mtu"; else printf '%s\n' 'Keine Antwort – Ziel nicht erreichbar oder ICMP gesperrt.'; fi

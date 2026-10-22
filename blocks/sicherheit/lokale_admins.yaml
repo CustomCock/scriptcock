@@ -1,0 +1,16 @@
+id: lokale_admins
+version: 1
+name: Lokale Administratoren anzeigen
+kategorie: Sicherheit
+beschreibung: Zeigt, wer auf diesem Rechner Administratorrechte hat.
+risiko: gruen
+fortschritt: Lokale Administratoren werden aufgelistet
+ziele:
+  powershell: |
+    Get-LocalGroupMember -SID 'S-1-5-32-544' | Format-Table Name, ObjectClass, PrincipalSource -AutoSize
+  cmd: |
+    net localgroup Administratoren 2>nul || net localgroup Administrators
+  bash: |
+    getent group sudo wheel || printf '%s\n' 'Keine Gruppe sudo/wheel gefunden.'
+  zsh: |
+    dscl . -read /Groups/admin GroupMembership

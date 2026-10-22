@@ -1,0 +1,24 @@
+id: teams_cache_leeren
+version: 1
+name: Teams-Cache leeren
+kategorie: Speicher
+beschreibung: Beendet Microsoft Teams und leert dessen Zwischenspeicher (klassisches und neues Teams) – hilft bei Anmelde- und Anzeigeproblemen.
+hilfe: |
+  Nach dem Leeren muss sich der Benutzer in Teams ggf. neu anmelden. Chats und Dateien bleiben erhalten (liegen in der Cloud).
+risiko: rot
+fortschritt: Teams wird beendet und der Cache geleert
+ziele:
+  powershell: |
+    Get-Process -Name ms-teams, Teams -ErrorAction SilentlyContinue | Stop-Process -Force{{ whatif }}
+    Start-Sleep -Seconds 3
+    $okmOrdner = @(
+        (Join-Path $env:LOCALAPPDATA 'Packages\MSTeams_8wekyb3d8bbwe\LocalCache\Microsoft\MSTeams'),
+        (Join-Path $env:APPDATA 'Microsoft\Teams')
+    )
+    foreach ($okmPfad in $okmOrdner) {
+        if (Test-Path -LiteralPath $okmPfad) {
+            Write-Host ('Leere ' + $okmPfad)
+            Get-ChildItem -LiteralPath $okmPfad -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue{{ whatif }}
+        }
+    }
+    Write-Host 'Teams-Cache geleert. Teams kann jetzt neu gestartet werden.'

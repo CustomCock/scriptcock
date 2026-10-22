@@ -1,0 +1,14 @@
+id: windows_lizenz
+version: 1
+name: Windows-Lizenzstatus
+kategorie: Inventar
+beschreibung: Zeigt Edition, Aktivierungsstatus und Lizenzkanal von Windows (slmgr).
+risiko: gruen
+fortschritt: Lizenzstatus wird abgefragt
+ziele:
+  powershell: |
+    cscript.exe //nologo "$env:SystemRoot\System32\slmgr.vbs" /dli
+    cscript.exe //nologo "$env:SystemRoot\System32\slmgr.vbs" /xpr
+  cmd: |
+    cscript //nologo "%SystemRoot%\System32\slmgr.vbs" /dli
+    cscript //nologo "%SystemRoot%\System32\slmgr.vbs" /xpr

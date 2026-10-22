@@ -1,0 +1,22 @@
+id: sprache_region
+version: 1
+name: Systemsprache und Region anzeigen
+kategorie: Inventar
+beschreibung: Zeigt Anzeigesprache, Regionsformat und Tastaturlayouts.
+risiko: gruen
+fortschritt: Sprache und Region werden gelesen
+ziele:
+  powershell: |
+    Write-Host ('Regionsformat:  ' + (Get-Culture).Name)
+    Write-Host ('Systemgebietsschema: ' + (Get-WinSystemLocale).Name)
+    Get-WinUserLanguageList | Format-Table LanguageTag, @{ Name = 'Tastatur'; Expression = { $_.InputMethodTips -join ', ' } } -AutoSize
+  cmd: |
+    reg query "HKCU\Control Panel\International" /v LocaleName
+    reg query "HKCU\Keyboard Layout\Preload"
+  bash: |
+    locale
+    if command -v localectl >/dev/null 2>&1; then localectl status; fi
+  zsh: |
+    printf 'Region:  %s\n' "$(defaults read -g AppleLocale 2>/dev/null || printf '%s' '?')"
+    printf 'Sprachen:\n'
+    defaults read -g AppleLanguages 2>/dev/null || true

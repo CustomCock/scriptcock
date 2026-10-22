@@ -1,0 +1,23 @@
+id: angemeldete_benutzer
+version: 1
+name: Angemeldete Benutzer
+kategorie: Inventar
+beschreibung: Zeigt, wer gerade am Rechner angemeldet ist (lokal und per Remotedesktop/SSH).
+risiko: gruen
+fortschritt: Angemeldete Benutzer werden ermittelt
+ziele:
+  powershell: |
+    Write-Host ('Konsole: ' + (Get-CimInstance -ClassName Win32_ComputerSystem).UserName)
+    if (Get-Command quser.exe -ErrorAction SilentlyContinue) {
+        quser.exe 2>$null
+        $global:LASTEXITCODE = 0
+    } else {
+        Write-Host 'quser ist auf dieser Windows-Edition nicht verfügbar.'
+    }
+  cmd: |
+    query user
+    cmd /c exit 0
+  bash: |
+    who
+  zsh: |
+    who

@@ -37,11 +37,15 @@ try {
     . {
         $okmOs = Get-CimInstance -ClassName Win32_OperatingSystem
         $okmCs = Get-CimInstance -ClassName Win32_ComputerSystem
+        $okmCpu = Get-CimInstance -ClassName Win32_Processor | Select-Object -First 1
         $okmLaufzeit = (Get-Date) - $okmOs.LastBootUpTime
         [PSCustomObject]@{
             Rechnername       = $env:COMPUTERNAME
             Betriebssystem    = $okmOs.Caption
             Version           = $okmOs.Version
+            Build             = $okmOs.BuildNumber
+            Prozessor         = $okmCpu.Name.Trim()
+            'Kerne/Threads'   = '{0}/{1}' -f $okmCpu.NumberOfCores, $okmCpu.NumberOfLogicalProcessors
             'RAM gesamt (GB)' = [math]::Round($okmCs.TotalPhysicalMemory / 1GB, 1)
             'RAM frei (GB)'   = [math]::Round($okmOs.FreePhysicalMemory / 1MB, 1)
             Laufzeit          = '{0} Tage {1} Std. {2} Min.' -f $okmLaufzeit.Days, $okmLaufzeit.Hours, $okmLaufzeit.Minutes

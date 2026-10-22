@@ -1,0 +1,21 @@
+id: papierkorb_leeren
+version: 1
+name: Papierkorb leeren
+kategorie: Speicher
+beschreibung: Leert den Papierkorb des angemeldeten Benutzers endgültig.
+hilfe: |
+  macOS fragt beim ersten Mal, ob das Terminal den Finder steuern darf.
+risiko: rot
+fortschritt: Papierkorb wird geleert
+ziele:
+  powershell: |
+    Clear-RecycleBin -Force -ErrorAction SilentlyContinue{{ whatif }}
+    Write-Host 'Papierkorb geleert.'
+  bash: |
+    if [ -d "$HOME/.local/share/Trash" ]; then
+      find "$HOME/.local/share/Trash" -mindepth 2 -delete 2>/dev/null || true
+    fi
+    printf '%s\n' 'Papierkorb geleert.'
+  zsh: |
+    osascript -e 'tell application "Finder" to empty trash'
+    printf '%s\n' 'Papierkorb geleert.'

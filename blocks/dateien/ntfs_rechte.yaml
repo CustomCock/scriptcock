@@ -1,0 +1,19 @@
+id: ntfs_rechte
+version: 1
+name: Ordnerrechte (NTFS) anzeigen
+kategorie: Dateien
+beschreibung: Zeigt, welche Benutzer und Gruppen welche Rechte auf einem Ordner haben.
+risiko: gruen
+fortschritt: "Rechte von {{ pfad }} werden gelesen"
+parameter:
+  - id: pfad
+    label: Ordner
+    typ: pfad_windows
+    beispiel: D:\Daten\Buchhaltung
+ziele:
+  powershell: |
+    $okmAcl = Get-Acl -LiteralPath {{ pfad }}
+    Write-Host ('Besitzer: ' + $okmAcl.Owner)
+    $okmAcl.Access | Format-Table IdentityReference, FileSystemRights, AccessControlType, IsInherited -AutoSize -Wrap
+  cmd: |
+    icacls {{ pfad }}

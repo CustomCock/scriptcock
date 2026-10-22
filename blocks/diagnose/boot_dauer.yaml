@@ -1,0 +1,23 @@
+id: boot_dauer
+version: 1
+name: Startdauer analysieren
+kategorie: Diagnose
+beschreibung: Zeigt, wie lange die letzten Systemstarts gedauert haben und welche Dienste bzw. Programme bremsen.
+risiko: gruen
+admin_noetig:
+  powershell: true
+fortschritt: Startdauer wird ausgewertet
+ziele:
+  powershell: |
+    $okmStarts = Get-WinEvent -FilterHashtable @{ LogName = 'Microsoft-Windows-Diagnostics-Performance/Operational'; Id = 100 } -MaxEvents 5 -ErrorAction SilentlyContinue
+    if ($okmStarts) {
+        $okmStarts | Format-Table TimeCreated, @{ Name = 'Startdauer (s)'; Expression = { [math]::Round([int64]$_.Properties[5].Value / 1000) } } -AutoSize
+    } else {
+        Write-Host 'Keine Startzeit-Messungen im Protokoll gefunden.'
+    }
+    $okmBremsen = Get-WinEvent -FilterHashtable @{ LogName = 'Microsoft-Windows-Diagnostics-Performance/Operational'; Id = 101, 102, 103 } -MaxEvents 15 -ErrorAction SilentlyContinue
+    if ($okmBremsen) { Write-Host 'Langsame Programme/Treiber beim Start:'; $okmBremsen | Format-Table TimeCreated, Message -AutoSize -Wrap }
+  bash: |
+    systemd-analyze
+    printf '\n%s\n' 'Langsamste Dienste:'
+    systemd-analyze blame --no-pager | awk 'NR <= 15'

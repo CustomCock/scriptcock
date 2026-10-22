@@ -1,0 +1,14 @@
+id: winget_upgrade_alle
+version: 1
+name: Alle Programme aktualisieren (winget)
+kategorie: Software
+beschreibung: Aktualisiert alle Programme, für die winget eine neuere Version kennt.
+hilfe: |
+  Laufende Programme sollten vorher geschlossen werden. Einige Programme fragen nach Administratorrechten.
+risiko: gelb
+fortschritt: Programme werden aktualisiert
+ziele:
+  powershell: |
+    winget.exe upgrade --all --silent --accept-source-agreements --accept-package-agreements
+  cmd: |
+    winget upgrade --all --silent --accept-source-agreements --accept-package-agreements

@@ -1,0 +1,16 @@
+id: geraete_fehler
+version: 1
+name: Geräte mit Fehlern
+kategorie: Inventar
+beschreibung: Zeigt Geräte, die im Geräte-Manager mit einem Fehler (gelbes Ausrufezeichen) markiert sind.
+risiko: gruen
+fortschritt: Geräte-Manager wird geprüft
+ziele:
+  powershell: |
+    $okmFehler = Get-CimInstance -ClassName Win32_PnPEntity | Where-Object { $_.ConfigManagerErrorCode -ne 0 }
+    if ($okmFehler) {
+        $okmFehler | Format-Table Name, @{ Name = 'Fehlercode'; Expression = { $_.ConfigManagerErrorCode } }, PNPDeviceID -AutoSize -Wrap
+        Write-Host 'Fehlercode 28 = kein Treiber, 22 = deaktiviert, 10 = Gerät kann nicht gestartet werden.'
+    } else {
+        Write-Host 'Keine Geräte mit Fehlern gefunden.' -ForegroundColor Green
+    }

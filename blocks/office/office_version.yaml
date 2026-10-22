@@ -1,0 +1,30 @@
+id: office_version
+version: 1
+name: Office-Version und Updatekanal
+kategorie: Office
+beschreibung: Zeigt Version, Architektur und Updatekanal von Microsoft 365 / Office (Klick-und-Los).
+risiko: gruen
+fortschritt: Office-Version wird gelesen
+ziele:
+  powershell: |
+    $okmC2r = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration' -ErrorAction SilentlyContinue
+    if (-not $okmC2r) { throw 'Kein Klick-und-Los-Office gefunden.' }
+    $okmKanalUrl = if ($okmC2r.UpdateChannel) { $okmC2r.UpdateChannel } else { $okmC2r.CDNBaseUrl }
+    $okmKanaele = @{
+        '492350f6-3a01-4f97-b9c0-c7c6ddf67d60' = 'Aktueller Kanal'
+        '64256afe-f5d9-4f86-8936-8840a6a4f5be' = 'Aktueller Kanal (Vorschau)'
+        '55336b82-a18d-4dd6-b5f6-9e5095c314a6' = 'Monatlicher Enterprise-Kanal'
+        '7ffbc6bf-bc32-4f92-8982-f9dd17fd3114' = 'Halbjährlicher Enterprise-Kanal'
+        'b8f9b850-328d-4355-9145-c59439a0c4cf' = 'Halbjährlicher Enterprise-Kanal (Vorschau)'
+        '5440fd1f-7ecb-4221-8110-145efaa6372f' = 'Beta-Kanal'
+    }
+    $okmKanal = 'unbekannt'
+    foreach ($okmGuid in $okmKanaele.Keys) { if ($okmKanalUrl -like ('*' + $okmGuid + '*')) { $okmKanal = $okmKanaele[$okmGuid] } }
+    Write-Host ('Version:      ' + $okmC2r.VersionToReport)
+    Write-Host ('Architektur:  ' + $okmC2r.Platform)
+    Write-Host ('Produkte:     ' + $okmC2r.ProductReleaseIds)
+    Write-Host ('Updatekanal:  ' + $okmKanal)
+  cmd: |
+    reg query "HKLM\SOFTWARE\Microsoft\Office\ClickToRun\Configuration" /v VersionToReport
+    reg query "HKLM\SOFTWARE\Microsoft\Office\ClickToRun\Configuration" /v Platform
+    reg query "HKLM\SOFTWARE\Microsoft\Office\ClickToRun\Configuration" /v CDNBaseUrl

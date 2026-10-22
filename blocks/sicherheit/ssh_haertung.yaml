@@ -1,0 +1,17 @@
+id: ssh_haertung
+version: 1
+name: "Linux: SSH-Konfiguration prüfen"
+kategorie: Sicherheit
+beschreibung: Zeigt die wichtigsten Sicherheitseinstellungen des SSH-Servers (Root-Login, Passwort-Anmeldung, Port).
+hilfe: |
+  Empfohlen: PermitRootLogin no (oder prohibit-password), PasswordAuthentication no, wenn Schlüssel verwendet werden.
+risiko: gruen
+admin_noetig: true
+fortschritt: SSH-Konfiguration wird gelesen
+ziele:
+  bash: |
+    if ! command -v sshd >/dev/null 2>&1; then
+      printf '%s\n' 'Kein SSH-Server installiert.'
+    else
+      sshd -T 2>/dev/null | grep -Ei '^(port|permitrootlogin|passwordauthentication|pubkeyauthentication|permitemptypasswords|x11forwarding|maxauthtries) ' || true
+    fi

@@ -1,0 +1,28 @@
+id: server_gesundheitscheck
+name: Server-Gesundheitscheck
+kategorie: Server
+beschreibung: Überblick über Laufzeit, Speicherplatz, Dienste, Fehler im Ereignisprotokoll bzw. Journal, RAID und Updates.
+hilfe: Das Script ändert nichts am Server.
+schlagworte: [server, gesundheit, check, monitoring, linux, windows server, raid, dienste]
+schritte:
+  - block: systeminfo
+    nur_fuer: [powershell]
+  - block: uptime_neustart
+    nur_fuer: [powershell]
+  - block: festplattenbelegung
+    nur_fuer: [powershell]
+  - block: gestoppte_autodienste
+    nur_fuer: [powershell]
+  - block: ereignisanzeige_fehler
+    parameter: {anzahl: 30}
+    nur_fuer: [powershell]
+  - block: linux_gesundheitscheck
+    nur_fuer: [bash]
+  - block: fehlgeschlagene_units
+    nur_fuer: [bash]
+  - block: raid_status
+    nur_fuer: [bash]
+  - block: kernel_fehler
+    nur_fuer: [bash]
+  - block: update_status
+    nur_fuer: [powershell, bash]

@@ -1,0 +1,24 @@
+id: virenschutz_status
+version: 1
+name: Virenschutz-Status
+kategorie: Sicherheit
+beschreibung: Zeigt, welcher Virenschutz installiert ist, ob er aktiv ist und ob die Signaturen aktuell sind.
+hilfe: |
+  Liest das Windows-Sicherheitscenter – funktioniert auch für Fremdprodukte (z. B. ESET). Auf Windows Server
+  gibt es das Sicherheitscenter nicht; dort wird nur der Defender-Status angezeigt.
+risiko: gruen
+fortschritt: Virenschutz-Status wird gelesen
+ziele:
+  powershell: |
+    $okmProdukte = Get-CimInstance -Namespace 'root\SecurityCenter2' -ClassName AntiVirusProduct -ErrorAction SilentlyContinue
+    foreach ($okmProdukt in $okmProdukte) {
+        $okmHex = '{0:x6}' -f [int]$okmProdukt.productState
+        $okmAktiv = $okmHex.Substring(2, 2) -in @('10', '11')
+        $okmAktuell = $okmHex.Substring(4, 2) -eq '00'
+        Write-Host ($okmProdukt.displayName + ': ' + $(if ($okmAktiv) { 'aktiv' } else { 'NICHT aktiv' }) + ', Signaturen ' + $(if ($okmAktuell) { 'aktuell' } else { 'VERALTET' })) -ForegroundColor $(if ($okmAktiv -and $okmAktuell) { 'Green' } else { 'Red' })
+    }
+    if (-not $okmProdukte) { Write-Host 'Kein Eintrag im Sicherheitscenter (Server oder kein Virenschutz).' -ForegroundColor Yellow }
+    $okmDefender = Get-MpComputerStatus -ErrorAction SilentlyContinue
+    if ($okmDefender) {
+        $okmDefender | Format-List AMRunningMode, AntivirusEnabled, RealTimeProtectionEnabled, AntivirusSignatureLastUpdated, QuickScanEndTime
+    }

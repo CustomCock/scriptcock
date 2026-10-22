@@ -1,0 +1,18 @@
+id: profilgroessen
+version: 1
+name: Größe der Benutzerprofile
+kategorie: Benutzer
+beschreibung: Zeigt, wie viel Platz jedes Benutzerprofil auf diesem Rechner belegt.
+risiko: gruen
+admin_noetig: true
+fortschritt: Profilgrößen werden berechnet (kann dauern)
+ziele:
+  powershell: |
+    Get-CimInstance -ClassName Win32_UserProfile | Where-Object { -not $_.Special } | ForEach-Object {
+        $okmGroesse = (Get-ChildItem -LiteralPath $_.LocalPath -Recurse -Force -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+        [pscustomobject]@{ Profil = $_.LocalPath; 'Größe (GB)' = [math]::Round($okmGroesse / 1GB, 1); 'Zuletzt benutzt' = $_.LastUseTime }
+    } | Sort-Object 'Größe (GB)' -Descending | Format-Table -AutoSize
+  bash: |
+    du -sh /home/* 2>/dev/null | sort -rh || true
+  zsh: |
+    du -sh /Users/* 2>/dev/null | sort -rh || true

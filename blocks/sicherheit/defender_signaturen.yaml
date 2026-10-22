@@ -1,0 +1,14 @@
+id: defender_signaturen
+version: 1
+name: Defender-Signaturen aktualisieren
+kategorie: Sicherheit
+beschreibung: Lädt die neuesten Virensignaturen für Microsoft Defender herunter.
+risiko: gelb
+admin_noetig: true
+fortschritt: Defender-Signaturen werden aktualisiert
+ziele:
+  powershell: |
+    Update-MpSignature
+    Get-MpComputerStatus | Format-List AntivirusSignatureVersion, AntivirusSignatureLastUpdated
+  cmd: |
+    "%ProgramFiles%\Windows Defender\MpCmdRun.exe" -SignatureUpdate

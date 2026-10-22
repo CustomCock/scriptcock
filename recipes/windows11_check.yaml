@@ -1,0 +1,8 @@
+id: windows11_check
+name: Windows-11-Tauglichkeit prüfen
+kategorie: Inventar
+beschreibung: Prüft TPM, Secure Boot, Prozessor, Arbeitsspeicher und Speicherplatz auf die Windows-11-Anforderungen.
+schlagworte: [windows 11, upgrade, tpm, secure boot, kompatibel]
+schritte:
+  - block: windows11_check
+  - block: windows_version

@@ -1,0 +1,15 @@
+id: winsxs_bereinigen
+version: 1
+name: Komponentenspeicher (WinSxS) bereinigen
+kategorie: Speicher
+beschreibung: Entfernt veraltete Update-Komponenten aus dem Windows-Komponentenspeicher und schafft Platz.
+hilfe: |
+  Danach lassen sich bereits installierte Updates nicht mehr deinstallieren. Dauert einige Minuten.
+risiko: gelb
+admin_noetig: true
+fortschritt: Komponentenspeicher wird bereinigt
+ziele:
+  powershell: |
+    DISM.exe /Online /Cleanup-Image /StartComponentCleanup
+  cmd: |
+    DISM /Online /Cleanup-Image /StartComponentCleanup

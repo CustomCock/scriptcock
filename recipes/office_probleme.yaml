@@ -1,0 +1,9 @@
+id: office_probleme
+name: Office-Probleme eingrenzen
+kategorie: Office
+beschreibung: Zeigt Office-Version und Updatekanal sowie den Anmeldestatus des Geräts (Entra ID) – die häufigsten Ursachen für Office- und Teams-Probleme.
+hilfe: Das Script ändert nichts. Bei Problemen mit Outlook danach „Outlook im abgesicherten Modus starten“ im Baukasten ausprobieren.
+schlagworte: [office, outlook, word, excel, teams, anmeldung, lizenz, microsoft 365]
+schritte:
+  - block: office_version
+  - block: dsregcmd_status

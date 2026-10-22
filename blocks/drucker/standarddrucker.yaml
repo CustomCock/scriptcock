@@ -1,0 +1,27 @@
+id: standarddrucker
+version: 1
+name: Standarddrucker setzen
+kategorie: Drucker
+beschreibung: Legt fest, auf welchem Drucker standardmäßig gedruckt wird.
+hilfe: |
+  Den genauen Namen zeigt der Baustein „Installierte Drucker auflisten“.
+  Windows 10/11: Ist „Windows verwaltet Standarddrucker“ aktiv, kann Windows die Auswahl später wieder ändern.
+risiko: gelb
+fortschritt: "Standarddrucker wird auf {{ name }} gesetzt"
+parameter:
+  - id: name
+    label: Druckername
+    typ: text_kurz
+    beispiel: Drucker-Empfang
+ziele:
+  powershell: |
+    $okmDrucker = Get-CimInstance -ClassName Win32_Printer | Where-Object { $_.Name -eq {{ name }} }
+    if (-not $okmDrucker) { throw 'Drucker nicht gefunden.' }
+    Invoke-CimMethod -InputObject $okmDrucker -MethodName SetDefaultPrinter | Out-Null
+    Write-Host 'Standarddrucker gesetzt.'
+  cmd: |
+    rundll32 printui.dll,PrintUIEntry /y /n {{ name }}
+  bash: |
+    lpoptions -d {{ name }}
+  zsh: |
+    lpoptions -d {{ name }}

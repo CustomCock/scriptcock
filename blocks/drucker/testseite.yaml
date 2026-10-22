@@ -1,0 +1,24 @@
+id: testseite
+version: 1
+name: Testseite drucken
+kategorie: Drucker
+beschreibung: Druckt eine Testseite auf dem angegebenen Drucker.
+risiko: gelb
+fortschritt: "Testseite wird auf {{ name }} gedruckt"
+parameter:
+  - id: name
+    label: Druckername
+    typ: text_kurz
+    beispiel: Drucker-Empfang
+ziele:
+  powershell: |
+    $okmDrucker = Get-CimInstance -ClassName Win32_Printer | Where-Object { $_.Name -eq {{ name }} }
+    if (-not $okmDrucker) { throw 'Drucker nicht gefunden.' }
+    Invoke-CimMethod -InputObject $okmDrucker -MethodName PrintTestPage | Out-Null
+    Write-Host 'Testseite gesendet.'
+  cmd: |
+    rundll32 printui.dll,PrintUIEntry /k /n {{ name }}
+  bash: |
+    lp -d {{ name }} /usr/share/cups/data/testprint
+  zsh: |
+    lp -d {{ name }} /usr/share/cups/data/testprint
