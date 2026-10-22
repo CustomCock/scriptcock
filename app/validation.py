@@ -56,7 +56,7 @@ _TEXT_SONDER = set(".,:;!?-_()/+#'@=* ")
 _HOST_LABEL = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
 _DIENST = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.@\-]{0,254}$")
 _PROZESS = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_. \-]{0,63}$")
-_PAKET = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.+\-@/]{0,127}$")
+_PAKET = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+@-]{0,127}$")
 _DRUCKER = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\-]{0,62}$")
 _BENUTZER = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\-]{0,19}$")
 _WIN_PFAD = re.compile(r"^[A-Za-z]:\\")
@@ -315,7 +315,7 @@ _TEXT_PRUEFER: dict[ParamTyp, Any] = {
     ParamTyp.PROZESSNAME: _prozessname,
     ParamTyp.PAKETNAME: _regex_typ(
         _PAKET,
-        "Das ist kein gültiger Paketname. Erlaubt sind Buchstaben, Ziffern und _ . + - @ /, "
+        "Das ist kein gültiger Paketname. Erlaubt sind Buchstaben, Ziffern und _ . + - @, "
         "z. B. Mozilla.Firefox oder firefox",
     ),
     ParamTyp.DRUCKERNAME: _regex_typ(

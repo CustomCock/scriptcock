@@ -33,7 +33,7 @@ echo([1/1] Mozilla.Firefox wird installiert ...
 >>"%OKM_LOG%" echo([1/1] Mozilla.Firefox wird installiert ...
 (call )
 (
-winget install --id "Mozilla.Firefox" --exact --silent --accept-source-agreements --accept-package-agreements
+winget install --id "Mozilla.Firefox" -e --source winget --silent --accept-package-agreements --accept-source-agreements
 ) >"%OKM_TMP%" 2>&1
 if errorlevel 1 (set "OKM_RC=1") else if not errorlevel 0 (set "OKM_RC=1") else (set "OKM_RC=0")
 type "%OKM_TMP%"

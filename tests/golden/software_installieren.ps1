@@ -33,7 +33,7 @@ Write-Host '[1/1] Mozilla.Firefox wird installiert …'
 try {
     $global:LASTEXITCODE = 0
     . {
-        winget.exe install --id 'Mozilla.Firefox' --exact --silent --accept-source-agreements --accept-package-agreements
+        winget.exe install --id 'Mozilla.Firefox' -e --source winget --silent --accept-package-agreements --accept-source-agreements
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
     $OkmErfolgreich++

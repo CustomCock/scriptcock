@@ -1,0 +1,42 @@
+{# Software-Katalog – als ausklappbares Panel (Baukasten/Rezept) oder als ganze Seite.
+   erwartet: katalog_modus ("seite" | "baukasten" | "rezept"), optional katalog_ziel (Ziel).
+   Die Einträge baut static/js/software-katalog.js aus dem eingebetteten JSON. #}
+{% import "_icons.html" as i %}
+{% set seite = katalog_modus == "seite" %}
+<section id="software-katalog" class="katalog{% if not seite %} katalog-panel{% endif %}" data-modus="{{ katalog_modus }}"
+         {% if katalog_ziel %}data-ziel="{{ katalog_ziel.value }}"{% endif %} aria-labelledby="katalog-titel"{% if not seite %} hidden{% endif %}>
+  {% if seite %}
+  <h2 id="katalog-titel" class="sr-only">Software-Katalog</h2>
+  {% else %}
+  <div class="katalog-kopf">
+    <h2 id="katalog-titel">{{ i.icon("software") }} Software-Katalog</h2>
+    <button type="button" class="knopf-klein" data-katalog-schliessen aria-label="Software-Katalog schließen" title="Schließen (Esc)">✕</button>
+  </div>
+  {% endif %}
+  <label class="sr-only" for="katalog-suche">Software suchen</label>
+  <input id="katalog-suche" class="katalog-suche" type="search" placeholder="Software suchen … (z. B. pdf, vpn, firefox)"
+         autocomplete="off" spellcheck="false" aria-controls="katalog-liste" aria-describedby="katalog-tasten">
+  <div class="katalog-plattform" role="group" aria-label="Plattform">
+    {% for wert, text in [("windows", "Windows"), ("macos", "macOS"), ("linux", "Linux"), ("alle", "Alle")] %}
+    <button type="button" class="katalog-schalter" data-plattform="{{ wert }}" aria-pressed="false">{{ text }}</button>
+    {% endfor %}
+  </div>
+  <details class="katalog-kategorien"{% if seite %} open{% endif %}>
+    <summary>Kategorien <span data-kategorien-anzahl></span></summary>
+    <div class="katalog-chips" role="group" aria-label="Kategorien">
+      {% for k in katalog.kategorien() %}<button type="button" class="chip" data-kategorie="{{ k }}" aria-pressed="false">{{ k }}</button>{% endfor %}
+    </div>
+  </details>
+  <div class="katalog-status">
+    <span id="katalog-anzahl" aria-live="polite"></span>
+    {% if katalog_modus == "baukasten" %}
+    <button type="button" class="knopf" data-katalog-auswahl disabled>{{ i.icon("plus") }} <span>Ausgewählte installieren (<span data-anzahl>0</span>)</span></button>
+    {% endif %}
+  </div>
+  <p id="katalog-tasten" class="katalog-tasten"><kbd>/</kbd> suchen · <kbd>↑</kbd> <kbd>↓</kbd> auswählen · <kbd>Enter</kbd> ID kopieren · <kbd>Esc</kbd> leeren</p>
+  <ul id="katalog-liste" class="katalog-liste"></ul>
+  <p class="katalog-leer" hidden>Nichts gefunden. Versuch einen allgemeineren Begriff wie ‚pdf‘ oder ‚backup‘.</p>
+  <p class="katalog-fuss">IDs geprüft am {{ katalog.geprueft_am.strftime("%d.%m.%Y") }}{% if not seite %} · <a href="{{ basis }}/software" target="_blank" rel="noopener">als eigene Seite öffnen</a>{% endif %}</p>
+  <div id="katalog-meldung" class="sr-only" aria-live="polite"></div>
+  <script type="application/json" id="software-katalog-daten">{{ katalog_daten | tojson }}</script>
+</section>

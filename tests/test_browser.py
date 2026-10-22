@@ -173,3 +173,94 @@ def test_blockly_im_browser(server: str, browser) -> None:
     seite.locator("#bl-ergebnis a.knopf-primaer").wait_for(timeout=5000)
     assert seite.get_attribute("#bl-ergebnis a.knopf-primaer", "href").endswith("/download")
     assert js_fehler == []
+
+
+def test_software_katalog_im_browser(server: str, browser) -> None:
+    """Suche, Kopieren (Clipboard-API und Fallback), „＋“, Mehrfachauswahl, Feld befüllen, Zielwechsel."""
+    kontext = browser.new_context(viewport={"width": 1400, "height": 950})
+    kontext.grant_permissions(["clipboard-read", "clipboard-write"])
+    seite = kontext.new_page()
+    js_fehler: list[str] = []
+    seite.on("pageerror", lambda e: js_fehler.append(str(e)))
+
+    # Eigene Seite: Suche + Kopieren über die Clipboard-API
+    seite.goto(f"{server}/software")
+    seite.locator("#katalog-anzahl", has_text="259 Treffer").wait_for()
+    seite.fill("#katalog-suche", "Mozilla.Fire")
+    seite.locator("#katalog-anzahl", has_text="2 Treffer").wait_for()
+    assert seite.locator(".katalog-name").all_text_contents() == ["Mozilla Firefox", "Mozilla Firefox ESR"]
+    seite.fill("#katalog-suche", "7zip")
+    seite.locator(".katalog-eintrag:first-child .katalog-name", has_text="7-Zip").wait_for()
+    assert seite.locator(".katalog-eintrag").first.locator("mark").count() >= 1
+    seite.click("[data-plattform=windows]")
+    knopf = seite.locator(".katalog-eintrag").first.locator(".katalog-id .knopf-klein").first
+    knopf.click()
+    seite.locator(".katalog-eintrag .kopiert", has_text="✓ Kopiert").wait_for()
+    assert seite.evaluate("navigator.clipboard.readText()") == "7zip.7zip"
+    seite.fill("#katalog-suche", "gibtesnichtxyz")
+    seite.locator(".katalog-leer:not([hidden])").wait_for()
+
+    # Fallback ohne sicheren Kontext (Intranet per HTTP/IP): execCommand('copy')
+    seite.add_init_script("Object.defineProperty(window, 'isSecureContext', { value: false });")
+    seite.goto(f"{server}/software")
+    seite.fill("#katalog-suche", "vlc")
+    seite.click("[data-plattform=linux]")
+    seite.locator(".katalog-eintrag:first-child .katalog-name", has_text="VLC").wait_for()
+    seite.locator(".katalog-eintrag").first.locator(".katalog-id .knopf-klein").first.click()
+    seite.locator(".katalog-eintrag .kopiert").wait_for()
+    assert seite.evaluate("navigator.clipboard.readText()") == "vlc"
+
+    # Baukasten: "/" öffnet das Panel, Plattform folgt dem Zielsystem
+    seite = kontext.new_page()
+    seite.goto(f"{server}/baukasten?ziel=bash")
+    seite.keyboard.press("/")
+    seite.locator("#software-katalog:not([hidden])").wait_for()
+    assert seite.get_attribute("[data-plattform=linux]", "aria-pressed") == "true"
+    seite.keyboard.type("vlc")
+    seite.locator(".katalog-eintrag:first-child .katalog-name", has_text="VLC").wait_for()
+    seite.locator(".katalog-eintrag").first.locator(".knopf-uebernehmen").last.click()  # flatpak
+    schritt = seite.locator("#schrittliste li.schritt[data-block=paket_installieren]").first
+    schritt.wait_for()
+    assert schritt.locator("input[data-typ=paketname]").input_value() == "org.videolan.VLC"
+    seite.locator(
+        "#bk-vorschau code", has_text="flatpak install -y --noninteractive flathub 'org.videolan.VLC'"
+    ).wait_for(timeout=5000)
+
+    # Mehrfachauswahl → mehrere Schritte in Reihenfolge
+    seite.fill("#katalog-suche", "gimp")
+    seite.locator(".katalog-eintrag:first-child .katalog-name", has_text="GIMP").wait_for()
+    seite.locator(".katalog-auswahl").first.check()
+    seite.fill("#katalog-suche", "7zip")
+    seite.locator(".katalog-eintrag:first-child .katalog-name", has_text="7-Zip").wait_for()
+    seite.locator(".katalog-auswahl").first.check()
+    seite.locator("[data-katalog-auswahl]", has_text="(2)").click()
+    seite.locator("#schrittliste li.schritt").nth(2).wait_for(timeout=5000)
+    felder = seite.locator("#schrittliste input[data-typ=paketname]")
+    assert [felder.nth(i).input_value() for i in range(3)][1:] == ["gimp", "7zip"]
+
+    # Fokussiertes Paketfeld wird befüllt statt einen Schritt anzuhängen
+    felder.nth(1).focus()
+    seite.fill("#katalog-suche", "inkscape")
+    seite.locator(".katalog-eintrag:first-child .katalog-name", has_text="Inkscape").wait_for()
+    seite.locator(".katalog-eintrag").first.locator(".knopf-uebernehmen").first.click()
+    assert felder.nth(1).input_value() == "inkscape"
+    assert seite.locator("#schrittliste li.schritt").count() == 3
+
+    # Zielwechsel → Plattform zieht mit, Windows-Tools fehlen unter macOS
+    seite.keyboard.press("Escape")
+    seite.click("label.ziel-option:has(input[value=zsh])")
+    seite.click("[data-katalog-oeffnen]")
+    assert seite.get_attribute("[data-plattform=macos]", "aria-pressed") == "true"
+    seite.fill("#katalog-suche", "sysinternals")
+    seite.locator(".katalog-leer:not([hidden])").wait_for()
+
+    # Rezept: Feld „Paketname“ und Paketmanager werden gesetzt
+    seite.goto(f"{server}/rezepte/software_installieren?ziel=zsh")
+    seite.click("[data-katalog-oeffnen]")
+    seite.fill("#katalog-suche", "firefox esr")
+    seite.locator(".katalog-eintrag:first-child .katalog-name", has_text="Firefox ESR").wait_for()
+    seite.locator(".katalog-eintrag").first.locator(".knopf-uebernehmen").first.click()
+    assert seite.input_value("input[name='f.paket']") == "firefox@esr"
+    assert seite.input_value("select[name='f.paketmanager']") == "brew_cask"
+    assert js_fehler == []
+    kontext.close()

@@ -29,6 +29,7 @@ from app.validation import FehlerSammlung, Feldfehler
 
 router = APIRouter()
 
+MAX_VORBELEGUNG = 300
 ZIEL_KURZ = {Ziel.POWERSHELL: "PowerShell", Ziel.CMD: "CMD", Ziel.BASH: "Linux", Ziel.ZSH: "macOS"}
 
 
@@ -125,7 +126,14 @@ async def neuer_schritt(
         raise HTTPException(400, "Ungültiges Zielsystem") from None
     if b is None:
         raise HTTPException(404, "Unbekannter Baustein")
-    return _render(request, "_bk_schritt.html", benutzer, **_schritt_kontext(reg, b, z, neue_uid(), {}))
+    # Vorbelegte Werte (p.<parameter>=…), z. B. aus dem Software-Katalog. Sie landen nur als
+    # Formularwerte im HTML und werden wie jede Eingabe erst beim Erzeugen geprüft.
+    werte = {
+        k[2:]: v[:MAX_VORBELEGUNG]
+        for k, v in request.query_params.items()
+        if k.startswith("p.") and b.param(k[2:]) is not None
+    }
+    return _render(request, "_bk_schritt.html", benutzer, **_schritt_kontext(reg, b, z, neue_uid(), werte))
 
 
 @router.post("/baukasten/liste", response_class=HTMLResponse)

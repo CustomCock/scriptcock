@@ -113,7 +113,7 @@ Weitere Regeln, die beim Start geprüft werden:
 | `laufwerksbuchstabe` | ein Buchstabe, wird zu `Z:` | `Z` |
 | `dienstname` | Buchstaben, Ziffern, `_ . @ -` | `Spooler`, `cups` |
 | `prozessname` | Buchstaben, Ziffern, Leerzeichen, `_ . -`; `.exe` wird entfernt | `notepad` |
-| `paketname` | Buchstaben, Ziffern, `_ . + - @ /` | `Mozilla.Firefox` |
+| `paketname` | Buchstaben, Ziffern, `_ . + - @` (max. 128) | `Mozilla.Firefox` |
 | `druckername` | Buchstaben, Ziffern, `_ . -` (keine Leerzeichen) | `Drucker-Empfang` |
 | `benutzername` | Buchstaben, Ziffern, `_ . -` (max. 20) | `max.mustermann` |
 | `url` | nur `http://` und `https://` | `https://intranet.okm.local` |

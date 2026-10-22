@@ -19,7 +19,7 @@
       value="{{ aktuell if aktuell is not none else '' }}" placeholder="{{ f.beispiel if f.beispiel is not none else '' }}"
       {% if f.pflicht %}required{% endif %} {{ pruefen|safe }} aria-describedby="status-{{ dom }} hilfe-{{ dom }}">
   {% else %}
-    <input id="f-{{ dom }}" name="{{ name }}" type="text" autocomplete="off" spellcheck="false"
+    <input id="f-{{ dom }}" name="{{ name }}" type="text" autocomplete="off" spellcheck="false" data-typ="{{ f.typ.value }}"
       value="{{ aktuell if aktuell is not none else '' }}" placeholder="{{ 'z. B. ' ~ f.beispiel if f.beispiel is not none else '' }}"
       {% if f.pflicht %}required{% endif %} {{ pruefen|safe }} aria-describedby="status-{{ dom }} hilfe-{{ dom }}">
   {% endif %}

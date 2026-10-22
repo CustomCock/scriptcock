@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block titel %}Software-Katalog{% endblock %}
+{% block breit %} inhalt-breit{% endblock %}
+{% block inhalt %}
+<div class="seitenkopf">
+  <div>
+    <h1>Software-Katalog</h1>
+    <p class="untertitel">Paket-IDs für winget, Homebrew, apt und Flatpak nachschlagen und kopieren. Ins Script übernehmen geht im
+      <a href="{{ basis }}/baukasten">Baukasten</a> über den Knopf „Software-Katalog“.</p>
+  </div>
+</div>
+{% with katalog_modus="seite", katalog_ziel=none %}{% include "_katalog.html" %}{% endwith %}
+{% endblock %}

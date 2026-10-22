@@ -59,6 +59,22 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 - Der Browser-Test (`tests/test_browser.py`) läuft in der CI nicht, weil Playwright keine
   Projektabhängigkeit ist.
 
+## Software-Katalog
+
+- Kopieren ist automatisch in Chromium getestet (Clipboard-API und Fallback). In **Edge und
+  Firefox** über HTTPS **und** reines HTTP noch einmal von Hand prüfen.
+- Die Spec verweist bei fehlendem Homebrew auf eine Vorlage „Homebrew installieren“ – die gibt
+  es noch nicht (der Installer lädt ein Script aus dem Internet und ist interaktiv). Bis dahin
+  meldet der Baustein „bitte an die IT wenden“.
+- Im **Blockly-Modus** gibt es kein Katalog-Panel; dort die ID über die Seite „Software“ kopieren.
+- Die Auswahlliste „Paketmanager“ zeigt unter Linux/macOS alle Werte. Ein unpassender Wert
+  (z. B. `brew_cask` unter Linux) erzeugt eine klare Fehlermeldung im Script statt eines
+  falschen Befehls; unter Windows wird das Feld ausgeblendet (immer winget).
+- „＋“ füllt das zuletzt fokussierte Paketfeld. Safari fokussiert Knöpfe beim Klicken nicht – das
+  Verhalten dort einmal prüfen.
+- Gemerkte Plattform: Im Baukasten/Rezept gewinnt immer das Zielsystem; die gemerkte Wahl gilt
+  nur auf der Seite „Software“.
+
 ## Bibliothek & Verwaltung
 
 - Freigegebene DB-Rezepte liegen im Speicher der Registry. Mit mehreren uvicorn-Workern

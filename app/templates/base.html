@@ -1,6 +1,6 @@
 {%- import "_icons.html" as i -%}
 {%- set pfad = request.url.path[basis | length:] or "/" -%}
-{%- set aktiv = "start" if pfad == "/" else ("rezepte" if pfad.startswith("/rezepte") else ("baukasten" if pfad.startswith("/baukasten") else ("blockly" if pfad.startswith("/blockly") else ("bibliothek" if pfad.startswith("/bibliothek") or pfad.startswith("/skripte") else ("verwaltung" if pfad.startswith("/verwaltung") else ""))))) -%}
+{%- set aktiv = "start" if pfad == "/" else ("rezepte" if pfad.startswith("/rezepte") else ("baukasten" if pfad.startswith("/baukasten") else ("blockly" if pfad.startswith("/blockly") else ("bibliothek" if pfad.startswith("/bibliothek") or pfad.startswith("/skripte") else ("verwaltung" if pfad.startswith("/verwaltung") else ("software" if pfad.startswith("/software") else "")))))) -%}
 <!doctype html>
 <html lang="de">
 <head>
@@ -18,6 +18,8 @@
   <script src="{{ basis }}/static/vendor/highlight/languages/powershell.min.js" defer></script>
   <script src="{{ basis }}/static/vendor/highlight/languages/dos.min.js" defer></script>
   <script src="{{ basis }}/static/js/app.js" defer></script>
+  <script src="{{ basis }}/static/js/katalog-suche.js" defer></script>
+  <script src="{{ basis }}/static/js/software-katalog.js" defer></script>
   {% block kopf %}{% endblock %}
 </head>
 <body>
@@ -33,6 +35,7 @@
           ("baukasten", "/baukasten", "Baukasten"),
           ("blockly", "/blockly", "Blockly"),
           ("bibliothek", "/bibliothek", "Bibliothek"),
+          ("software", "/software", "Software"),
         ] %}
         <a href="{{ basis }}{{ ziel_pfad }}"{% if aktiv == schluessel %} class="aktiv" aria-current="page"{% endif %}>{{ i.icon(schluessel) }}<span>{{ text }}</span></a>
         {% endfor %}

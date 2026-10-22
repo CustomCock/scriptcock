@@ -10,7 +10,10 @@
     <h1>{{ rezept.name }}</h1>
     <p class="untertitel">{{ rezept.beschreibung }}</p>
   </div>
-  <span class="marke">{{ ziel_anzeige[ziel] }}</span>
+  <div class="seitenkopf-aktionen">
+    <span class="marke">{{ ziel_anzeige[ziel] }}</span>
+    <button type="button" class="knopf" data-katalog-oeffnen aria-controls="software-katalog" aria-expanded="false">{{ i.icon("software") }} Software-Katalog</button>
+  </div>
 </div>
 
 <div class="raster-arbeit">
@@ -71,4 +74,5 @@
     </div>
   </div>
 </div>
+{% with katalog_modus="rezept", katalog_ziel=ziel %}{% include "_katalog.html" %}{% endwith %}
 {% endblock %}

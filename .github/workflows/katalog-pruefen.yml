@@ -1,0 +1,51 @@
+name: Software-Katalog prüfen
+
+# Prüft alle Paket-IDs gegen winget-pkgs, Homebrew, Ubuntu/Debian und Flathub.
+# Braucht Netz, deshalb nicht im normalen CI, sondern monatlich bzw. per Hand.
+on:
+  schedule:
+    - cron: "17 5 1 * *"  # am 1. jedes Monats
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python-Abhängigkeiten
+        run: pip install -e .
+
+      - name: IDs prüfen
+        id: pruefen
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # nur für den Flathub-Fallback über die GitHub-API
+        run: python tools/katalog_pruefen.py --bericht bericht.md
+
+      - name: Issue anlegen oder ergänzen
+        if: steps.pruefen.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LAUF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          titel="Software-Katalog: ungültige Paket-IDs"
+          if [ ! -f bericht.md ]; then
+            printf 'Eine Quelle war nicht erreichbar – Details im Lauf: %s\n' "$LAUF" > bericht.md
+          else
+            printf '\nLauf: %s\n' "$LAUF" >> bericht.md
+          fi
+          nummer="$(gh issue list --state open --search "\"$titel\" in:title" --json number --jq '.[0].number')"
+          if [ -n "$nummer" ]; then
+            gh issue comment "$nummer" --body-file bericht.md
+          else
+            gh issue create --title "$titel" --body-file bericht.md
+          fi

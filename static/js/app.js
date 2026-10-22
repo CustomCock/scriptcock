@@ -68,14 +68,18 @@
         el.title = ok ? el.dataset.beschreibung : "Unter " + anzeige + " nicht verfügbar";
       });
     }
-    function hinzufuegen(blockId, platzhalter) {
+    // werte (optional): Parameter vorbelegen, z. B. { paket: "7zip.7zip" } aus dem Software-Katalog
+    function hinzufuegen(blockId, platzhalter, werte) {
       var url = basis + "/baukasten/schritt?block=" + encodeURIComponent(blockId) + "&ziel=" + encodeURIComponent(ziel());
+      Object.keys(werte || {}).forEach(function (k) {
+        url += "&p." + encodeURIComponent(k) + "=" + encodeURIComponent(werte[k]);
+      });
       if (platzhalter) {
-        window.htmx.ajax("GET", url, { target: platzhalter, swap: "outerHTML" }).then(aendern);
-      } else {
-        window.htmx.ajax("GET", url, { target: liste, swap: "beforeend" });
+        return window.htmx.ajax("GET", url, { target: platzhalter, swap: "outerHTML" }).then(aendern);
       }
+      return window.htmx.ajax("GET", url, { target: liste, swap: "beforeend" });
     }
+    window.OkmBaukasten = { ziel: ziel, hinzufuegen: function (blockId, werte) { return hinzufuegen(blockId, null, werte); } };
 
     document.addEventListener("click", function (ev) {
       var knopf = ev.target.closest("[data-hinzufuegen]");

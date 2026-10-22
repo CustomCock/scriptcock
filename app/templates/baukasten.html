@@ -9,6 +9,9 @@
     <h1>Freier Baukasten</h1>
     <p class="untertitel">Bausteine in die Schrittliste ziehen oder mit <strong>+</strong> hinzufügen – die Vorschau rechts aktualisiert sich automatisch.</p>
   </div>
+  <div class="seitenkopf-aktionen">
+    <button type="button" class="knopf" data-katalog-oeffnen aria-controls="software-katalog" aria-expanded="false">{{ i.icon("software") }} Software-Katalog</button>
+  </div>
 </div>
 
 {% if vorbelegung %}
@@ -102,4 +105,5 @@
     <div id="bk-ergebnis" aria-live="polite"></div>
   </section>
 </div>
+{% with katalog_modus="baukasten", katalog_ziel=ziel %}{% include "_katalog.html" %}{% endwith %}
 {% endblock %}

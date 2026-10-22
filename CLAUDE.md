@@ -13,11 +13,12 @@ pytest -q -rs                              # alle Tests (zeigt übersprungene Sy
 UPDATE_GOLDEN=1 pytest tests/test_golden.py   # Golden-Files nach gewollter Änderung neu erzeugen
 ruff check . && ruff format --check .      # Lint + Format
 mypy app                                   # Typprüfung (strict)
+python tools/katalog_pruefen.py            # Paket-IDs des Software-Katalogs online prüfen (braucht Netz)
 ```
 
 Syntax-Checks in den Tests brauchen `bash`, `zsh`, `shellcheck`, `pwsh` (+ Modul
-`PSScriptAnalyzer`). Fehlt ein Werkzeug, wird der Test mit Hinweis übersprungen; die
-GitHub-CI installiert alle.
+`PSScriptAnalyzer`), der Test der Katalog-Suche braucht `node`. Fehlt ein Werkzeug, wird der
+Test mit Hinweis übersprungen; die GitHub-CI hat alle.
 
 ## Architektur / Datenfluss
 
@@ -42,6 +43,10 @@ UI-Formular / JSON ──► ScriptRequest ──► validation.py ──► Scr
 | `app/routes/pages.py`, `baukasten.py`, `bibliothek.py`, `verwaltung.py`, `api.py` | HTML-Seiten je Bereich, JSON-API |
 | `app/routes/blockly.py`, `static/js/blockly-modus.js` | Blockly-Modus: Katalog → Toolbox, Arbeitsfläche → JSON (kein Code!) |
 | `static/js/app.js` | Gemeinsames JS (Highlighting, Zwischenablage, Listen-Modus: Sortable, Palette) |
+| `app/katalog.py`, `app/models/software.py` | Software-Katalog (`katalog/software-katalog.yaml`) laden/prüfen; Abbruch bei Fehlern |
+| `app/routes/software.py`, `_katalog.html` | Seite `/software` und Panel in Baukasten/Rezept (Daten als eingebettetes JSON) |
+| `static/js/katalog-suche.js`, `software-katalog.js` | Suche (rein, auch unter Node getestet) bzw. Katalog-Oberfläche |
+| `tools/katalog_pruefen.py` | Prüft alle Paket-IDs online (monatlich per `.github/workflows/katalog-pruefen.yml`) |
 | `app/auth.py` | OIDC (Keycloak), Rollen `nutzer`/`admin`, `AUTH_DISABLED` |
 
 ## Konventionen
@@ -85,6 +90,15 @@ sonst wird `tests/test_browser.py` übersprungen.
   `OKM_VERSUCH` (in der Subshell nur diese beenden). Roter Abbruch im Versuch = Exit 112.
 - CMD: niemals Schritte in `for`/`( … )`-Blöcke packen – nur Sprungmarken.
 - Flache Scripte müssen byte-gleich bleiben (Golden-Files).
+
+## Software-Katalog
+
+- Einzige Datenquelle ist `katalog/software-katalog.yaml` (nicht `data/` – das ist DB/Volume).
+  Nichts davon im Frontend hart codieren; Details und Pflege: `docs/software-katalog.md`.
+- Alle IDs müssen den Typ `paketname` bestehen (`^[A-Za-z0-9][A-Za-z0-9._+@-]{0,127}$`).
+- „＋“ ruft `GET /baukasten/schritt?block=paket_installieren&p.paket=…&p.paketmanager=…` auf;
+  Paketmanager-Werte = Katalogfelder (`winget`, `brew`, `brew_cask`, `apt`, `flatpak`).
+- Daten nur über Textknoten ins DOM (kein `innerHTML`), JSON per `tojson` eingebettet.
 
 ## Rechte
 

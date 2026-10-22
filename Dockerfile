@@ -14,6 +14,7 @@ RUN pip install .
 
 COPY blocks ./blocks
 COPY recipes ./recipes
+COPY katalog ./katalog
 COPY static ./static
 
 RUN mkdir -p /app/data && chown baukasten:baukasten /app/data

@@ -1,5 +1,35 @@
 # Changelog
 
+## Software-Katalog
+
+- **Katalog mit 259 Programmen** (`katalog/software-katalog.yaml`) – einzige Datenquelle,
+  Pydantic-Schema `SoftwarePaket`/`SoftwareKatalog`, wird beim Start geprüft (Pflichtfelder,
+  mindestens eine Paket-ID bzw. Herstellerlink, keine doppelten IDs pro Plattform, alle IDs
+  bestehen `paketname`). Vorgesehene Zusatzfelder: `hinweis`, `hersteller_url`, `intern`.
+- **Oberfläche:** eigene Seite `/software` (neuer Menüpunkt „Software“) und ausklappbares Panel
+  im Baukasten und in Rezepten (auf dem Handy Vollbild). Live-Suche im Browser über Name,
+  Beschreibung, Kategorie, Suchbegriffe und alle IDs mit Umlaut-/Satzzeichen-Normalisierung,
+  Ranking und Hervorhebung; Plattform-Umschalter (folgt dem Zielsystem), Kategorie-Chips,
+  Tastatur (`/`, `↑`/`↓`, `Enter`, `Esc`).
+- **Kopieren** der ID (Clipboard-API, Fallback für HTTP, sonst Markieren + „Strg+C“) und des
+  kompletten Installationsbefehls.
+- **Ins Script übernehmen:** „＋“ legt einen Schritt „Paket/Software installieren“ an bzw.
+  befüllt das aktive Paketfeld; Mehrfachauswahl „Ausgewählte installieren (n)“.
+- `paket_installieren` (Version 2) kennt die Paketmanager `winget`, `apt`, `dnf`, `flatpak`,
+  `brew`, `brew_cask`; winget immer mit `--id … -e --source winget`; Flatpak/Homebrew prüfen,
+  ob das Werkzeug installiert ist. Das Rezept „Software installieren“ zieht mit.
+- Parametertyp `paketname`: neue Whitelist `^[A-Za-z0-9][A-Za-z0-9._+@-]{0,127}$`
+  (`/` ist nicht mehr erlaubt).
+- **`tools/katalog_pruefen.py`** prüft alle IDs gegen winget-pkgs, Homebrew, Ubuntu 24.04/Debian
+  und Flathub; monatlicher GitHub-Workflow legt bei Fehlern ein Issue an.
+- Katalog-Korrekturen aus der ersten Prüfung: `python3` (apt) war bei Python 3.12 und 3.13
+  doppelt → nur noch bei 3.12; Flathub-Paket von PyCharm Community ist abgekündigt (EOL) →
+  entfernt; `dnsutils` → `bind9-dnsutils` (gibt es unter Ubuntu und Debian); Hinweise für
+  apt-Pakete, die es nur unter Ubuntu gibt.
+- Tests: Schema/Fehlermeldungen, Validierung + Escaping aller IDs für alle Ziele (inkl.
+  Ausführung in bash/zsh/pwsh), Syntax-Checks der Scripte mit allen IDs, Suche unter Node,
+  Browser-Test (Playwright).
+
 ## Vorlagen – 116 neue Bausteine, 13 neue Rezepte
 
 - **Bausteine (jetzt 140)** aus der Ideensammlung, zuerst die ★-Vorlagen der Kategorien

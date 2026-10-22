@@ -1,11 +1,11 @@
 id: paket_installieren
-version: 1
+version: 2
 name: Paket/Software installieren
 kategorie: Software
-beschreibung: Installiert ein Programm über den Paketmanager des Systems (Windows winget, Linux apt/dnf, macOS Homebrew).
+beschreibung: Installiert ein Programm über den Paketmanager des Systems (Windows winget, Linux apt/dnf/Flatpak, macOS Homebrew).
 hilfe: |
-  Windows: die winget-ID angeben, z. B. Mozilla.Firefox (Suche: "winget search firefox").
-  Linux: Paketname, z. B. firefox-esr. macOS: Homebrew-Name, z. B. firefox.
+  Die richtige Paket-ID steht im Software-Katalog (Knopf „Software-Katalog“ bzw. Seite „Software“).
+  Windows: winget-ID, z. B. Mozilla.Firefox. Linux: Paketname, z. B. firefox-esr. macOS: Homebrew-Name, z. B. firefox.
 risiko: gelb
 admin_noetig:
   bash: true
@@ -16,32 +16,60 @@ parameter:
     typ: paketname
     beispiel: Mozilla.Firefox
   - id: paketmanager
-    label: Paketmanager (nur Linux)
+    label: Paketmanager
     typ: auswahl
-    standard: apt
+    standard: standard
     optionen:
+      - wert: standard
+        label: "Standard (Windows: winget, Linux: apt, macOS: brew)"
+      - wert: winget
+        label: winget (Windows)
       - wert: apt
-        label: apt (Debian, Ubuntu)
+        label: "apt (Linux: Debian, Ubuntu)"
       - wert: dnf
-        label: dnf (Fedora, RHEL, Rocky)
+        label: "dnf (Linux: Fedora, RHEL, Rocky)"
+      - wert: flatpak
+        label: Flatpak (Linux, Flathub)
+      - wert: brew
+        label: brew – Formel (macOS)
+      - wert: brew_cask
+        label: brew --cask – App (macOS)
 ziele:
   powershell: |
-    winget.exe install --id {{ paket }} --exact --silent --accept-source-agreements --accept-package-agreements
+    winget.exe install --id {{ paket }} -e --source winget --silent --accept-package-agreements --accept-source-agreements
   cmd: |
-    winget install --id {{ paket }} --exact --silent --accept-source-agreements --accept-package-agreements
+    winget install --id {{ paket }} -e --source winget --silent --accept-package-agreements --accept-source-agreements
   bash: |
-    {% if paketmanager.wert == 'dnf' %}
+    {% if paketmanager.wert in ('winget', 'brew', 'brew_cask') %}
+    printf '%s\n' 'Dieser Paketmanager ist unter Linux nicht verfügbar – bitte apt, dnf oder Flatpak wählen.'
+    false
+    {% elif paketmanager.wert == 'flatpak' %}
+    if ! command -v flatpak >/dev/null 2>&1; then
+      printf '%s\n' 'Flatpak ist nicht installiert (z. B. „apt install flatpak“, danach Flathub einrichten). Bitte an die IT wenden.'
+      false
+    fi
+    flatpak install -y --noninteractive flathub {{ paket }}
+    {% elif paketmanager.wert == 'dnf' %}
     dnf install -y {{ paket }}
     {% else %}
     apt-get update
     apt-get install -y {{ paket }}
     {% endif %}
   zsh: |
+    {% if paketmanager.wert in ('winget', 'apt', 'dnf', 'flatpak') %}
+    printf '%s\n' 'Dieser Paketmanager ist unter macOS nicht verfügbar – bitte brew oder brew --cask wählen.'
+    false
+    {% else %}
     if ! command -v brew >/dev/null 2>&1; then
       printf '%s\n' 'Homebrew ist nicht installiert (siehe https://brew.sh). Bitte an die IT wenden.'
       false
     fi
+    {% if paketmanager.wert == 'brew_cask' %}
+    brew install --cask {{ paket }}
+    {% else %}
     brew install {{ paket }}
+    {% endif %}
+    {% endif %}
 hinweise:
   powershell: Benötigt winget (App-Installer, ab Windows 10 1809 enthalten).
   cmd: Benötigt winget (App-Installer, ab Windows 10 1809 enthalten).
