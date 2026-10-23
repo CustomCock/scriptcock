@@ -37,6 +37,8 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 | `neustart_countdown` | bash | `shutdown -r +N` – Meldung erscheint nur in Terminal-Sitzungen (wall). |
 | alle | cmd | Ausgaben eines Schritts erscheinen erst nach seinem Ende (Umleitung in eine Temp-Datei, weil CMD kein `tee` hat). Interaktive Blöcke (`interaktiv: true`) laufen ohne Umleitung und werden daher nicht vollständig protokolliert. |
 | alle | powershell | Native Programme, die Fehler über stderr melden, aber Exit-Code 0 liefern, werden nicht als Fehler erkannt. |
+| alle | powershell/cmd | Ausführen-Checkliste (`docs/test-vms.md`, Abschnitt 4): alle Windows-Zellen (Doppelklick/„Mit PowerShell ausführen“, UAC angefordert/abgelehnt, Konsole UTF-8, Fenster bleibt offen) sind noch **nicht** auf Win 11 geprüft. |
+| alle | bash/zsh | Checkliste bisher nur im Linux-Container mit Attrappen (`ping`, `sudo`); auf Debian 12 und echtem macOS (Terminal.app, echtes sudo) wiederholen. |
 
 ## Bewusst nicht umgesetzt
 

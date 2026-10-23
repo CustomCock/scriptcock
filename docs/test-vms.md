@@ -44,8 +44,44 @@ qm snapshot <vmid> sauber --description "Grundinstallation für Script-Baukasten
 - Alle Blöcke mit Einträgen in `docs/offene-punkte.md`.
 - Neue oder geänderte Blöcke (`version` erhöht) vor dem Merge.
 
-## 4. Protokoll der Prüfungen
+## 4. Ausführen-Checkliste (Fehlerbehebung Runde 1)
+
+Test-Scripte erzeugen – je Zielsystem ein Script mit Umlauten, einem Admin-/root-Block
+(„Druckwarteschlange leeren“), einem Ping auf die nicht erreichbare IP `192.0.2.1` und einem
+absichtlich fehlschlagenden Block („Datei kopieren“ mit fehlender Quelle), dazu je eine im Editor
+„manuell bearbeitete“ Fassung:
+
+```bash
+python tools/checkliste_scripte.py checkliste/
+```
+
+Legende: **✓ auto** = am 23.10.2026 automatisch im Container geprüft (Ubuntu 24.04, bash 5.2,
+zsh unter Linux, pwsh 7 unter Linux; `ping`/`cancel`/`sudo` als Attrappen im `PATH`, Start als
+`root` und als `nobody`). **offen** = braucht die echte VM, noch nicht geprüft.
+
+| Test | Win 11 PS 5.1 | Win 11 cmd | Debian | macOS |
+|---|---|---|---|---|
+| Rechtsklick „Mit PowerShell ausführen“ bzw. Doppelklick | offen | offen | – | – |
+| Start im Terminal (`./script.sh`) | – | – | ✓ auto (Ubuntu statt Debian 12); VM offen | ✓ auto (zsh unter Linux); Mac offen |
+| Umlaute korrekt in Konsole und Log | Datei ✓ auto (UTF-8 mit BOM, CRLF); Konsole offen | Datei ✓ auto (ohne BOM, CRLF, `chcp 65001`); Konsole offen | ✓ auto (Ausgabe + Protokoll) | ✓ auto (zsh/Linux); Terminal.app offen |
+| Keine Steuerzeichen/Farbcodes als Text | Datei ✓ auto (kein ESC); Konsole offen | Datei ✓ auto; Konsole offen | ✓ auto (Ausgabe ohne ESC) | ✓ auto (zsh/Linux) |
+| Admin/sudo wird erklärt und angefordert | offen (UAC nur unter Windows) | offen | ✓ auto (`nobody` + sudo-Attrappe) | ✓ auto (zsh, `nobody` + sudo-Attrappe); echtes sudo offen |
+| UAC/sudo abgelehnt → verständliche Meldung | offen | offen | ✓ auto („sudo wurde abgelehnt …“, „Abgebrochen: fehlende Rechte.“) | ✓ auto (zsh/Linux) |
+| Fehlschlagender Block → Schritt + Grund + Zusammenfassung | pwsh 7/Linux ✓ auto (`tests/test_abbruch.py`); 5.1 offen | offen | ✓ auto (Schritt 4/4, Exit-Code, Zeile, Befehl, Tipp, Zusammenfassung) | ✓ auto (zsh/Linux, mit Zeile) |
+| Nicht erreichbarer Ping bricht nicht ab | offen | offen | ✓ auto (ping-Attrappe, kein ICMP im Container) | ✓ auto (zsh/Linux) |
+| Fenster bleibt am Ende offen | offen | offen | – | – |
+| Manuell bearbeitetes Script: Download korrekt, Kopfzeile vorhanden | Datei ✓ auto (BOM, CRLF, Kopfzeile, PowerShell-Parser ohne Fehler); Ausführung offen | Datei ✓ auto (CRLF, `chcp`, `rem`-Kopfzeile); Ausführung offen | ✓ auto (Kopfzeile, läuft); Browser-Download ✓ (`tests/test_browser.py`) | ✓ auto (Datei, Kopfzeile) |
+
+**Gefunden und behoben beim Durchgehen (23.10.2026):** Schlug ein Befehl mit `{{ sudo }}` fehl,
+nannte die Fehlermeldung unter bash die Zeile *in* der Hilfsfunktion und den Befehl `"$@"`, unter
+zsh sogar `Zeile 0`/`Zeile 3`. Jetzt: Zeile des Schritts und der echte Befehl (siehe CHANGELOG).
+
+**Noch offen:** alle Windows-Zellen sowie Debian 12 und macOS auf echten Maschinen – bitte mit
+Datum und Prüfer in die Tabelle unten eintragen.
+
+## 5. Protokoll der Prüfungen
 
 | Datum | Prüfer | VM / System | Rezept/Block | Ergebnis |
 |---|---|---|---|---|
+| 23.10.2026 | Claude (automatisch) | Container Ubuntu 24.04 (bash 5.2, zsh, pwsh 7) | Checkliste-Scripte (`tools/checkliste_scripte.py`) | Linux-/zsh-Zeilen ✓, Dateiformate aller Ziele ✓; sudo-Fehlerzeile korrigiert; Windows/echte VMs offen |
 | | | | | |

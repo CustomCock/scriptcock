@@ -2,6 +2,27 @@
 
 ## Fehlerbehebung Runde 1
 
+### 10. + 11. CLAUDE.md und Ausführen-Checkliste
+
+- `CLAUDE.md` beschreibt jetzt `rechte`-Schema und `{{ sudo }}`, Ausgabe-Helfer und Abschluss,
+  Export-/Prüf-Endpunkt, die Katalog-Komponente und die Editor-Zustände.
+- `tools/checkliste_scripte.py` erzeugt das Test-Script der Checkliste (Umlaute, Admin-/root-Block,
+  nicht erreichbarer Ping, absichtlich fehlschlagender Block) für alle vier Ziele, je auch als
+  „manuell bearbeitete“ Fassung. Ergebnisse in `docs/test-vms.md` (Abschnitt 4): Linux/zsh im
+  Container geprüft, Dateiformate aller Ziele geprüft, Windows und echte VMs **offen**.
+- **Gefunden beim Durchgehen – Fehlermeldung bei `{{ sudo }}`-Befehlen:**
+  - **Ursache:** `okm_sudo` war eine Funktion. Schlug der Befehl darin fehl, lief der ERR-Trap
+    *in* der Funktion: bash meldete die Zeile der Hilfsfunktion und den Befehl `"$@"`, zsh
+    „Zeile 0“ (nach dem Rücksprung „Zeile 3“ – `$LINENO` relativ zur Funktion).
+  - **Lösung:** bash: `okm_sudo` reicht den Exit-Code nur weiter (`|| okm_rc=$?`, `return`),
+    der Trap feuert in der Zeile des Schritts; der Befehl kommt aus `OKM_SUDO_BEFEHL`.
+    zsh: `okm_sudo` ist ein Alias auf das Array `OKM_SUDO` (`sudo --` bzw. leer als root) –
+    der Befehl steht damit direkt in der Script-Zeile.
+  - Test: `test_fehler_mit_sudo_nennt_scriptzeile` (bash + zsh); die sudo-Tests als `nobody`
+    laufen jetzt auch für zsh.
+  - **Golden-Files bewusst aktualisiert:** nur die Scripte mit root-Bausteinen
+    (`okm_sudo`-Definition und eine `case`-Zeile im bash-Fehler-Handler).
+
 ### 9. Bearbeitbarer Script-Editor in allen Modi
 
 - **Vorher:** Die Vorschau war ein schreibgeschützter `<pre>`-Block. Wer eine Zeile anpassen

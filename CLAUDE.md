@@ -14,6 +14,8 @@ UPDATE_GOLDEN=1 pytest tests/test_golden.py   # Golden-Files nach gewollter Änd
 ruff check . && ruff format --check .      # Lint + Format
 mypy app                                   # Typprüfung (strict)
 python tools/katalog_pruefen.py            # Paket-IDs des Software-Katalogs online prüfen (braucht Netz)
+python tools/screenshots.py [katalog rezepte]   # Screenshots in 4 Breiten nach docs/screenshots/
+python tools/checkliste_scripte.py checkliste/  # Test-Scripte für die VM-Checkliste (docs/test-vms.md)
 ```
 
 Syntax-Checks in den Tests brauchen `bash`, `zsh`, `shellcheck`, `pwsh` (+ Modul
@@ -37,15 +39,19 @@ UI-Formular / JSON ──► ScriptRequest ──► validation.py ──► Scr
 | `app/registry.py` | Lädt/prüft `blocks/**/*.yaml` und `recipes/*.yaml` beim Start, bricht bei Fehlern ab |
 | `app/generators/base.py` | Fester Script-Aufbau (Kopf → Präambel → Schritte → Abschluss), Dry-Run-Logik |
 | `app/generators/{powershell,cmd,bash}.py` | Sprachspezifische Bausteine (`bash.py` enthält auch zsh) |
+| `app/export.py` | **Einzige Stelle** für Dateiformat: PS = UTF-8 mit BOM + CRLF, CMD = ohne BOM + CRLF + `chcp 65001`, bash/zsh = LF; Kopfzeile „Manuell bearbeitet“ |
+| `app/routes/export.py` | `POST /api/script/export` (Text → Datei-Bytes, `X-Script-SHA256`) und `POST /api/script/pruefen` |
+| `app/syntaxpruefung.py` | „Syntax prüfen“: dieselben Checks wie die Tests (`tests/syntax.py` importiert von hier), nur parsen |
 | `app/service.py` | Rezept-Formular → Request, `generiere` (ohne Speichern) / `erzeuge` (mit Speichern) |
 | `app/baukasten.py` | Listen-Modus: Formular lesen, Rezept aus Schrittliste; DB-Rezepte vorschlagen/freigeben/laden/YAML |
 | `app/bibliothek.py` | Bibliothek: Rechte, Suche, Tags, Bewertungen, „Erneut öffnen“ aus der IR, Blockversionen |
 | `app/routes/pages.py`, `baukasten.py`, `bibliothek.py`, `verwaltung.py`, `api.py` | HTML-Seiten je Bereich, JSON-API |
 | `app/routes/blockly.py`, `static/js/blockly-modus.js` | Blockly-Modus: Katalog → Toolbox, Arbeitsfläche → JSON (kein Code!) |
-| `static/js/app.js` | Gemeinsames JS (Highlighting, Zwischenablage, Listen-Modus: Sortable, Palette) |
+| `static/js/app.js` | Gemeinsames JS (Zwischenablage, `OkmExport`, Listen-Modus: Sortable, Palette, Rezept-Filter) |
+| `static/js/script-editor.js`, `_editor.html`, `_editor_kopf.html` | Script-Editor (CodeMirror 5) für alle Modi, siehe unten und `docs/editor.md` |
 | `app/katalog.py`, `app/models/software.py` | Software-Katalog (`katalog/software-katalog.yaml`) laden/prüfen; Abbruch bei Fehlern |
-| `app/routes/software.py`, `_katalog.html` | Seite `/software` und Panel in Baukasten/Rezept (Daten als eingebettetes JSON) |
-| `static/js/katalog-suche.js`, `software-katalog.js` | Suche (rein, auch unter Node getestet) bzw. Katalog-Oberfläche |
+| `app/routes/software.py`, `_katalog.html` | Seite `/software` und einklappbarer Katalog in Rezept/Baukasten/Blockly (Daten als eingebettetes JSON) |
+| `static/js/katalog-suche.js`, `software-katalog.js` | Suche (rein, auch unter Node getestet) bzw. **eine** Katalog-Komponente `SoftwareKatalog.mount` |
 | `tools/katalog_pruefen.py` | Prüft alle Paket-IDs online (monatlich per `.github/workflows/katalog-pruefen.yml`) |
 | `app/auth.py` | OIDC (Keycloak), Rollen `nutzer`/`admin`, `AUTH_DISABLED` |
 
@@ -56,6 +62,17 @@ UI-Formular / JSON ──► ScriptRequest ──► validation.py ──► Scr
 - Neue Parametertypen: Whitelist in `validation.py` + Tests in `tests/test_validation.py`.
   Werte dürfen nicht mit `-` beginnen (Option-Injection).
 - Neue Blöcke: nur YAML (`docs/neuen-block-anlegen.md`). Jeder Pflichtparameter braucht `beispiel`/`standard`.
+- **Rechte** pro Ziel im Block: `rechte: {powershell: admin, bash: root, zsh: nie_root, …}` mit
+  `admin` (nur Windows), `root` (nur bash/zsh), `benutzer` (Standard), `nie_root`. Das alte
+  `admin_noetig` wird abgelehnt. Windows-Scripte starten sich per UAC selbst neu; bash/zsh holen
+  einmal `sudo -v` + Keepalive. Root-Blöcke schreiben `{{ sudo }}` vor privilegierte Befehle
+  (wird `okm_sudo `; bash = Funktion, zsh = Alias) – nie `sudo` direkt. `nie_root` bricht als root ab.
+- Ausgaben in Templates nur über die Helfer (`okm_info`/`okm_ok`/`okm_warn`/`okm_fehler`,
+  `Write-OkmInfo`/`Write-OkmOk`/`Write-OkmWarnung`/`Write-OkmFehler`) – keine Farbcodes. `tipp:` im
+  Block erscheint beim Fehler. Erwartete negative Ergebnisse (Ping ohne Antwort, Dienst gestoppt …)
+  melden statt abbrechen.
+- Jedes Script endet mit Zusammenfassung (bash/zsh `trap okm_ende EXIT`, PS `trap`/`Exit-OkmScript`,
+  CMD Sprungmarken) und hält das Fenster offen, außer mit `--nopause`/`-NoPause`/`/nopause`.
 - In CMD-Templates verboten: `%ERRORLEVEL%`, `goto`, `exit` (außer `cmd /c exit N`),
   `EnableDelayedExpansion`, `call` mit Platzhaltern, unausgeglichene Klammern.
   In bash/zsh: `eval`, Backticks, `exit`, `sudo`. In PowerShell: `Invoke-Expression`/`iex`, Here-Strings, `exit`.
@@ -91,12 +108,33 @@ sonst wird `tests/test_browser.py` übersprungen.
 - CMD: niemals Schritte in `for`/`( … )`-Blöcke packen – nur Sprungmarken.
 - Flache Scripte müssen byte-gleich bleiben (Golden-Files).
 
+## Script-Editor (alle Modi)
+
+- Eine Instanz pro Seite (`#script-editor`, `window.OkmEditor`). Zustände `generiert` / `manuell`
+  (Text ≠ letzte generierte Fassung) → Banner mit „Neu generieren“ und Diff, einmaliger
+  Sicherheitshinweis (`localStorage`).
+- Listen-Modus: Der Editor steht **außerhalb** von `#bk-vorschau`; das htmx-Fragment liefert den
+  generierten Text in `textarea[data-editor-generiert]` (bzw. `[data-editor-leer]`). Im Zustand
+  `manuell` bleibt der bearbeitete Text bei jeder Live-Vorschau stehen. Blockly ruft
+  `ScriptEditor.fuer(el).setzeGeneriert(text, ziel, dateiname)`.
+- Download/Kopieren immer über `POST /api/script/export` (`manuell_bearbeitet: true` → Kopfzeile
+  „Manuell bearbeitet: ja (nicht vom Baukasten geprüft)“). Knöpfe im Ergebnisbereich tragen
+  `data-editor-bezug="herunterladen|kopieren"` und nehmen den Editor-Inhalt, wenn er bearbeitet ist.
+- Bibliothek: `input[name=editor_text][data-editor-text]` im Speichern-Formular; DB-Spalten
+  `editor_text`, `manuell_bearbeitet` (Mini-Migration in `Datenbank._migrieren`). „Erneut öffnen“
+  bettet `#editor-vorbelegung` ein.
+- „Syntax prüfen“: `POST /api/script/pruefen` – parst nur, meldet fehlende Werkzeuge ehrlich.
+
 ## Software-Katalog
 
 - Einzige Datenquelle ist `katalog/software-katalog.yaml` (nicht `data/` – das ist DB/Volume).
   Nichts davon im Frontend hart codieren; Details und Pflege: `docs/software-katalog.md`.
 - Alle IDs müssen den Typ `paketname` bestehen (`^[A-Za-z0-9][A-Za-z0-9._+@-]{0,127}$`).
-- „＋“ ruft `GET /baukasten/schritt?block=paket_installieren&p.paket=…&p.paketmanager=…` auf;
+- Eine Komponente: `_katalog.html` mit `katalog_modus` (`seite`, `rezept`, `baukasten`, `blockly`),
+  JS `SoftwareKatalog.mount(el, {daten, zielPlattform, onUebernehmen, kannUebernehmen, onMehrfach})`
+  mit Adaptern je `data-modus`. Außer auf `/software` steht er eingeklappt unter der Vorschau.
+- „＋“ im Listen-Modus ruft `GET /baukasten/schritt?block=paket_installieren&p.paket=…&p.paketmanager=…`
+  auf; im Blockly-Modus setzt es die ID im ausgewählten Paket-Block oder legt einen an.
   Paketmanager-Werte = Katalogfelder (`winget`, `brew`, `brew_cask`, `apt`, `flatpak`).
 - Daten nur über Textknoten ins DOM (kein `innerHTML`), JSON per `tojson` eingebettet.
 
