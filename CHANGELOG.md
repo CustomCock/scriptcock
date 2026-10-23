@@ -2,6 +2,22 @@
 
 ## Fehlerbehebung Runde 1
 
+### 5. Software-Katalog: Zeilenumbrüche
+
+- **Ursachen (reproduziert per Playwright bei 360/768/1280/1920 px):**
+  - IDs brachen mitten im Wort um (`overflow-wrap: anywhere` + `<wbr>` nach Punkten:
+    „geeksoftwareGmbH.“ / „PDF24Creator“), Label/ID/Knöpfe flossen frei (Flexbox mit Umbruch).
+  - Im Panel wurden bei vielen Treffern die Flex-Kinder gestaucht: Der Plattform-Umschalter
+    schrumpfte, die Kategorien-Zeile lag darüber und fing Klicks ab.
+- **Lösung:** Eintrag als CSS-Grid – Kopf: Name (darf umbrechen) | Kategorie (bricht nie);
+  Beschreibung höchstens zwei Zeilen (voller Text als `title`); ID-Zeile
+  `7rem | minmax(0, 1fr) | auto` mit `white-space: nowrap` + Ellipsis + `title`, Knöpfe mit
+  fester Größe in derselben Zeile. Panel mindestens 340 px; schmaler (Container-Query) wechselt
+  die Zeile ins Kartenlayout mit dem Label über der ID. `flex-shrink: 0` im Katalog.
+- **Tests:** Playwright misst bei vier Breiten auf `/software` und im Panel: ID einzeilig,
+  `title` = volle ID, kein `break-all`, Knöpfe ≥ 28 px und auf Höhe der ID.
+- Screenshots: `docs/screenshots/katalog-seite-*.png`, `katalog-panel-*.png`.
+
 ### 4. Software-Katalog: aktiver Filter erkennbar
 
 - **Ursache:** Aktive Kategorie-Chips waren nur dunkelsand hinterlegt (kaum Kontrast zu inaktiv),

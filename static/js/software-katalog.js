@@ -35,23 +35,6 @@
     return e;
   }
 
-  /* ID als <code> mit Umbruchstellen (<wbr>) nach . - / – damit lange IDs nicht mitten im Wort brechen.
-     <wbr> ist kein Zeichen: Markieren und Kopieren liefern weiterhin exakt die ID. */
-  function idCode(id) {
-    var code = el("code");
-    var teil = "";
-    for (var i = 0; i < id.length; i += 1) {
-      teil += id.charAt(i);
-      if (".-/".indexOf(id.charAt(i)) >= 0 && i < id.length - 1) {
-        code.appendChild(document.createTextNode(teil));
-        code.appendChild(document.createElement("wbr"));
-        teil = "";
-      }
-    }
-    code.appendChild(document.createTextNode(teil));
-    return code;
-  }
-
   function start() {
     var wurzel = document.getElementById("software-katalog");
     var daten = document.getElementById("software-katalog-daten");
@@ -184,7 +167,9 @@
     function idZeile(eintrag, uebernahme) {
       var zeile = el("div", "katalog-id");
       zeile.appendChild(el("span", "katalog-id-label", LABEL[eintrag.feld]));
-      var code = idCode(eintrag.id);
+      // Eine Zeile, bei Platzmangel „…“ – die volle ID steht im Tooltip und wird immer ganz kopiert
+      var code = el("code", null, eintrag.id);
+      code.title = eintrag.id;
       zeile.appendChild(code);
       var knoepfe = el("span", "katalog-id-knoepfe");
       var kop = el("button", "knopf-klein", "⧉");
@@ -217,7 +202,7 @@
       var p = t.paket;
       var li = el("li", "katalog-eintrag");
       li.id = "katalog-eintrag-" + nr;
-      var kopf = el("div", "katalog-eintrag-kopf");
+      var kopf = el("div", "katalog-eintrag-kopf" + (modus === "baukasten" ? " mit-auswahl" : ""));
       if (modus === "baukasten") {
         var ziel = zielEintrag(p);
         var box = el("input");
@@ -235,7 +220,9 @@
       kopf.appendChild(markiert("strong", "katalog-name", p.name, anfrage));
       kopf.appendChild(el("span", "marke marke-leise", p.kategorie));
       li.appendChild(kopf);
-      li.appendChild(markiert("p", "katalog-beschreibung", p.beschreibung, anfrage));
+      var beschreibung = markiert("p", "katalog-beschreibung", p.beschreibung, anfrage);
+      beschreibung.title = p.beschreibung;  // höchstens zwei Zeilen sichtbar
+      li.appendChild(beschreibung);
       if (p.hinweis) { li.appendChild(el("p", "katalog-hinweis", p.hinweis)); }
       var uebernahme = kannUebernehmen();
       S.ids(p, zustand.plattform).forEach(function (e) { li.appendChild(idZeile(e, uebernahme)); });
@@ -249,7 +236,9 @@
       if (p.intern) {
         var z = el("div", "katalog-id");
         z.appendChild(el("span", "katalog-id-label", "intern"));
-        z.appendChild(el("code", null, p.intern));
+        var intern = el("code", null, p.intern);
+        intern.title = p.intern;
+        z.appendChild(intern);
         li.appendChild(z);
       }
       return li;
