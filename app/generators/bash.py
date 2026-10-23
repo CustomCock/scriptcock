@@ -74,11 +74,7 @@ class ShGenerator(Generator):
             f"else printf '%s\\n' '{EINZUG}OK'; fi; }}",
             f"okm_warn() {{ printf '{EINZUG}WARNUNG  %s\\n' \"$*\"; }}",
             f"okm_fehler() {{ printf '{EINZUG}FEHLER  %s\\n' \"$*\"; }}",
-            *(
-                ['okm_sudo() { if [ "$(id -u)" -eq 0 ]; then "$@"; else sudo -- "$@"; fi; }']
-                if self._admin_schritte
-                else []
-            ),
+            *(self.sudo_helfer() if self._admin_schritte else []),
             *self._zusammenfassung(),
             "# Fenster/Terminal offen halten – nur wenn ein Mensch davor sitzt",
             "okm_pause() {",
@@ -239,6 +235,18 @@ class ShGenerator(Generator):
     def fehler_ort(self) -> list[str]:
         raise NotImplementedError
 
+    def sudo_helfer(self) -> list[str]:
+        """``{{ sudo }}`` wird zu ``okm_sudo `` – als root direkt, sonst über sudo."""
+        return [
+            "# Exit-Code nur weiterreichen: der Fehler-Handler meldet so die Zeile des Schritts",
+            "# (nicht die dieser Funktion) und den Befehl aus OKM_SUDO_BEFEHL.",
+            "okm_sudo() {",
+            '  local okm_rc=0; OKM_SUDO_BEFEHL="okm_sudo $*"',
+            '  if [ "$(id -u)" -eq 0 ]; then "$@" || okm_rc=$?; else sudo -- "$@" || okm_rc=$?; fi',
+            '  return "$okm_rc"',
+            "}",
+        ]
+
     def schritt(self, info: SchrittInfo) -> list[str]:
         b = info.block
         zeilen = [
@@ -330,6 +338,11 @@ class BashGenerator(ShGenerator):
         return [
             "okm_bei_fehler() {",
             "  local okm_rc=$1 okm_zeile=$2 okm_befehl=$3",
+            *(
+                ["  case $okm_befehl in 'return \"$okm_rc\"') okm_befehl=$OKM_SUDO_BEFEHL ;; esac"]
+                if self._admin_schritte
+                else []
+            ),
             *self._fehler_pruefungen(),
             "  trap - ERR",
             *self._fehler_ausgabe(),
@@ -371,6 +384,15 @@ class ZshGenerator(ShGenerator):
 
     def fehler_ort(self) -> list[str]:
         return [f'  okm_info "{EINZUG}Zeile $okm_zeile"']
+
+    def sudo_helfer(self) -> list[str]:
+        # Alias statt Funktion: Nach dem Rücksprung aus einer Funktion liefert $LINENO im
+        # ZERR-Trap die Zeile *in* der Funktion. So steht der Befehl selbst in der Script-Zeile.
+        return [
+            "OKM_SUDO=(sudo --)",
+            'if [ "$(id -u)" -eq 0 ]; then OKM_SUDO=(); fi',
+            "alias okm_sudo='\"${OKM_SUDO[@]}\"'",
+        ]
 
     def pause(self) -> list[str]:
         return [f"  read -r {_lit('okm_weiter?Drücke Enter zum Schließen …')} || true"]

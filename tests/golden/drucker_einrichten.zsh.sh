@@ -37,7 +37,9 @@ okm_info() { printf '%s\n' "$*"; }
 okm_ok() { if [ $# -gt 0 ]; then printf '      OK  %s\n' "$*"; else printf '%s\n' '      OK'; fi; }
 okm_warn() { printf '      WARNUNG  %s\n' "$*"; }
 okm_fehler() { printf '      FEHLER  %s\n' "$*"; }
-okm_sudo() { if [ "$(id -u)" -eq 0 ]; then "$@"; else sudo -- "$@"; fi; }
+OKM_SUDO=(sudo --)
+if [ "$(id -u)" -eq 0 ]; then OKM_SUDO=(); fi
+alias okm_sudo='"${OKM_SUDO[@]}"'
 okm_zusammenfassung() {
   okm_info '----------------------------------------------'
   case "$OKM_STATUS" in

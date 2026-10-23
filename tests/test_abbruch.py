@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -27,8 +28,10 @@ def _test_registry(tmp_path: Path, code: dict[str, str]) -> Registry:
     bloecke = tmp_path / "blocks"
     bloecke.mkdir()
     ziele = "".join(f"  {z}: |\n    {c}\n" for z, c in code.items())
+    root = "".join(f"  {z}: root\n" for z, c in code.items() if "{{ sudo }}" in c)
+    rechte = "rechte:\n" + root if root else ""
     (bloecke / "kaputt.yaml").write_text(
-        f"id: kaputt\nname: Kaputt\nkategorie: Test\nbeschreibung: Test\nrisiko: gruen\nziele:\n{ziele}",
+        f"id: kaputt\nname: Kaputt\nkategorie: Test\nbeschreibung: Test\nrisiko: gruen\n{rechte}ziele:\n{ziele}",
         encoding="utf-8",
     )
     (tmp_path / "recipes").mkdir()
@@ -82,6 +85,29 @@ def test_fehler_nennt_schritt_zeile_und_befehl(
     assert " Abgebrochen bei Schritt 2 von 3." in r.stdout
     assert "darf nicht erscheinen" not in r.stdout.split("--- LOG ---")[0]
     assert "FEHLER" in _log(r.stdout) and "Abgebrochen bei Schritt 2 von 3." in _log(r.stdout)
+
+
+@pytest.mark.parametrize(("shell", "ziel"), SH_ZIELE)
+def test_fehler_mit_sudo_nennt_scriptzeile(tmp_path: Path, shell: str, ziel: Ziel) -> None:
+    """Checkliste (Punkt 11): Schlug ein Befehl mit {{ sudo }} fehl, nannte die Meldung die Zeile
+    in der Hilfsfunktion und den Befehl ``"$@"`` statt der Zeile des Schritts."""
+    if os.geteuid() != 0:
+        pytest.skip("braucht root (sonst fragt okm_sudo nach dem Passwort)")
+    reg = _test_registry(
+        tmp_path,
+        {
+            "bash": "{{ sudo }}cp /okm-gibt-es-nicht /okm-ziel",
+            "zsh": "{{ sudo }}cp /okm-gibt-es-nicht /okm-ziel",
+        },
+    )
+    s = erzeuge(reg, ziel, [("kaputt", {})])
+    r = ausfuehren(shell, s.inhalt, tmp_path)
+    assert r.returncode != 0
+    zeile = int(re.search(r"Zeile (\d+)", r.stdout).group(1))
+    assert "okm_sudo cp" in s.text.split("\n")[zeile - 1], (zeile, r.stdout)
+    if ziel is Ziel.BASH:
+        assert "Befehl: okm_sudo cp /okm-gibt-es-nicht /okm-ziel" in r.stdout
+        assert '"$@"' not in r.stdout
 
 
 def test_powershell_fehler_nennt_zeile(registry: Registry, tmp_path: Path) -> None:

@@ -40,7 +40,13 @@ okm_info() { printf '%s\n' "$*"; }
 okm_ok() { if [ $# -gt 0 ]; then printf '      OK  %s\n' "$*"; else printf '%s\n' '      OK'; fi; }
 okm_warn() { printf '      WARNUNG  %s\n' "$*"; }
 okm_fehler() { printf '      FEHLER  %s\n' "$*"; }
-okm_sudo() { if [ "$(id -u)" -eq 0 ]; then "$@"; else sudo -- "$@"; fi; }
+# Exit-Code nur weiterreichen: der Fehler-Handler meldet so die Zeile des Schritts
+# (nicht die dieser Funktion) und den Befehl aus OKM_SUDO_BEFEHL.
+okm_sudo() {
+  local okm_rc=0; OKM_SUDO_BEFEHL="okm_sudo $*"
+  if [ "$(id -u)" -eq 0 ]; then "$@" || okm_rc=$?; else sudo -- "$@" || okm_rc=$?; fi
+  return "$okm_rc"
+}
 okm_zusammenfassung() {
   okm_info '----------------------------------------------'
   case "$OKM_STATUS" in
@@ -59,6 +65,7 @@ okm_pause() {
 }
 okm_bei_fehler() {
   local okm_rc=$1 okm_zeile=$2 okm_befehl=$3
+  case $okm_befehl in 'return "$okm_rc"') okm_befehl=$OKM_SUDO_BEFEHL ;; esac
   trap - ERR
   okm_fehler "Schritt $OKM_SCHRITT: Befehl endete mit Exit-Code $okm_rc."
   okm_info "      Zeile $okm_zeile, Befehl: $okm_befehl"

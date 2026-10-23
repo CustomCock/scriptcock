@@ -146,7 +146,9 @@ def offen() -> Path:
     shutil.rmtree(pfad, ignore_errors=True)
 
 
-def _als_nobody(tmp_path: Path, inhalt: bytes, sudo_v: int, *args: str) -> subprocess.CompletedProcess[str]:
+def _als_nobody(
+    tmp_path: Path, inhalt: bytes, sudo_v: int, *args: str, shell: str = "bash"
+) -> subprocess.CompletedProcess[str]:
     pfad = tmp_path / "bin"
     pfad.mkdir()
     pfad.chmod(0o755)
@@ -165,7 +167,7 @@ def _als_nobody(tmp_path: Path, inhalt: bytes, sudo_v: int, *args: str) -> subpr
     datei.write_bytes(inhalt)
     datei.chmod(0o755)
     return subprocess.run(
-        ["setpriv", "--reuid=65534", "--regid=65534", "--clear-groups", "bash", str(datei), *args],
+        ["setpriv", "--reuid=65534", "--regid=65534", "--clear-groups", shell, str(datei), *args],
         capture_output=True,
         text=True,
         cwd=tmp_path,
@@ -175,25 +177,35 @@ def _als_nobody(tmp_path: Path, inhalt: bytes, sudo_v: int, *args: str) -> subpr
     )
 
 
-def test_sudo_erfolgreich(registry: Registry, offen: Path) -> None:
+SUDO_SHELLS = [("bash", Ziel.BASH), ("zsh", Ziel.ZSH)]
+
+
+@pytest.mark.parametrize(("shell", "ziel"), SUDO_SHELLS)
+def test_sudo_erfolgreich(registry: Registry, offen: Path, shell: str, ziel: Ziel) -> None:
+    if shutil.which(shell) is None:
+        pytest.skip(f"{shell} fehlt")
     tmp_path = offen
-    s = erzeuge(registry, Ziel.BASH, [MELDUNG, ("dienst_neustarten", {"dienst": "cups"})])
-    r = _als_nobody(tmp_path, s.inhalt, 0)
+    s = erzeuge(registry, ziel, [MELDUNG, ("dienst_neustarten", {"dienst": "cups"})])
+    r = _als_nobody(tmp_path, s.inhalt, 0, shell=shell)
     assert "Schritt 2 (Dienst neu starten)" in r.stdout
     assert "Rechte: sudo erfolgreich" in r.stdout
-    assert "SUDO:systemctl restart cups" in r.stdout, r.stdout
+    befehl = "systemctl restart cups" if ziel is Ziel.BASH else "launchctl kickstart -k system/cups"
+    assert f"SUDO:{befehl}" in r.stdout, r.stdout
     assert " Fertig: 2 von 2 Schritten erfolgreich." in r.stdout
     log = next(tmp_path.glob("okm-script-*.log"))
     assert log.stat().st_uid == 65534, "Protokoll muss dem Benutzer gehören, nicht root"
 
 
-def test_sudo_abgelehnt(registry: Registry, offen: Path) -> None:
-    s = erzeuge(registry, Ziel.BASH, [("dienst_neustarten", {"dienst": "cups"})])
-    r = _als_nobody(offen, s.inhalt, 1)
+@pytest.mark.parametrize(("shell", "ziel"), SUDO_SHELLS)
+def test_sudo_abgelehnt(registry: Registry, offen: Path, shell: str, ziel: Ziel) -> None:
+    if shutil.which(shell) is None:
+        pytest.skip(f"{shell} fehlt")
+    s = erzeuge(registry, ziel, [("dienst_neustarten", {"dienst": "cups"})])
+    r = _als_nobody(offen, s.inhalt, 1, shell=shell)
     assert r.returncode == 1
     assert "sudo wurde abgelehnt" in r.stdout
     assert " Abgebrochen: fehlende Rechte." in r.stdout
-    assert "SUDO:systemctl" not in r.stdout
+    assert "SUDO:" not in r.stdout
 
 
 def test_als_root_mit_nie_root_block_bricht_ab(registry: Registry, tmp_path: Path) -> None:
