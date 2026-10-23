@@ -82,7 +82,11 @@ def rezepte(seite: Page, url: str) -> None:
 
 
 BEREICHE: dict[str, list[tuple[str, Callable[[Page, str], None]]]] = {
-    "katalog": [("katalog-seite", katalog_seite), ("katalog-panel", katalog_panel), ("katalog-blockly", blockly)],
+    "katalog": [
+        ("katalog-seite", katalog_seite),
+        ("katalog-panel", katalog_panel),
+        ("katalog-blockly", blockly),
+    ],
     "rezepte": [("rezepte", rezepte)],
 }
 

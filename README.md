@@ -35,7 +35,7 @@ Die Anwendung **erzeugt** Scripte, sie führt sie **nicht** selbst aus.
 - **Verwaltung für Admins:** Rezept-Vorschläge von Nutzern freigeben oder ablehnen.
 - **Software-Katalog** (259 Programme): Paket-IDs für winget, Homebrew, apt und Flatpak
   durchsuchen, mit einem Klick kopieren oder direkt als Installationsschritt ins Script
-  übernehmen – als eigene Seite und als Panel im Baukasten. Siehe
+  übernehmen – als eigene Seite und unter der Vorschau in Rezept, Baukasten und Blockly. Siehe
   [docs/software-katalog.md](docs/software-katalog.md).
 - **140 Bausteine** in den Bereichen Inventar, Netzwerk, Drucker, Dateien, Benutzer, Dienste,
   Updates, Speicher, Sicherheit, Fehleranalyse, Leistung, Office, Support, Linux-Server und macOS.
