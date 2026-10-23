@@ -113,20 +113,6 @@ async def startseite(
     )
 
 
-def _rezepte_fuer(reg: Registry, ziel: Ziel, q: str, kategorie: str) -> list[RezeptDef]:
-    suchwoerter = q.lower().split()
-    treffer = []
-    for r in sorted(reg.rezepte.values(), key=lambda r: (r.kategorie, r.name)):
-        if not r.freigegeben or ziel not in reg.rezept_ziele(r):
-            continue
-        if kategorie and r.kategorie != kategorie:
-            continue
-        text = " ".join([r.name, r.beschreibung, r.kategorie, *r.schlagworte]).lower()
-        if all(w in text for w in suchwoerter):
-            treffer.append(r)
-    return treffer
-
-
 RISIKO_TEXT = {Risiko.GRUEN: "nur lesen", Risiko.GELB: "ändert etwas", Risiko.ROT: "kritisch"}
 ZIEL_KURZNAME = {Ziel.POWERSHELL: "Windows", Ziel.CMD: "Windows", Ziel.BASH: "Linux", Ziel.ZSH: "macOS"}
 
