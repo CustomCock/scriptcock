@@ -4,8 +4,15 @@ Der Software-Katalog listet Paket-IDs für **winget** (Windows), **Homebrew** (m
 **apt** und **Flatpak** (Linux). Mitarbeiter finden ihn
 
 - als eigene Seite unter **Software** (`/software`) – zum Nachschlagen und Kopieren,
-- im **Baukasten** und in **Rezepten** über den Knopf „Software-Katalog“ (Panel rechts, auf dem
-  Handy als Vollbild). Dort übernimmt **＋** eine ID ins Script.
+- in **Rezepten**, im **Baukasten** und in **Blockly** als einklappbarer Abschnitt rechts direkt
+  unter der Vorschau (auf schmalen Bildschirmen unter der Vorschau). Er klappt von selbst auf,
+  sobald ein Feld „Paketname“ fokussiert oder ein Schritt „Paket installieren“ hinzugefügt bzw.
+  (Blockly) ausgewählt wird. Dort übernimmt **＋** eine ID ins Script.
+
+Technisch ist es **eine** Komponente: das Partial `app/templates/_katalog.html` und
+`SoftwareKatalog.mount(element, optionen)` in `static/js/software-katalog.js`. Kleine Adapter
+am Ende der Datei verbinden sie mit der jeweiligen Seite (`data-modus` = `seite`, `rezept`,
+`baukasten`, `blockly`).
 
 Einzige Datenquelle ist [`katalog/software-katalog.yaml`](../katalog/software-katalog.yaml).
 Die Oberfläche wird komplett daraus erzeugt; ist die Datei fehlerhaft, startet die Anwendung
@@ -23,9 +30,9 @@ nicht und nennt Eintrag und Feld (wie bei Bausteinen).
 | Kategorien | Aufklappen und Chips anklicken (Mehrfachauswahl). Auswahl und Plattform merkt sich der Browser. |
 | ⧉ | kopiert **nur die ID** (funktioniert auch über HTTP – dann mit Fallback; klappt gar nichts, wird die ID markiert: Strg+C). |
 | ▾ | kopiert den kompletten Installationsbefehl (z. B. `winget install --id … -e --source winget …`). |
-| ＋ | Baukasten: hängt einen Schritt „Paket/Software installieren“ mit ID und passendem Paketmanager an. War vorher ein Feld „Paketname“ aktiv, wird nur dieses Feld befüllt. Rezept: befüllt das Feld „Paketname“. |
+| ＋ | Baukasten: hängt einen Schritt „Paket/Software installieren“ mit ID und passendem Paketmanager an. War vorher ein Feld „Paketname“ aktiv, wird nur dieses Feld befüllt. Rezept: befüllt das Feld „Paketname“. Blockly: ist ein „Paket installieren“-Baustein ausgewählt, bekommt er die ID; sonst wird ein neuer Baustein unter dem ausgewählten (bzw. am Ende des Scripts) angelegt. |
 | Checkboxen | Baukasten: mehrere Programme wählen → „Ausgewählte installieren (n)“ legt je einen Schritt an – das eigene „Standardsoftware-Paket“. |
-| Tastatur | `/` öffnet bzw. fokussiert die Suche · `↑` `↓` wählen einen Treffer · `Enter` kopiert dessen ID · `Esc` leert die Suche (bzw. schließt das Panel). |
+| Tastatur | `/` klappt den Katalog auf und fokussiert die Suche · `↑` `↓` wählen einen Treffer · `Enter` kopiert dessen ID · `Esc` leert die Suche. |
 
 ## Eintrag ergänzen
 

@@ -214,7 +214,7 @@ def test_software_katalog_im_browser(server: str, browser) -> None:
     seite = kontext.new_page()
     seite.goto(f"{server}/baukasten?ziel=bash")
     seite.keyboard.press("/")
-    seite.locator("#software-katalog:not([hidden])").wait_for()
+    seite.locator("#software-katalog[open]").wait_for()
     assert seite.get_attribute("[data-plattform=linux]", "aria-pressed") == "true"
     seite.keyboard.type("vlc")
     seite.locator(".katalog-eintrag:first-child .katalog-name", has_text="VLC").wait_for()
@@ -247,16 +247,15 @@ def test_software_katalog_im_browser(server: str, browser) -> None:
     assert seite.locator("#schrittliste li.schritt").count() == 3
 
     # Zielwechsel → Plattform zieht mit, Windows-Tools fehlen unter macOS
-    seite.keyboard.press("Escape")
     seite.click("label.ziel-option:has(input[value=zsh])")
-    seite.click("[data-katalog-oeffnen]")
     assert seite.get_attribute("[data-plattform=macos]", "aria-pressed") == "true"
     seite.fill("#katalog-suche", "sysinternals")
     seite.locator(".katalog-leer:not([hidden])").wait_for()
 
     # Rezept: Feld „Paketname“ und Paketmanager werden gesetzt
     seite.goto(f"{server}/rezepte/software_installieren?ziel=zsh")
-    seite.click("[data-katalog-oeffnen]")
+    seite.focus("input[name='f.paket']")  # Paketfeld fokussiert → Katalog klappt auf
+    seite.locator("#software-katalog[open]").wait_for()
     seite.fill("#katalog-suche", "firefox esr")
     seite.locator(".katalog-eintrag:first-child .katalog-name", has_text="Firefox ESR").wait_for()
     seite.locator(".katalog-eintrag").first.locator(".knopf-uebernehmen").first.click()
@@ -322,7 +321,7 @@ def test_katalog_zeilen_brechen_nicht_chaotisch(server: str, browser, breite: in
         seite.goto(f"{server}/software")
     else:
         seite.goto(f"{server}/baukasten?ziel=powershell")
-        seite.click("[data-katalog-oeffnen]")
+        seite.click("#software-katalog > summary")
     seite.click("[data-plattform=alle]")
     seite.locator(".katalog-eintrag").first.wait_for()
     seite.fill("#katalog-suche", "visual c++")  # lange IDs wie Microsoft.VCRedist.2015+.x64
@@ -352,3 +351,99 @@ def test_katalog_zeilen_brechen_nicht_chaotisch(server: str, browser, breite: in
             assert k["oben"] < z["codeUnten"] + 2 and k["unten"] > z["codeOben"] - 2, (
                 f"Knopf rutscht weg: {z}"
             )
+
+
+def test_baukasten_katalog_unter_vorschau(server: str, browser) -> None:
+    """Punkt 6: Katalog in der rechten Spalte direkt unter der Vorschau, klappt bei Bedarf auf."""
+    seite = browser.new_page(viewport={"width": 1400, "height": 900})
+    js_fehler: list[str] = []
+    seite.on("pageerror", lambda e: js_fehler.append(str(e)))
+    seite.goto(f"{server}/baukasten?ziel=bash")
+    katalog = seite.locator("#software-katalog")
+    assert katalog.get_attribute("open") is None, "Katalog soll anfangs eingeklappt sein"
+    # Position: in der rechten Spalte, unter der Vorschau
+    assert seite.evaluate(
+        "() => { const a = document.querySelector('.bk-ausgabe'); const k = document.getElementById('software-katalog');"
+        " const v = document.getElementById('bk-vorschau');"
+        " return a.contains(k) && a.contains(v) && (v.compareDocumentPosition(k) & Node.DOCUMENT_POSITION_FOLLOWING) > 0"
+        " && getComputedStyle(a).position === 'sticky'; }"
+    )
+    # paket_installieren hinzufügen → Katalog klappt auf, Plattform passt zum Ziel
+    seite.click("[data-hinzufuegen=paket_installieren]")
+    seite.locator("#schrittliste li.schritt[data-block=paket_installieren]").wait_for()
+    seite.locator("#software-katalog[open]").wait_for()
+    assert seite.get_attribute("[data-plattform=linux]", "aria-pressed") == "true"
+    # Paketfeld ist fokussiert → ＋ füllt genau dieses Feld
+    feld = seite.locator("#schrittliste li.schritt[data-block=paket_installieren] input[data-typ=paketname]")
+    feld.focus()
+    seite.fill("#katalog-suche", "vlc")
+    seite.locator(".katalog-eintrag:first-child .katalog-name", has_text="VLC").wait_for()
+    seite.locator(".katalog-eintrag").first.locator(".knopf-uebernehmen").first.click()
+    assert feld.input_value() == "vlc"
+    assert seite.locator("#schrittliste li.schritt").count() == 1
+    # Katalog wieder zu, Feld fokussieren → klappt auf
+    seite.click("#software-katalog > summary")
+    assert katalog.get_attribute("open") is None
+    feld.focus()
+    seite.locator("#software-katalog[open]").wait_for()
+    assert js_fehler == []
+
+    # Schmal: Blöcke → Vorschau → Katalog untereinander
+    schmal = browser.new_page(viewport={"width": 600, "height": 900})
+    schmal.goto(f"{server}/baukasten?ziel=bash")
+    oben = schmal.evaluate(
+        "() => ['#schrittliste', '#bk-vorschau', '#software-katalog'].map(s => document.querySelector(s)"
+        ".getBoundingClientRect().top)"
+    )
+    assert oben == sorted(oben), oben
+
+
+def test_blockly_katalog(server: str, browser) -> None:
+    """Punkt 7: dieselbe Komponente in Blockly – ＋ legt einen Baustein an bzw. setzt dessen ID."""
+    seite = browser.new_page(viewport={"width": 1400, "height": 1000})
+    js_fehler: list[str] = []
+    seite.on("pageerror", lambda e: js_fehler.append(str(e)))
+    seite.goto(f"{server}/blockly?ziel=zsh")
+    seite.locator(".blocklyDraggable", has_text="Script").first.wait_for()
+    seite.evaluate("() => { try { localStorage.clear(); } catch (e) {} }")
+    assert seite.evaluate(
+        "() => { const a = document.querySelector('.bl-ausgabe'); const k = document.getElementById('software-katalog');"
+        " return !!k && a.contains(k) && k.dataset.modus === 'blockly'; }"
+    )
+    seite.click("#software-katalog > summary")
+    assert seite.get_attribute("[data-plattform=macos]", "aria-pressed") == "true"
+    seite.fill("#katalog-suche", "firefox esr")
+    seite.locator(".katalog-eintrag:first-child .katalog-name", has_text="Firefox ESR").wait_for()
+    seite.locator(".katalog-eintrag").first.locator(".knopf-uebernehmen").first.click()
+    bloecke = seite.evaluate(
+        "() => window.okmBlockly.arbeitsflaeche.getAllBlocks(false).filter(b => b.type === 'bk_paket_installieren')"
+        ".map(b => ({paket: b.getFieldValue('paket'), pm: b.getFieldValue('paketmanager'),"
+        " imScript: !!b.getRootBlock() && b.getRootBlock().type === 'ablauf_start'}))"
+    )
+    assert bloecke == [{"paket": "firefox@esr", "pm": "brew_cask", "imScript": True}], bloecke
+    # Neuer Block ist ausgewählt → ＋ setzt dessen ID statt einen weiteren anzulegen
+    seite.fill("#katalog-suche", "vlc")
+    seite.locator(".katalog-eintrag:first-child .katalog-name", has_text="VLC").wait_for()
+    seite.locator(".katalog-eintrag").first.locator(".knopf-uebernehmen").first.click()
+    bloecke = seite.evaluate(
+        "() => window.okmBlockly.arbeitsflaeche.getAllBlocks(false).filter(b => b.type === 'bk_paket_installieren')"
+        ".map(b => b.getFieldValue('paket'))"
+    )
+    assert bloecke == ["vlc"], bloecke
+    seite.locator("#bl-code", has_text="brew install --cask 'vlc'").wait_for(timeout=8000)
+    assert js_fehler == []
+
+
+def test_katalog_ist_eine_komponente(server: str, browser) -> None:
+    """Punkt 7: dieselbe Komponente (SoftwareKatalog.mount) auf allen vier Seiten."""
+    seite = browser.new_page(viewport={"width": 1280, "height": 900})
+    for pfad, modus in [
+        ("/software", "seite"),
+        ("/baukasten?ziel=bash", "baukasten"),
+        ("/rezepte/software_installieren?ziel=bash", "rezept"),
+        ("/blockly?ziel=bash", "blockly"),
+    ]:
+        seite.goto(server + pfad)
+        assert seite.evaluate("() => typeof window.SoftwareKatalog.mount") == "function"
+        assert seite.get_attribute("#software-katalog", "data-modus") == modus
+        assert seite.locator("#software-katalog").count() == 1

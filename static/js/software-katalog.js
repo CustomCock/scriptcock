@@ -1,10 +1,23 @@
-/* okm Script-Baukasten – Software-Katalog (Panel im Baukasten/Rezept und Seite /software).
-   Daten: eingebettetes JSON (#software-katalog-daten). Suche: katalog-suche.js. Kein innerHTML mit Daten. */
+/* okm Script-Baukasten – Software-Katalog als EINE Komponente.
+ *
+ *   var katalog = SoftwareKatalog.mount(element, {
+ *     daten:            [...],                  // Pakete (JSON aus #software-katalog-daten)
+ *     zielPlattform:    function () {…},        // "windows" | "macos" | "linux" | "" (Filter folgt dem Ziel)
+ *     onUebernehmen:    function (eintrag) {…}, // ＋ – eintrag = {feld: "winget", id: "7zip.7zip"}
+ *     kannUebernehmen:  function () {…},        // ob ＋ angezeigt wird (Standard: wenn onUebernehmen da ist)
+ *     onMehrfach:       function (eintraege) {…} // Checkboxen + „Ausgewählte installieren (n)“
+ *   });
+ *   katalog.oeffnen(); katalog.zielGeaendert(); katalog.aktualisieren();
+ *
+ * Unten stehen die Adapter für /software, Rezept, Baukasten (Listen-Modus) und Blockly.
+ * Daten nur über Textknoten ins DOM – kein innerHTML. Suche: katalog-suche.js.
+ */
 (function () {
   "use strict";
 
   var LABEL = { winget: "winget", brew: "brew", brew_cask: "brew --cask", apt: "apt", flatpak: "flatpak" };
   var FELD_PLATTFORM = { winget: "windows", brew: "macos", brew_cask: "macos", apt: "linux", flatpak: "linux" };
+  var PLATTFORM_NAME = { windows: "Windows", macos: "macOS", linux: "Linux" };
   var SPEICHER_PLATTFORM = "okm.katalog.plattform";
   var SPEICHER_KATEGORIEN = "okm.katalog.kategorien";
 
@@ -35,97 +48,53 @@
     return e;
   }
 
-  function start() {
-    var wurzel = document.getElementById("software-katalog");
-    var daten = document.getElementById("software-katalog-daten");
-    if (!wurzel || !daten || !window.OkmKatalogSuche) { return; }
+  // --- Kopieren (Clipboard-API, Fallback für HTTP, sonst markieren + „Strg+C“) -------------
+  function altKopieren(text) {
+    var feld = document.createElement("textarea");
+    feld.value = text;
+    feld.setAttribute("readonly", "");
+    feld.className = "sr-only";
+    document.body.appendChild(feld);
+    feld.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    document.body.removeChild(feld);
+    return ok;
+  }
+
+  // ======================================================================================
+  // Komponente
+  // ======================================================================================
+  function mount(wurzel, optionen) {
+    optionen = optionen || {};
     var S = window.OkmKatalogSuche;
-    var pakete = JSON.parse(daten.textContent);
-    var index = S.baueIndex(pakete);
-    var modus = wurzel.dataset.modus;
-    var suchfeld = document.getElementById("katalog-suche");
-    var liste = document.getElementById("katalog-liste");
-    var anzahl = document.getElementById("katalog-anzahl");
-    var leer = wurzel.querySelector(".katalog-leer");
-    var meldung = document.getElementById("katalog-meldung");
-    var auswahlKnopf = wurzel.querySelector("[data-katalog-auswahl]");
-    var oeffnen = document.querySelectorAll("[data-katalog-oeffnen]");
-    var filterZeile = wurzel.querySelector(".katalog-filter");
-    var PLATTFORM_NAME = { windows: "Windows", macos: "macOS", linux: "Linux" };
+    var index = S.baueIndex(optionen.daten || []);
+    var eingeklappt = wurzel.tagName === "DETAILS";
+    var $ = function (sel) { return wurzel.querySelector(sel); };
+    var suchfeld = $(".katalog-suche");
+    var liste = $(".katalog-liste");
+    var anzahl = $("#katalog-anzahl");
+    var leer = $(".katalog-leer");
+    var meldung = $("#katalog-meldung");
+    var auswahlKnopf = $("[data-katalog-auswahl]");
+    var filterZeile = $(".katalog-filter");
+    var zustand = { plattform: "alle", kategorien: [], treffer: [], aktiv: -1, auswahl: {}, gezeigt: false };
 
-    var zustand = { plattform: "alle", kategorien: [], treffer: [], aktiv: -1, auswahl: {} };
-    var letztesPaketfeld = null;
-
+    function zielPlattform() { return optionen.zielPlattform ? optionen.zielPlattform() || "" : ""; }
+    function kannUebernehmen() {
+      if (!optionen.onUebernehmen) { return false; }
+      return optionen.kannUebernehmen ? optionen.kannUebernehmen() : true;
+    }
     function melden(text) {
       meldung.textContent = "";
       setTimeout(function () { meldung.textContent = text; }, 30);
     }
-
-    // --- Zielsystem → Plattform ------------------------------------------------
-    function zielsystem() {
-      if (window.OkmBaukasten) { return window.OkmBaukasten.ziel(); }
-      return wurzel.dataset.ziel || "";
-    }
-    function zielPlattform() { return S.ZIEL_PLATTFORM[zielsystem()] || ""; }
-
-    // --- Übernahme ins Script --------------------------------------------------
-    function paketfeld() {
-      if (letztesPaketfeld && document.body.contains(letztesPaketfeld)) { return letztesPaketfeld; }
-      if (modus === "rezept") { return document.querySelector("form input[data-typ='paketname']"); }
-      return null;
-    }
-    function kannUebernehmen() {
-      return modus === "baukasten" || (modus === "rezept" && !!document.querySelector("form input[data-typ='paketname']"));
-    }
-    function feldBefuellen(feld, eintrag) {
-      feld.value = eintrag.id;
-      feld.dispatchEvent(new Event("input", { bubbles: true }));
-      feld.dispatchEvent(new Event("change", { bubbles: true }));
-      // Passenden Paketmanager im selben Schritt bzw. Formular mitsetzen
-      var behaelter = feld.closest("li.schritt") || feld.form;
-      var auswahl = behaelter && behaelter.querySelector("select[name$='.paketmanager']");
-      if (auswahl && auswahl.querySelector("option[value='" + eintrag.feld + "']")) {
-        auswahl.value = eintrag.feld;
-        auswahl.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-      feld.focus();
-      melden(eintrag.id + " eingetragen.");
-    }
-    function bausteinHinzufuegen(eintraege) {
-      var kette = Promise.resolve();
-      eintraege.forEach(function (e) {
-        kette = kette.then(function () {
-          return window.OkmBaukasten.hinzufuegen("paket_installieren", { paket: e.id, paketmanager: e.feld });
-        });
-      });
-      return kette.then(function () {
-        melden(eintraege.length === 1 ? eintraege[0].id + " zum Script hinzugefügt." : eintraege.length + " Pakete zum Script hinzugefügt.");
-      });
-    }
-    function uebernehmen(eintrag) {
-      var feld = paketfeld();
-      if (feld) { feldBefuellen(feld, eintrag); return; }
-      if (window.OkmBaukasten) { bausteinHinzufuegen([eintrag]); }
-    }
-    /* ID eines Pakets, die zum aktuellen Zielsystem passt (für Auswahl-Checkboxen). */
+    /* ID eines Pakets, die zum aktuellen Zielsystem passt (Checkboxen, Mehrfachauswahl). */
     function zielEintrag(paket) {
       var ids = S.ids(paket, zielPlattform() || "alle");
       return ids.length ? ids[0] : null;
     }
 
-    // --- Kopieren --------------------------------------------------------------
-    function altKopieren(text) {
-      var feld = document.createElement("textarea");
-      feld.value = text;
-      feld.setAttribute("readonly", "");
-      feld.className = "sr-only";
-      document.body.appendChild(feld);
-      feld.select();
-      var ok = false;
-      try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
-      document.body.removeChild(feld);
-      return ok;
-    }
     function rueckmeldung(knopf, text) {
       if (knopf.dataset.alt === undefined) { knopf.dataset.alt = knopf.textContent; }
       knopf.textContent = "✓ Kopiert";
@@ -163,7 +132,16 @@
       }
     }
 
-    // --- Darstellung -----------------------------------------------------------
+    // --- Darstellung -------------------------------------------------------------------
+    function knopf(text, klasse, titel, beschriftung, aktion) {
+      var k = el("button", klasse, text);
+      k.type = "button";
+      k.title = titel;
+      k.setAttribute("aria-label", beschriftung);
+      k.addEventListener("click", aktion);
+      return k;
+    }
+
     function idZeile(eintrag, uebernahme) {
       var zeile = el("div", "katalog-id");
       zeile.appendChild(el("span", "katalog-id-label", LABEL[eintrag.feld]));
@@ -172,26 +150,19 @@
       code.title = eintrag.id;
       zeile.appendChild(code);
       var knoepfe = el("span", "katalog-id-knoepfe");
-      var kop = el("button", "knopf-klein", "⧉");
-      kop.type = "button";
-      kop.title = "ID kopieren";
-      kop.setAttribute("aria-label", "ID kopieren: " + eintrag.id);
-      kop.addEventListener("click", function () { kopieren(eintrag.id, kop, code); });
+      var kop = knopf("⧉", "knopf-klein", "ID kopieren", "ID kopieren: " + eintrag.id, function () {
+        kopieren(eintrag.id, kop, code);
+      });
+      var bef = knopf("▾", "knopf-klein", "Installationsbefehl kopieren", "Installationsbefehl kopieren: " + eintrag.id,
+        function () { kopieren(S.befehl(eintrag.feld, eintrag.id), bef, code); });
       knoepfe.appendChild(kop);
-      var bef = el("button", "knopf-klein", "▾");
-      bef.type = "button";
-      bef.title = "Installationsbefehl kopieren";
-      bef.setAttribute("aria-label", "Installationsbefehl kopieren: " + eintrag.id);
-      bef.addEventListener("click", function () { kopieren(S.befehl(eintrag.feld, eintrag.id), bef, code); });
       knoepfe.appendChild(bef);
       if (uebernahme) {
-        var plus = el("button", "knopf-klein knopf-uebernehmen", "＋");
-        plus.type = "button";
         var passt = !zielPlattform() || FELD_PLATTFORM[eintrag.feld] === zielPlattform();
+        var plus = knopf("＋", "knopf-klein knopf-uebernehmen",
+          passt ? "Ins Script übernehmen" : "Passt nicht zum gewählten Zielsystem",
+          "Ins Script übernehmen: " + eintrag.id, function () { optionen.onUebernehmen(eintrag); });
         plus.disabled = !passt;
-        plus.title = passt ? "Ins Script übernehmen" : "Passt nicht zum gewählten Zielsystem";
-        plus.setAttribute("aria-label", "Ins Script übernehmen: " + eintrag.id);
-        plus.addEventListener("click", function () { uebernehmen(eintrag); });
         knoepfe.appendChild(plus);
       }
       zeile.appendChild(knoepfe);
@@ -202,8 +173,9 @@
       var p = t.paket;
       var li = el("li", "katalog-eintrag");
       li.id = "katalog-eintrag-" + nr;
-      var kopf = el("div", "katalog-eintrag-kopf" + (modus === "baukasten" ? " mit-auswahl" : ""));
-      if (modus === "baukasten") {
+      var mehrfach = !!optionen.onMehrfach;
+      var kopf = el("div", "katalog-eintrag-kopf" + (mehrfach ? " mit-auswahl" : ""));
+      if (mehrfach) {
         var ziel = zielEintrag(p);
         var box = el("input");
         box.type = "checkbox";
@@ -252,11 +224,8 @@
       filterZeile.hidden = !aktiv;
       if (!aktiv) { return; }
       function marke(text, beschriftung, entfernen) {
-        var k = el("button", "katalog-filter-marke", text + " ×");
-        k.type = "button";
-        k.setAttribute("aria-label", beschriftung);
-        k.addEventListener("click", function () { entfernen(); zeigen(); });
-        filterZeile.appendChild(k);
+        filterZeile.appendChild(knopf(text + " ×", "katalog-filter-marke", beschriftung, beschriftung,
+          function () { entfernen(); zeigen(); }));
       }
       filterZeile.appendChild(el("span", null, "Gefiltert:"));
       zustand.kategorien.forEach(function (k) {
@@ -276,6 +245,7 @@
     }
 
     function zeigen() {
+      zustand.gezeigt = true;
       filterZeigen();
       var anfrage = suchfeld.value;
       zustand.treffer = S.suche(index, { anfrage: anfrage, plattform: zustand.plattform, kategorien: zustand.kategorien });
@@ -308,7 +278,7 @@
       auswahlKnopf.disabled = n === 0;
     }
 
-    // --- Filter ----------------------------------------------------------------
+    // --- Filter --------------------------------------------------------------------------
     function plattformSetzen(wert, merken) {
       zustand.plattform = S.PLATTFORMEN[wert] ? wert : "alle";
       wurzel.querySelectorAll("[data-plattform]").forEach(function (k) {
@@ -316,14 +286,14 @@
       });
       if (merken) { schreiben(SPEICHER_PLATTFORM, zustand.plattform); }
     }
-    function kategorienSetzen(liste_) {
+    function kategorienSetzen(neu) {
       var vorhanden = {};
       wurzel.querySelectorAll("[data-kategorie]").forEach(function (k) { vorhanden[k.dataset.kategorie] = k; });
-      zustand.kategorien = liste_.filter(function (k) { return vorhanden[k]; });
+      zustand.kategorien = neu.filter(function (k) { return vorhanden[k]; });
       Object.keys(vorhanden).forEach(function (k) {
         vorhanden[k].setAttribute("aria-pressed", String(zustand.kategorien.indexOf(k) >= 0));
       });
-      var zaehler = wurzel.querySelector("[data-kategorien-anzahl]");
+      var zaehler = $("[data-kategorien-anzahl]");
       if (zaehler) { zaehler.textContent = zustand.kategorien.length ? "(" + zustand.kategorien.length + " gewählt)" : ""; }
       schreiben(SPEICHER_KATEGORIEN, JSON.stringify(zustand.kategorien));
     }
@@ -341,21 +311,11 @@
       });
     });
 
-    // Startzustand: Zielsystem gewinnt (Baukasten/Rezept), sonst gemerkte Plattform
+    // Startzustand: Zielsystem gewinnt, sonst gemerkte Plattform
     plattformSetzen(zielPlattform() || lesen(SPEICHER_PLATTFORM) || "alle", false);
     try { kategorienSetzen(JSON.parse(lesen(SPEICHER_KATEGORIEN) || "[]") || []); } catch (e) { kategorienSetzen([]); }
 
-    // Zielsystem im Baukasten gewechselt → Filter zieht mit
-    var zielWahl = document.getElementById("ziel-wahl");
-    if (zielWahl) {
-      zielWahl.addEventListener("change", function () {
-        plattformSetzen(zielPlattform(), false);
-        auswahlAktualisieren();
-        zeigen();
-      });
-    }
-
-    // --- Suche & Tastatur --------------------------------------------------------
+    // --- Suche & Tastatur ----------------------------------------------------------------
     var zeit = null;
     suchfeld.addEventListener("input", function () {
       clearTimeout(zeit);
@@ -367,65 +327,30 @@
       else if (ev.key === "Enter") {
         ev.preventDefault();
         var li = document.getElementById("katalog-eintrag-" + Math.max(zustand.aktiv, 0));
-        var knopf = li && li.querySelector(".katalog-id .knopf-klein");
-        if (knopf) { knopf.click(); }
+        var k = li && li.querySelector(".katalog-id .knopf-klein");
+        if (k) { k.click(); }
       } else if (ev.key === "Escape") {
         ev.preventDefault();
         ev.stopPropagation();
-        if (suchfeld.value) { suchfeld.value = ""; zeigen(); } else if (modus !== "seite") { schliessen(); }
+        if (suchfeld.value) { suchfeld.value = ""; zeigen(); }
       }
     });
-
     document.addEventListener("keydown", function (ev) {
-      if (ev.key === "/" && !ev.ctrlKey && !ev.metaKey && !ev.altKey) {
-        var a = document.activeElement;
-        var tippt = a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
-        if (tippt) { return; }
-        ev.preventDefault();
-        oeffnenPanel();
-      } else if (ev.key === "Escape" && modus !== "seite" && !wurzel.hidden) {
-        schliessen();
-      }
+      if (ev.key !== "/" || ev.ctrlKey || ev.metaKey || ev.altKey) { return; }
+      var a = document.activeElement;
+      if (a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) { return; }
+      if (a && a.closest && a.closest(".blocklyDiv, .blocklyWidgetDiv")) { return; }
+      ev.preventDefault();
+      oeffnen(true);
     });
-
-    // Merken, welches Paketname-Feld zuletzt aktiv war (dann füllt „＋“ nur dieses Feld)
-    document.addEventListener("focusin", function (ev) {
-      var z = ev.target;
-      if (wurzel.contains(z)) { return; }
-      if (z.matches && z.matches("input[data-typ='paketname']")) { letztesPaketfeld = z; }
-      else if (z.matches && z.matches("input, select, textarea")) { letztesPaketfeld = null; }
-    });
-
-    // --- Panel öffnen/schließen ----------------------------------------------------
-    function oeffnenPanel() {
-      if (modus === "seite") { suchfeld.focus(); suchfeld.select(); return; }
-      wurzel.hidden = false;
-      document.body.classList.add("katalog-offen");
-      oeffnen.forEach(function (k) { k.setAttribute("aria-expanded", "true"); });
-      if (!liste.childElementCount) { zeigen(); }
-      suchfeld.focus();
-      suchfeld.select();
-    }
-    function schliessen() {
-      if (modus === "seite") { return; }
-      wurzel.hidden = true;
-      document.body.classList.remove("katalog-offen");
-      oeffnen.forEach(function (k) { k.setAttribute("aria-expanded", "false"); });
-      if (oeffnen.length) { oeffnen[0].focus(); }
-    }
-    oeffnen.forEach(function (k) {
-      k.addEventListener("click", function () { if (wurzel.hidden) { oeffnenPanel(); } else { schliessen(); } });
-    });
-    var zu = wurzel.querySelector("[data-katalog-schliessen]");
-    if (zu) { zu.addEventListener("click", schliessen); }
 
     if (auswahlKnopf) {
       auswahlKnopf.addEventListener("click", function () {
         var eintraege = Object.keys(zustand.auswahl)
           .map(function (k) { return zielEintrag(zustand.auswahl[k]); })
           .filter(Boolean);
-        if (!eintraege.length || !window.OkmBaukasten) { return; }
-        bausteinHinzufuegen(eintraege).then(function () {
+        if (!eintraege.length) { return; }
+        Promise.resolve(optionen.onMehrfach(eintraege)).then(function () {
           zustand.auswahl = {};
           auswahlAktualisieren();
           zeigen();
@@ -433,8 +358,210 @@
       });
     }
 
-    if (modus === "seite") { zeigen(); }
+    // --- Ein-/Ausklappen -----------------------------------------------------------------
+    function oeffnen(fokus) {
+      if (eingeklappt && !wurzel.open) { wurzel.open = true; }
+      if (!zustand.gezeigt) { zeigen(); }
+      if (fokus) { suchfeld.focus(); suchfeld.select(); }
+    }
+    if (eingeklappt) {
+      wurzel.addEventListener("toggle", function () { if (wurzel.open && !zustand.gezeigt) { zeigen(); } });
+    } else {
+      zeigen();
+    }
+
+    return {
+      oeffnen: oeffnen,
+      melden: melden,
+      aktualisieren: function () { if (zustand.gezeigt) { auswahlAktualisieren(); zeigen(); } },
+      /* Zielsystem gewechselt → Plattformfilter zieht mit */
+      zielGeaendert: function () {
+        plattformSetzen(zielPlattform() || "alle", false);
+        auswahlAktualisieren();
+        if (zustand.gezeigt) { zeigen(); }
+      }
+    };
   }
 
-  document.addEventListener("DOMContentLoaded", start);
+  window.SoftwareKatalog = { mount: mount };
+
+  // ======================================================================================
+  // Adapter je Seite
+  // ======================================================================================
+
+  /* Paketfeld im Formular befüllen (+ passenden Paketmanager im selben Schritt bzw. Formular). */
+  function feldBefuellen(feld, eintrag) {
+    feld.value = eintrag.id;
+    feld.dispatchEvent(new Event("input", { bubbles: true }));
+    feld.dispatchEvent(new Event("change", { bubbles: true }));
+    var behaelter = feld.closest("li.schritt") || feld.form;
+    var auswahl = behaelter && behaelter.querySelector("select[name$='.paketmanager']");
+    if (auswahl && auswahl.querySelector("option[value='" + eintrag.feld + "']")) {
+      auswahl.value = eintrag.feld;
+      auswahl.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    feld.focus();
+  }
+
+  /* Merkt sich das zuletzt fokussierte Paketname-Feld; Fokus darauf klappt den Katalog auf. */
+  function paketfeldVerfolgen(wurzel, katalog) {
+    var letztes = null;
+    document.addEventListener("focusin", function (ev) {
+      var z = ev.target;
+      if (wurzel.contains(z)) { return; }
+      if (z.matches && z.matches("input[data-typ='paketname']")) { letztes = z; katalog.oeffnen(false); }
+      else if (z.matches && z.matches("input, select, textarea")) { letztes = null; }
+    });
+    return function () { return letztes && document.body.contains(letztes) ? letztes : null; };
+  }
+
+  function zielRadios(container) {
+    return function () {
+      var r = container && container.querySelector("input[name=ziel]:checked");
+      return r ? window.OkmKatalogSuche.ZIEL_PLATTFORM[r.value] || "" : "";
+    };
+  }
+
+  var ADAPTER = {
+    seite: function (wurzel, daten) {
+      return mount(wurzel, { daten: daten });
+    },
+
+    rezept: function (wurzel, daten) {
+      var feldImFormular = function () { return document.querySelector("form input[data-typ='paketname']"); };
+      var paketfeld = null;
+      var katalog = mount(wurzel, {
+        daten: daten,
+        zielPlattform: function () { return window.OkmKatalogSuche.ZIEL_PLATTFORM[wurzel.dataset.ziel] || ""; },
+        kannUebernehmen: function () { return !!feldImFormular(); },
+        onUebernehmen: function (eintrag) {
+          var feld = (paketfeld && paketfeld()) || feldImFormular();
+          if (feld) { feldBefuellen(feld, eintrag); katalog.melden(eintrag.id + " eingetragen."); }
+        }
+      });
+      paketfeld = paketfeldVerfolgen(wurzel, katalog);
+      return katalog;
+    },
+
+    baukasten: function (wurzel, daten) {
+      var bk = window.OkmBaukasten;
+      var zielWahl = document.getElementById("ziel-wahl");
+      var paketfeld = null;
+      var katalog = null;
+      function anhaengen(eintraege) {
+        var kette = Promise.resolve();
+        eintraege.forEach(function (e) {
+          kette = kette.then(function () {
+            return bk.hinzufuegen("paket_installieren", { paket: e.id, paketmanager: e.feld });
+          });
+        });
+        return kette.then(function () {
+          katalog.melden(eintraege.length === 1 ? eintraege[0].id + " zum Script hinzugefügt."
+            : eintraege.length + " Pakete zum Script hinzugefügt.");
+        });
+      }
+      katalog = mount(wurzel, {
+        daten: daten,
+        zielPlattform: zielRadios(zielWahl),
+        // Fokussiertes Paketfeld → genau dieses Feld; sonst neuen Schritt anhängen
+        onUebernehmen: function (eintrag) {
+          var feld = paketfeld && paketfeld();
+          if (feld) { feldBefuellen(feld, eintrag); katalog.melden(eintrag.id + " eingetragen."); }
+          else { anhaengen([eintrag]); }
+        },
+        onMehrfach: anhaengen
+      });
+      paketfeld = paketfeldVerfolgen(wurzel, katalog);
+      if (zielWahl) { zielWahl.addEventListener("change", katalog.zielGeaendert); }
+      // Neuer Schritt „Paket installieren“ → Katalog aufklappen
+      var schritte = document.getElementById("schrittliste");
+      if (schritte && window.MutationObserver) {
+        new MutationObserver(function (aenderungen) {
+          aenderungen.forEach(function (a) {
+            a.addedNodes.forEach(function (n) {
+              if (n.nodeType === 1 && n.matches("li.schritt[data-block=paket_installieren]")) { katalog.oeffnen(false); }
+            });
+          });
+        }).observe(schritte, { childList: true });
+      }
+      return katalog;
+    },
+
+    blockly: function (wurzel, daten) {
+      var zielWahl = document.getElementById("bl-ziel");
+      var TYP = "bk_paket_installieren";
+      var katalog = null;
+      function ausgewaehlt() {
+        var B = window.Blockly;
+        if (!B) { return null; }
+        if (B.getSelected) { return B.getSelected(); }
+        return B.selected || null;
+      }
+      function uebernehmen(eintrag) {
+        var bl = window.okmBlockly;
+        if (!bl) { return; }
+        var ws = bl.arbeitsflaeche;
+        var sel = ausgewaehlt();
+        if (sel && sel.type === TYP) {
+          // Ausgewählter „Paket installieren“-Baustein → nur dessen ID setzen
+          sel.setFieldValue(eintrag.id, "paket");
+          sel.setFieldValue(eintrag.feld, "paketmanager");
+          katalog.melden(eintrag.id + " eingetragen.");
+          return;
+        }
+        var neu = ws.newBlock(TYP);
+        neu.setFieldValue(eintrag.id, "paket");
+        neu.setFieldValue(eintrag.feld, "paketmanager");
+        neu.initSvg();
+        neu.render();
+        if (sel && sel.type === "ablauf_start") {
+          sel.getInput("SCHRITTE").connection.connect(neu.previousConnection);
+        } else if (sel && sel.nextConnection) {
+          sel.nextConnection.connect(neu.previousConnection);  // unter dem ausgewählten Baustein einfügen
+        } else {
+          // Nichts ausgewählt → ans Ende des Scripts hängen
+          var start = ws.getTopBlocks(false).filter(function (b) { return b.type === "ablauf_start"; })[0];
+          if (start) {
+            var verbindung = start.getInput("SCHRITTE").connection;
+            var letzter = verbindung.targetBlock();
+            while (letzter && letzter.getNextBlock()) { letzter = letzter.getNextBlock(); }
+            if (letzter) { letzter.nextConnection.connect(neu.previousConnection); }
+            else { verbindung.connect(neu.previousConnection); }
+          }
+        }
+        // Neuen Baustein auswählen – das nächste ＋ setzt dann dessen ID
+        var B = window.Blockly;
+        if (B.common && B.common.setSelected) { B.common.setSelected(neu); } else if (neu.select) { neu.select(); }
+        katalog.melden(eintrag.id + " als Baustein hinzugefügt.");
+      }
+      katalog = mount(wurzel, {
+        daten: daten,
+        zielPlattform: zielRadios(zielWahl),
+        onUebernehmen: uebernehmen
+      });
+      if (zielWahl) { zielWahl.addEventListener("change", katalog.zielGeaendert); }
+      // „Paket installieren“ angelegt oder ausgewählt → Katalog aufklappen
+      function beobachten() {
+        var bl = window.okmBlockly;
+        if (!bl) { return false; }
+        bl.arbeitsflaeche.addChangeListener(function (ev) {
+          var id = ev.newElementId || ev.blockId;
+          var b = id && bl.arbeitsflaeche.getBlockById(id);
+          if (b && b.type === TYP && (ev.type === "selected" || ev.type === "create")) { katalog.oeffnen(false); }
+        });
+        return true;
+      }
+      // blockly-modus.js richtet die Arbeitsfläche erst nach diesem Script ein
+      if (!beobachten()) { window.addEventListener("load", beobachten); }
+      return katalog;
+    }
+  };
+
+  document.addEventListener("DOMContentLoaded", function () {
+    var wurzel = document.getElementById("software-katalog");
+    var datenEl = document.getElementById("software-katalog-daten");
+    if (!wurzel || !datenEl || !window.OkmKatalogSuche) { return; }
+    var adapter = ADAPTER[wurzel.dataset.modus];
+    if (adapter) { window.okmKatalog = adapter(wurzel, JSON.parse(datenEl.textContent)); }
+  });
 })();

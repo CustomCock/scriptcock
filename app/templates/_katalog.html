@@ -1,18 +1,11 @@
-{# Software-Katalog – als ausklappbares Panel (Baukasten/Rezept) oder als ganze Seite.
-   erwartet: katalog_modus ("seite" | "baukasten" | "rezept"), optional katalog_ziel (Ziel).
-   Die Einträge baut static/js/software-katalog.js aus dem eingebetteten JSON. #}
+{# Software-Katalog – EINE Komponente für /software, Rezept, Baukasten und Blockly.
+   erwartet: katalog_modus ("seite" | "rezept" | "baukasten" | "blockly"), optional katalog_ziel (Ziel).
+   Außer auf /software ein einklappbarer Abschnitt (standardmäßig zu), der in der rechten Spalte
+   unter der Vorschau steht. Die Einträge baut static/js/software-katalog.js (SoftwareKatalog.mount)
+   aus dem eingebetteten JSON. #}
 {% import "_icons.html" as i %}
 {% set seite = katalog_modus == "seite" %}
-<section id="software-katalog" class="katalog{% if not seite %} katalog-panel{% endif %}" data-modus="{{ katalog_modus }}"
-         {% if katalog_ziel %}data-ziel="{{ katalog_ziel.value }}"{% endif %} aria-labelledby="katalog-titel"{% if not seite %} hidden{% endif %}>
-  {% if seite %}
-  <h2 id="katalog-titel" class="sr-only">Software-Katalog</h2>
-  {% else %}
-  <div class="katalog-kopf">
-    <h2 id="katalog-titel">{{ i.icon("software") }} Software-Katalog</h2>
-    <button type="button" class="knopf-klein" data-katalog-schliessen aria-label="Software-Katalog schließen" title="Schließen (Esc)">✕</button>
-  </div>
-  {% endif %}
+{% set inhalt %}
   <label class="sr-only" for="katalog-suche">Software suchen</label>
   <input id="katalog-suche" class="katalog-suche" type="search" placeholder="Software suchen … (z. B. pdf, vpn, firefox)"
          autocomplete="off" spellcheck="false" aria-controls="katalog-liste" aria-describedby="katalog-tasten">
@@ -39,5 +32,16 @@
   <p class="katalog-leer" hidden>Nichts gefunden. Versuch einen allgemeineren Begriff wie ‚pdf‘ oder ‚backup‘.</p>
   <p class="katalog-fuss">IDs geprüft am {{ katalog.geprueft_am.strftime("%d.%m.%Y") }}{% if not seite %} · <a href="{{ basis }}/software" target="_blank" rel="noopener">als eigene Seite öffnen</a>{% endif %}</p>
   <div id="katalog-meldung" class="sr-only" aria-live="polite"></div>
-  <script type="application/json" id="software-katalog-daten">{{ katalog_daten | tojson }}</script>
+{% endset %}
+{% if seite %}
+<section id="software-katalog" class="katalog katalog-seite" data-modus="seite" aria-label="Software-Katalog">
+  <div class="katalog-inhalt">{{ inhalt }}</div>
 </section>
+{% else %}
+<details id="software-katalog" class="katalog katalog-eingebettet" data-modus="{{ katalog_modus }}"
+         {% if katalog_ziel %}data-ziel="{{ katalog_ziel.value }}"{% endif %}>
+  <summary class="katalog-kopf">{{ i.icon("software") }} <span>Software-Katalog</span> <span class="katalog-kopf-hilfe">Paket-IDs suchen und ins Script übernehmen</span></summary>
+  <div class="katalog-inhalt">{{ inhalt }}</div>
+</details>
+{% endif %}
+<script type="application/json" id="software-katalog-daten">{{ katalog_daten | tojson }}</script>

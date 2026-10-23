@@ -2,6 +2,29 @@
 
 ## Fehlerbehebung Runde 1
 
+### 6. + 7. Software-Katalog unter der Vorschau, eine Komponente, auch in Blockly
+
+(Ein gemeinsamer Commit: Beide Punkte beruhen auf demselben Umbau der Katalog-Komponente.)
+
+- **Vorher:** Der Katalog war eine Schublade über der Seite, im Baukasten über einen Knopf zu
+  öffnen; in Blockly fehlte er ganz. Paneel-Code und Seitenlogik waren vermischt.
+- **Lösung:**
+  - **Eine Komponente:** Partial `_katalog.html` + `SoftwareKatalog.mount(el, {daten,
+    zielPlattform, onUebernehmen, kannUebernehmen, onMehrfach})`; Adapter für `/software`,
+    Rezept, Baukasten und Blockly. Keine Kopien.
+  - **Platz:** rechte Spalte direkt unter der Vorschau (Rezept, Baukasten, Blockly), die Spalte
+    ist `position: sticky`. Auf schmalen Bildschirmen Blöcke → Vorschau → Katalog untereinander.
+  - Standardmäßig eingeklappt; klappt automatisch auf, wenn ein Schritt „Paket installieren“
+    hinzugefügt (Liste) bzw. angelegt/ausgewählt (Blockly) oder ein Feld „Paketname“ fokussiert
+    wird. Die Plattform folgt dem Zielsystem.
+  - Blockly: ＋ legt einen „Paket installieren“-Baustein mit ID und Paketmanager an – unter dem
+    ausgewählten Baustein, sonst am Ende des Scripts; ist ein solcher Baustein ausgewählt, wird
+    nur dessen ID gesetzt.
+- **Tests (Playwright):** Position/sticky/eingeklappt, Aufklappen beim Hinzufügen bzw. Fokus,
+  ＋ füllt das fokussierte Feld, Reihenfolge auf 600 px, Blockly (neuer Baustein im Script,
+  danach ID ersetzen, Vorschau zeigt `brew install --cask 'vlc'`), dieselbe Komponente auf allen
+  vier Seiten.
+
 ### 5. Software-Katalog: Zeilenumbrüche
 
 - **Ursachen (reproduziert per Playwright bei 360/768/1280/1920 px):**

@@ -12,7 +12,6 @@
   </div>
   <div class="seitenkopf-aktionen">
     <span class="marke">{{ ziel_anzeige[ziel] }}</span>
-    <button type="button" class="knopf" data-katalog-oeffnen aria-controls="software-katalog" aria-expanded="false">{{ i.icon("software") }} Software-Katalog</button>
   </div>
 </div>
 
@@ -72,7 +71,7 @@
         <div>{{ i.icon("terminal") }}<br>Hier erscheint die Vorschau,<br>sobald du auf „Script erzeugen“ klickst.</div>
       </div>
     </div>
+    {% with katalog_modus="rezept", katalog_ziel=ziel %}{% include "_katalog.html" %}{% endwith %}
   </div>
 </div>
-{% with katalog_modus="rezept", katalog_ziel=ziel %}{% include "_katalog.html" %}{% endwith %}
 {% endblock %}

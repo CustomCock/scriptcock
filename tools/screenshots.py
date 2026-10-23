@@ -59,10 +59,21 @@ def katalog_seite(seite: Page, url: str) -> None:
 
 
 def katalog_panel(seite: Page, url: str) -> None:
+    """Baukasten: Katalog in der rechten Spalte unter der Vorschau (bzw. unten auf dem Handy)."""
     seite.goto(f"{url}/baukasten?ziel=powershell")
-    seite.click("[data-katalog-oeffnen]")
+    seite.click("[data-hinzufuegen=paket_installieren]")
+    seite.locator("#software-katalog[open]").wait_for()
     seite.fill("#katalog-suche", "visual c++")
-    seite.wait_for_timeout(300)
+    seite.wait_for_timeout(500)
+    seite.locator("#software-katalog").scroll_into_view_if_needed()
+
+
+def blockly(seite: Page, url: str) -> None:
+    seite.goto(f"{url}/blockly?ziel=zsh")
+    seite.locator(".blocklyDraggable").first.wait_for()
+    seite.click("#software-katalog > summary")
+    seite.fill("#katalog-suche", "firefox")
+    seite.wait_for_timeout(500)
 
 
 def rezepte(seite: Page, url: str) -> None:
@@ -71,7 +82,7 @@ def rezepte(seite: Page, url: str) -> None:
 
 
 BEREICHE: dict[str, list[tuple[str, Callable[[Page, str], None]]]] = {
-    "katalog": [("katalog-seite", katalog_seite), ("katalog-panel", katalog_panel)],
+    "katalog": [("katalog-seite", katalog_seite), ("katalog-panel", katalog_panel), ("katalog-blockly", blockly)],
     "rezepte": [("rezepte", rezepte)],
 }
 
