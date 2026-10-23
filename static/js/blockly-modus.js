@@ -28,8 +28,7 @@
     var erzeugenKnopf = document.getElementById("bl-erzeugen");
     var statusEl = document.getElementById("bl-status");
     var fehlerEl = document.getElementById("bl-fehler");
-    var codeRahmen = document.getElementById("bl-code-rahmen");
-    var codeEl = document.getElementById("bl-code");
+    var editor = window.ScriptEditor ? window.ScriptEditor.fuer(document.getElementById("script-editor")) : null;
     var ergebnisEl = document.getElementById("bl-ergebnis");
 
     function ziel() {
@@ -328,7 +327,7 @@
       } catch (e) { /* privater Modus o. Ä. */ }
       if (!s.anfrage.schritte.length) {
         fehlerZeigen([], s.positionen);
-        codeRahmen.hidden = true;
+        if (editor) { editor.leer(); }
         erzeugenKnopf.disabled = true;
         statusEl.textContent = "Noch keine Schritte im Block „Script“.";
         return;
@@ -339,16 +338,12 @@
         if (nr !== letzteAnfrage) { return; } // veraltete Antwort
         if (r.status === 200) {
           fehlerZeigen([], s.positionen);
-          codeEl.textContent = r.json.text;
-          codeEl.className = "language-" + daten.sprachen[s.anfrage.ziel];
-          delete codeEl.dataset.highlighted;
-          if (window.hljs) { window.hljs.highlightElement(codeEl); }
-          codeRahmen.hidden = false;
+          if (editor) { editor.setzeGeneriert(r.json.text, s.anfrage.ziel, r.json.dateiname); }
           zuletztOk = true;
           statusEl.textContent = "Live-Vorschau (" + daten.ziele[s.anfrage.ziel] + ") – gespeichert wird erst beim Erzeugen.";
         } else {
           fehlerZeigen(r.json.fehler || [{ meldung: "Unerwarteter Fehler." }], s.positionen);
-          codeRahmen.hidden = true;
+          if (editor) { editor.leer(); }
           zuletztOk = false;
           statusEl.textContent = "Download gesperrt, bis alle Fehler behoben sind.";
         }

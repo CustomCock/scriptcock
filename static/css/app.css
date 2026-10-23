@@ -36,6 +36,8 @@
   --gelb: #e0a83a;
   --gelb-text: #f0c879;
   --gelb-flaeche: #2a2010;
+  --code-flaeche: #0a0a0c;
+  --fehlerzeile: rgba(255, 90, 95, .16);
 
   --radius: 10px;
   --radius-klein: 6px;
@@ -181,6 +183,7 @@ fieldset { min-width: 0; }
 .marke, .rolle { display: inline-block; background: var(--flaeche-3); color: var(--sand); border: 1px solid var(--rand-stark);
   border-radius: 999px; padding: 0 .5rem; font-size: .72rem; font-weight: 650; line-height: 1.5rem; vertical-align: middle; white-space: nowrap; }
 .marke-leise { color: var(--text-leise); }
+.marke-gelb { color: var(--gelb-text); border-color: #4a3816; background: var(--gelb-flaeche); }
 .marke-rot { color: var(--rot-hell); border-color: var(--rot-dunkel); background: var(--rot-flaeche); }
 .risiko { display: inline-block; font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
   padding: 0 .4rem; border-radius: 4px; line-height: 1.25rem; vertical-align: middle; border: 1px solid; }
@@ -519,3 +522,62 @@ a.rezept-link:focus-visible { outline: 2px solid var(--sand); outline-offset: 2p
 .rezept-karte.nicht-verfuegbar .rezept-link { opacity: .55; border-style: dashed; }
 .rezept-gesperrt { font-size: .8rem; font-weight: 650; color: var(--text-leise); }
 .rezept-gruppe-aus .rezept-gruppe-titel { color: var(--text-schwach); }
+
+/* --- Script-Editor (CodeMirror 5, static/js/script-editor.js) ------------------------------ */
+.script-editor { display: flex; flex-direction: column; gap: .5rem; margin: .75rem 0; min-width: 0; }
+.editor-leiste { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+.editor-leiste .knopf { padding: .35rem .7rem; font-size: .85rem; }
+.editor-leiste-rechts { display: flex; flex-wrap: wrap; gap: .4rem; margin-left: auto; }
+.editor-zustand { font-size: .78rem; }
+.editor-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem;
+  padding: .5rem .75rem; border: 1px solid #4a3816; border-left: 3px solid var(--gelb); border-radius: var(--radius-klein);
+  background: var(--gelb-flaeche); color: var(--gelb-text); font-size: .9rem; }
+.editor-banner-knoepfe { display: flex; flex-wrap: wrap; gap: .4rem; }
+.editor-banner .knopf { padding: .3rem .65rem; font-size: .85rem; }
+.editor-sicherheit { margin: 0; }
+.editor-sicherheit .knopf { margin-top: .5rem; padding: .3rem .65rem; font-size: .85rem; }
+.editor-quelle { width: 100%; min-height: 20rem; background: var(--code-flaeche); color: var(--text); font-family: var(--mono);
+  font-size: .85rem; border: 1px solid var(--rand); border-radius: var(--radius); padding: .75rem; }
+.editor-diff { border: 1px solid var(--rand); border-radius: var(--radius); background: var(--code-flaeche); padding: .5rem .75rem; }
+.editor-diff .feldhilfe { margin: 0 0 .4rem; }
+.diff { margin: 0; font-family: var(--mono); font-size: .8rem; line-height: 1.45; overflow-x: auto; max-height: 22rem; }
+.diff-zeile { display: block; white-space: pre; }
+.diff-plus { background: var(--gruen-flaeche); color: var(--gruen-text); }
+.diff-minus { background: var(--rot-flaeche); color: var(--rot-hell); }
+.diff-gleich { color: var(--text-schwach); }
+.diff-luecke { display: block; color: var(--text-schwach); font-style: italic; }
+.editor-pruefung { border: 1px solid var(--rand); border-radius: var(--radius-klein); padding: .5rem .75rem; font-size: .88rem; }
+.editor-pruefung p { margin: .2rem 0; }
+.editor-pruefung-ok { border-left: 3px solid var(--gruen); }
+.editor-pruefung-fehler { border-left: 3px solid var(--rot); }
+.editor-pruefung-offen { border-left: 3px solid var(--gelb); }
+.editor-pruefung-titel { font-weight: 650; }
+.editor-befunde { margin: .3rem 0; padding-left: 1.1rem; }
+.editor-befunde li { margin: .15rem 0; overflow-wrap: anywhere; }
+.editor-werkzeug { color: var(--text-leise); }
+.knopf-link { font: inherit; background: none; border: 0; padding: 0; color: var(--sand); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px; }
+.editor-hash { margin: 0; }
+
+/* CodeMirror im dunklen okm-Design */
+.script-editor .CodeMirror { height: auto; min-height: 12rem; max-height: 70vh; border: 1px solid var(--rand);
+  border-radius: var(--radius); font-family: var(--mono); font-size: .85rem; line-height: 1.5; }
+.script-editor .CodeMirror-scroll { min-height: 12rem; max-height: 70vh; }
+.script-editor[data-zustand="manuell"] .CodeMirror { border-color: var(--gelb); }
+.cm-s-okm.CodeMirror { background: var(--code-flaeche); color: var(--text); }
+.cm-s-okm .CodeMirror-gutters { background: var(--flaeche); border-right: 1px solid var(--rand); }
+.cm-s-okm .CodeMirror-linenumber { color: var(--text-schwach); }
+.cm-s-okm .CodeMirror-cursor { border-left: 2px solid var(--sand); }
+.cm-s-okm div.CodeMirror-selected, .cm-s-okm.CodeMirror-focused div.CodeMirror-selected { background: var(--flaeche-3); }
+.cm-s-okm .CodeMirror-line::selection, .cm-s-okm .CodeMirror-line > span::selection { background: var(--flaeche-3); }
+.cm-s-okm .CodeMirror-activeline-background { background: var(--flaeche); }
+.cm-s-okm .cm-comment { color: var(--text-schwach); font-style: italic; }
+.cm-s-okm .cm-string, .cm-s-okm .cm-string-2 { color: var(--gruen-text); }
+.cm-s-okm .cm-keyword, .cm-s-okm .cm-builtin { color: var(--rot-hell); }
+.cm-s-okm .cm-variable-2, .cm-s-okm .cm-variable-3, .cm-s-okm .cm-def { color: var(--sand); }
+.cm-s-okm .cm-number, .cm-s-okm .cm-atom { color: var(--gelb-text); }
+.cm-s-okm .cm-operator, .cm-s-okm .cm-meta, .cm-s-okm .cm-tag { color: var(--text-leise); }
+.cm-s-okm .cm-attribute, .cm-s-okm .cm-property { color: var(--sand); }
+.cm-s-okm .editor-fehlerzeile { background: var(--fehlerzeile); }
+.script-editor .CodeMirror-dialog { background: var(--flaeche-2); color: var(--text); border-color: var(--rand); }
+.script-editor .CodeMirror-dialog input { color: var(--text); font-family: var(--mono); }

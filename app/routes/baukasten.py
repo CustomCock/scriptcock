@@ -84,11 +84,15 @@ async def baukasten(
     except ValueError:
         z = Ziel.POWERSHELL
     vorbelegung: Wiederherstellung | None = None
+    editor: dict[str, object] | None = None
     schritte: list[dict[str, Any]] = []
     if aus is not None:
         # „Erneut öffnen und anpassen“: aus der gespeicherten IR, nicht aus dem Script-Text
+        # (ein im Editor geänderter Text kommt zusätzlich in den Editor)
         try:
-            vorbelegung = wiederherstellen(reg, bibliothek.hole(sitzung, aus, benutzer))
+            eintrag = bibliothek.hole(sitzung, aus, benutzer)
+            vorbelegung = wiederherstellen(reg, eintrag)
+            editor = bibliothek.editor_vorbelegung(eintrag)
         except bibliothek.KeinZugriffAufScript:
             raise HTTPException(404, "Script nicht gefunden") from None
         except FehlerSammlung as e:
@@ -111,6 +115,7 @@ async def baukasten(
         kategorien=kategorien,
         vorbelegung=vorbelegung,
         schritte=schritte,
+        editor_vorbelegung=editor,
     )
 
 

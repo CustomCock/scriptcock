@@ -3,6 +3,7 @@
 {% block titel %}Blockly{% endblock %}
 {% block breit %} inhalt-breit{% endblock %}
 {% block kopf %}
+{% include "_editor_kopf.html" %}
 <script src="{{ basis }}/static/vendor/blockly/blockly_compressed.js" defer></script>
 <script src="{{ basis }}/static/vendor/blockly/msg/de.js" defer></script>
 <script src="{{ basis }}/static/js/blockly-modus.js" defer></script>
@@ -52,7 +53,7 @@
         <button type="button" class="knopf-primaer" id="bl-erzeugen" disabled>{{ i.icon("download") }} Script erzeugen &amp; herunterladen</button>
       </div>
       <p id="bl-status" class="feldhilfe"></p>
-      <pre class="code" id="bl-code-rahmen" hidden><code id="bl-code"></code></pre>
+      {% with editor_ziel=ziel, editor_dateiname="", editor_text="", editor_verborgen=True %}{% include "_editor.html" %}{% endwith %}
     </div>
     <div id="bl-ergebnis" aria-live="polite"></div>
     {% with katalog_modus="blockly", katalog_ziel=ziel %}{% include "_katalog.html" %}{% endwith %}

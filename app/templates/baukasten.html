@@ -2,7 +2,8 @@
 {% import "_icons.html" as i %}
 {% block titel %}Freier Baukasten{% endblock %}
 {% block breit %} inhalt-breit{% endblock %}
-{% block kopf %}<script src="{{ basis }}/static/vendor/sortable/Sortable.min.js" defer></script>{% endblock %}
+{% block kopf %}<script src="{{ basis }}/static/vendor/sortable/Sortable.min.js" defer></script>
+{% include "_editor_kopf.html" %}{% endblock %}
 {% block inhalt %}
 <div class="seitenkopf">
   <div>
@@ -99,6 +100,7 @@
     <div id="bk-vorschau" aria-live="polite">
       <div class="platzhalter-ausgabe"><div>{{ i.icon("terminal") }}<br>Die Vorschau erscheint, sobald die Liste einen Schritt enthält.</div></div>
     </div>
+    {% with editor_ziel=ziel, editor_dateiname="", editor_text="", editor_verborgen=True %}{% include "_editor.html" %}{% endwith %}
     <div id="bk-ergebnis" aria-live="polite"></div>
     {% with katalog_modus="baukasten", katalog_ziel=ziel %}{% include "_katalog.html" %}{% endwith %}
   </section>

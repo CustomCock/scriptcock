@@ -99,6 +99,12 @@ erneut durch dieselbe Validierung.
 - Content-Security-Policy ohne Inline-Scripte, `frame-ancestors 'none'`.
 - Downloads nur für den Ersteller (bzw. Admins / freigegebene Bibliotheks-Scripte).
 - Keine CDNs: alle Bibliotheken liegen unter `static/vendor/`.
+- **Script-Editor** (`docs/editor.md`): Wer den Text im Browser ändert, umgeht bewusst Whitelist
+  und Escaping. Deshalb: einmaliger Warnhinweis, Banner „nicht vom Baukasten geprüft“, Kopfzeile
+  `Manuell bearbeitet: ja` in jeder exportierten/gespeicherten Datei, Hash über die fertige Datei.
+  Gespeicherter Editor-Text darf keine Steuer- oder Bidi-Zeichen enthalten (Tabs erlaubt).
+- „Syntax prüfen“ führt nichts aus: `bash -n`, `zsh -n`, shellcheck und der PowerShell-Parser
+  parsen nur; Größen-, Zeit- und Parallelitätslimit, eigenes Temp-Verzeichnis pro Prüfung.
 
 ## 7. Blockly-Modus
 

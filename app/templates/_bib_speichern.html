@@ -7,6 +7,8 @@
     <input id="bib-beschreibung-{{ eintrag_id }}" name="beschreibung" type="text" maxlength="300" value="{{ beschreibung }}"></div>
   <div class="feld"><label for="bib-tags-{{ eintrag_id }}">Tags</label>
     <input id="bib-tags-{{ eintrag_id }}" name="tags" type="text" maxlength="300" placeholder="z. B. drucker, empfang"></div>
+  {# vom Script-Editor gefüllt, wenn der Text manuell bearbeitet wurde (sonst leer) #}
+  <input type="hidden" name="editor_text" value="" data-editor-text>
   <button type="button" class="knopf" hx-post="{{ basis }}/skripte/{{ eintrag_id }}/bibliothek"
           hx-include="#bib-speichern-{{ eintrag_id }}" hx-target="#bib-speichern-{{ eintrag_id }} .bib-status">In Bibliothek speichern</button>
   <div class="bib-status" aria-live="polite"></div>

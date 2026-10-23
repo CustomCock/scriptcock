@@ -4,12 +4,17 @@
   <h2>{{ i.icon("check") }} {% if ohne_code %}Script erzeugt{% else %}Fertig{% endif %}{% if ergebnis.ir.optionen.dry_run %} (Simulation){% endif %}: {{ ergebnis.ir.meta.titel }}</h2>
   {% if rechte %}<p><span class="marke marke-rot" title="{{ rechte.schritte }}">Braucht {{ rechte.art }}</span> <span class="feldhilfe">für {{ rechte.schritte }}</span></p>{% endif %}
   <div class="aktionen">
-    <a class="knopf-primaer" href="{{ basis }}/skripte/{{ ergebnis.gespeichert.id }}/download" download="{{ s.dateiname }}">{{ i.icon("download") }} {{ s.dateiname }} herunterladen</a>
-    <button type="button" class="knopf" data-kopieren="#code-{{ ergebnis.gespeichert.id }}" data-ziel="{{ ziel.value }}">{{ i.icon("kopieren") }} In Zwischenablage kopieren</button>
+    <a class="knopf-primaer" href="{{ basis }}/skripte/{{ ergebnis.gespeichert.id }}/download" download="{{ s.dateiname }}" data-editor-bezug="herunterladen">{{ i.icon("download") }} {{ s.dateiname }} herunterladen</a>
+    {% if ohne_code %}<button type="button" class="knopf" data-kopieren="#code-{{ ergebnis.gespeichert.id }}" data-ziel="{{ ziel.value }}" data-editor-bezug="kopieren">{{ i.icon("kopieren") }} In Zwischenablage kopieren</button>{% endif %}
   </div>
   {% if ziel.value == "powershell" %}<p class="feldhilfe">Tipp: Lieber herunterladen. Wer den Text in eine Datei einfügt, muss sie als „UTF-8 mit BOM“ speichern – sonst zeigt PowerShell 5.1 Umlaute falsch an.</p>{% endif %}
   <p class="hash">SHA-256: <code>{{ s.sha256 }}</code></p>
-  <pre class="code"{% if ohne_code %} hidden{% endif %}><code id="code-{{ ergebnis.gespeichert.id }}" class="language-{{ sprache }}">{{ s.text.replace("\r\n", "\n") }}</code></pre>
+  {% if ohne_code %}
+  {# Listen-/Blockly-Modus: der Editor steht dauerhaft auf der Seite; hier nur der gespeicherte Text fürs Kopieren #}
+  <pre class="code" hidden><code id="code-{{ ergebnis.gespeichert.id }}">{{ s.text.replace("\r\n", "\n") }}</code></pre>
+  {% else %}
+  {% with editor_ziel=ziel, editor_dateiname=s.dateiname, editor_text=s.text.replace("\r\n", "\n"), editor_ohne_download=True %}{% include "_editor.html" %}{% endwith %}
+  {% endif %}
   {% with dateiname = s.dateiname %}{% include "_anleitung.html" %}{% endwith %}
   {% with eintrag_id=ergebnis.gespeichert.id, titel=ergebnis.ir.meta.titel, beschreibung=ergebnis.ir.meta.beschreibung.split("\n")[0][:300] %}{% include "_bib_speichern.html" %}{% endwith %}
 </section>

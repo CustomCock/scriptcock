@@ -1,0 +1,36 @@
+{# Bearbeitbarer Script-Editor (static/js/script-editor.js). Eine Instanz pro Seite (id="script-editor").
+   erwartet: editor_ziel (Ziel), editor_dateiname, editor_text (generierter Text, darf leer sein),
+   optional editor_ohne_download, editor_verborgen (bis die erste Vorschau da ist), editor_vorbelegung ({text, manuell}). #}
+{% import "_icons.html" as i %}
+<div id="script-editor" class="script-editor" data-ziel="{{ editor_ziel.value }}" data-dateiname="{{ editor_dateiname }}"{% if editor_verborgen %} hidden{% endif %}>
+  <div class="editor-leiste" role="toolbar" aria-label="Script-Editor">
+    <span class="marke editor-zustand" data-editor-zustand>generiert</span>
+    <button type="button" class="knopf-klein" data-editor="rueckgaengig" title="Rückgängig (Strg+Z)" aria-label="Rückgängig">↶</button>
+    <button type="button" class="knopf-klein" data-editor="wiederholen" title="Wiederholen (Strg+Y)" aria-label="Wiederholen">↷</button>
+    <button type="button" class="knopf" data-editor="pruefen">{{ i.icon("check") }} Syntax prüfen</button>
+    <span class="editor-leiste-rechts">
+      <button type="button" class="knopf" data-editor="kopieren">{{ i.icon("kopieren") }} Kopieren</button>
+      {% if not editor_ohne_download %}<button type="button" class="knopf" data-editor="herunterladen">{{ i.icon("download") }} Herunterladen</button>{% endif %}
+    </span>
+  </div>
+  <div class="hinweis hinweis-gelb editor-sicherheit" data-editor-sicherheit hidden role="alert">
+    <p><strong>Du bearbeitest den Script-Text direkt.</strong> Der Baukasten prüft deine Änderungen nicht – kein
+      Escaping, keine Freigabe der Bausteine. Das Script bekommt im Kopf die Zeile „Manuell bearbeitet: ja“.
+      Lade es nur herunter, wenn du jede geänderte Zeile verstehst.</p>
+    <button type="button" class="knopf" data-editor="verstanden">Verstanden</button>
+  </div>
+  <div class="editor-banner" data-editor-banner hidden>
+    <span><strong>Manuell bearbeitet</strong> – nicht vom Baukasten geprüft.<span data-editor-zielhinweis></span></span>
+    <span class="editor-banner-knoepfe">
+      <button type="button" class="knopf" data-editor="neu">Neu generieren</button>
+      <button type="button" class="knopf" data-editor="diff" aria-expanded="false">Änderungen anzeigen</button>
+    </span>
+  </div>
+  <div class="editor-diff" data-editor-diff hidden></div>
+  <label class="sr-only" for="script-editor-text">Script-Text</label>
+  <textarea id="script-editor-text" class="editor-quelle" spellcheck="false" autocomplete="off">
+{{ editor_text }}</textarea>
+  <div class="editor-pruefung" data-editor-pruefung aria-live="polite" hidden></div>
+  <p class="hash editor-hash" data-editor-hash hidden></p>
+</div>
+{% if editor_vorbelegung %}<script type="application/json" id="editor-vorbelegung">{{ editor_vorbelegung | tojson }}</script>{% endif %}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -13,12 +14,14 @@ from sqlalchemy.orm import Session
 
 from app.db import Bewertung, GespeichertesScript
 from app.escaping import UnsicherError, Ziel, pruefe_zeichen
+from app.export import exportiere
 from app.ir import Knoten, ScriptIR, WennFehler, Wiederhole
 from app.registry import Registry
 from app.service import Benutzer
 from app.validation import FehlerSammlung, Feldfehler, ValidierungsFehler
 
 SEITENGROESSE = 50
+MAX_EDITOR_TEXT = 2_000_000
 _TAG = re.compile(r"^[\w\-.]{1,30}$")
 
 
@@ -76,7 +79,10 @@ def in_bibliothek_speichern(
     titel: str,
     beschreibung: str,
     tags: str,
+    editor_text: str = "",
 ) -> GespeichertesScript:
+    """Speichert Metadaten; ist ``editor_text`` gesetzt (im Editor geändert), wird er zum Inhalt
+    – mit Kopfzeile „Manuell bearbeitet“, neuem Hash. Die IR bleibt für „Erneut öffnen“ erhalten."""
     # Titel/Beschreibung sind reine Metadaten (nur HTML-escaped angezeigt, nie in Scripten),
     # daher genügt hier: keine Steuerzeichen, Länge begrenzt.
     fehler: list[Feldfehler] = []
@@ -100,8 +106,28 @@ def in_bibliothek_speichern(
     except ValidierungsFehler as e:
         fehler.append(Feldfehler(None, "tags", f"Tags: {e}"))
         tag_liste = []
+    bearbeitet = editor_text.replace("\r\n", "\n").removeprefix("\ufeff")
+    if bearbeitet.strip():
+        try:
+            for zeile in bearbeitet.split("\n"):
+                try:
+                    pruefe_zeichen(zeile.replace("\t", " "))  # Tabs sind in Scripten normal
+                except UnsicherError:
+                    raise ValidierungsFehler(
+                        "Enthält unsichtbare Steuer- oder Bidi-Zeichen (nicht erlaubt)."
+                    ) from None
+            if len(bearbeitet) > MAX_EDITOR_TEXT:
+                raise ValidierungsFehler(f"Höchstens {MAX_EDITOR_TEXT} Zeichen.")
+        except (ValidierungsFehler, UnsicherError) as e:
+            fehler.append(Feldfehler(None, "editor_text", f"Bearbeiteter Script-Text: {e}"))
     if fehler:
         raise FehlerSammlung(fehler)
+    if bearbeitet.strip():
+        ziel = Ziel(eintrag.ziel)
+        eintrag.editor_text = bearbeitet
+        eintrag.manuell_bearbeitet = True
+        eintrag.inhalt = exportiere(bearbeitet, ziel, manuell_bearbeitet=True)
+        eintrag.sha256 = hashlib.sha256(eintrag.inhalt).hexdigest()
     eintrag.titel = werte["titel"]
     eintrag.beschreibung = werte["beschreibung"]
     eintrag.tags = tags_als_text(tag_liste)
@@ -333,3 +359,10 @@ def baum_wiederherstellen(
         return [x for x in (knoten(k) for k in ks) if x is not None]
 
     return ir, liste(ir.schritte), hinweise
+
+
+def editor_vorbelegung(eintrag: GespeichertesScript) -> dict[str, object] | None:
+    """Für „Erneut öffnen“: bearbeiteter Text, mit dem der Editor startet (sonst None)."""
+    if not eintrag.manuell_bearbeitet or eintrag.editor_text is None:
+        return None
+    return {"text": eintrag.editor_text, "manuell": True}

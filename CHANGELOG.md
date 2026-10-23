@@ -2,6 +2,32 @@
 
 ## Fehlerbehebung Runde 1
 
+### 9. Bearbeitbarer Script-Editor in allen Modi
+
+- **Vorher:** Die Vorschau war ein schreibgeschützter `<pre>`-Block. Wer eine Zeile anpassen
+  wollte, musste das Script herunterladen und in einem Editor ändern – PowerShell-Dateien danach
+  oft ohne BOM gespeichert (Umlaute kaputt), ohne Hinweis, dass das Script nicht mehr dem
+  Baukasten entspricht.
+- **Lösung:**
+  - CodeMirror 5 (vendort, keine CDN) als Editor in Rezept-, Listen- und Blockly-Modus –
+    eine Komponente (`script-editor.js`, `_editor.html`); Hervorhebung für PowerShell, bash/zsh
+    und Batch (eigener Simple-Mode), dunkles Theme über die Tokens.
+  - Zustände „generiert“ / „manuell bearbeitet“ mit Banner („Neu generieren“, „Änderungen
+    anzeigen“ als Zeilen-Diff), Rückgängig/Wiederholen, einmaliger Sicherheitshinweis.
+  - Download und Kopieren über den Export-Endpunkt; bearbeitete Scripte bekommen im Kopf
+    „Manuell bearbeitet: ja (nicht vom Baukasten geprüft)“, der SHA-256 gilt für die fertige Datei.
+  - „Syntax prüfen“: `POST /api/script/pruefen` mit denselben Checks wie die Tests (Code aus
+    `tests/syntax.py` nach `app/syntaxpruefung.py` verschoben), Befunde mit Zeilen im Editor
+    markiert, fehlende Werkzeuge werden ehrlich gemeldet, nichts wird ausgeführt.
+  - Bibliothek speichert IR + Editor-Text + `manuell_bearbeitet` (Mini-Migration per
+    `ALTER TABLE`); „Erneut öffnen“ stellt den bearbeiteten Text mit Banner wieder her.
+  - Im Listen-Modus bleiben eigene Änderungen bei jeder Live-Vorschau erhalten; der Editor steht
+    außerhalb des per htmx getauschten Bereichs und übernimmt nur die generierte Fassung.
+- Begründung der Editor-Wahl: `docs/editor.md`.
+- Tests: `tests/test_editor.py` (Export-Markierung, Prüf-Endpunkt inkl. „führt nichts aus“,
+  Bibliothek, Erneut öffnen, Migration), Browser-Tests für Bearbeiten/Diff/Download/Prüfen/Undo
+  und Speichern + Erneut öffnen; bestehende Browser-Tests lesen die Vorschau aus dem Editor.
+
 ### 8. Rezept-Übersicht als Karten-Raster
 
 - **Vorher:** schlichte Kartenliste mit Kategorie-Dropdown, Serversuche ohne Umlaut-Toleranz;

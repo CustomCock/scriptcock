@@ -56,6 +56,15 @@ def server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
     thread.join(timeout=5)
 
 
+def warte_editor(seite, text: str, timeout: int = 5000) -> None:
+    """Wartet, bis der Script-Editor sichtbar ist und ``text`` enthält."""
+    seite.wait_for_function(
+        "t => window.OkmEditor && !window.OkmEditor.wurzel.hidden && window.OkmEditor.wert().includes(t)",
+        arg=text,
+        timeout=timeout,
+    )
+
+
 @pytest.fixture(scope="module")
 def browser():
     with playwright.sync_playwright() as p:
@@ -79,16 +88,16 @@ def test_baukasten_im_browser(server: str, browser) -> None:
     seite.locator(".palette-block[data-block=ping] .palette-name").drag_to(seite.locator("#schrittliste"))
     seite.locator("#schrittliste li.schritt").nth(1).wait_for(timeout=5000)
     seite.fill("#schrittliste li.schritt[data-block=ping] input[type=text]", "10.0.0.7")
-    seite.locator("#bk-vorschau code", has_text="ping -c 4 '10.0.0.7'").wait_for(timeout=5000)
+    warte_editor(seite, "ping -c 4 '10.0.0.7'", 5000)
 
     # Umsortieren
     seite.click("#schrittliste li.schritt[data-block=ping] [data-hoch]")
-    seite.locator("#bk-vorschau code", has_text="[1/2] Ping auf 10.0.0.7").wait_for(timeout=5000)
+    warte_editor(seite, "[1/2] Ping auf 10.0.0.7", 5000)
 
     # Zielwechsel: SetupDiag nur unter PowerShell
     assert seite.is_disabled("[data-hinzufuegen=setupdiag]")
     seite.click("label.ziel-option:has(input[value=powershell])")
-    seite.locator("#bk-vorschau code", has_text="ping.exe -n 4 '10.0.0.7'").wait_for(timeout=5000)
+    warte_editor(seite, "ping.exe -n 4 '10.0.0.7'", 5000)
     assert not seite.is_disabled("[data-hinzufuegen=setupdiag]")
     seite.click("[data-hinzufuegen=setupdiag]")
     seite.locator("#schrittliste li.schritt").nth(2).wait_for()
@@ -166,8 +175,8 @@ def test_blockly_im_browser(server: str, browser) -> None:
     )
     sid = json.loads(urllib.request.urlopen(anfrage).read())["id"]
     seite.goto(f"{server}/blockly?aus={sid}")
-    seite.locator("#bl-code", has_text="Durchlauf").wait_for(timeout=5000)
-    assert "printf '%s\\n' 'Hallo'" in seite.inner_text("#bl-code")
+    warte_editor(seite, "Durchlauf", 5000)
+    assert "printf '%s\\n' 'Hallo'" in seite.evaluate("() => window.OkmEditor.wert()")
     assert not seite.is_disabled("#bl-erzeugen")
     seite.click("#bl-erzeugen")
     seite.locator("#bl-ergebnis a.knopf-primaer").wait_for(timeout=5000)
@@ -222,9 +231,7 @@ def test_software_katalog_im_browser(server: str, browser) -> None:
     schritt = seite.locator("#schrittliste li.schritt[data-block=paket_installieren]").first
     schritt.wait_for()
     assert schritt.locator("input[data-typ=paketname]").input_value() == "org.videolan.VLC"
-    seite.locator(
-        "#bk-vorschau code", has_text="flatpak install -y --noninteractive flathub 'org.videolan.VLC'"
-    ).wait_for(timeout=5000)
+    warte_editor(seite, "flatpak install -y --noninteractive flathub 'org.videolan.VLC'", 5000)
 
     # Mehrfachauswahl → mehrere Schritte in Reihenfolge
     seite.fill("#katalog-suche", "gimp")
@@ -430,7 +437,7 @@ def test_blockly_katalog(server: str, browser) -> None:
         ".map(b => b.getFieldValue('paket'))"
     )
     assert bloecke == ["vlc"], bloecke
-    seite.locator("#bl-code", has_text="brew install --cask 'vlc'").wait_for(timeout=8000)
+    warte_editor(seite, "brew install --cask 'vlc'", 8000)
     assert js_fehler == []
 
 
@@ -496,4 +503,123 @@ def test_rezeptuebersicht_live_suche(server: str, browser) -> None:
         if seite.evaluate("() => document.activeElement.matches('a.rezept-link')"):
             break
     assert seite.evaluate("() => getComputedStyle(document.activeElement).outlineStyle") == "solid"
+    assert js_fehler == []
+
+
+# --- Punkt 9: bearbeitbarer Script-Editor ----------------------------------------------------
+
+
+def _zustand(seite) -> str:
+    return seite.get_attribute("#script-editor", "data-zustand")
+
+
+def _tippen_am_ende(seite, text: str) -> None:
+    seite.click("#script-editor .CodeMirror")
+    seite.keyboard.press("Control+End")
+    seite.keyboard.type(text)
+
+
+def test_editor_rezept_bearbeiten_pruefen_herunterladen(server: str, browser) -> None:
+    import shutil
+
+    seite = browser.new_page(viewport={"width": 1280, "height": 1000}, accept_downloads=True)
+    js_fehler: list[str] = []
+    seite.on("pageerror", lambda e: js_fehler.append(str(e)))
+    seite.on("console", lambda m: js_fehler.append(m.text) if "Content Security Policy" in m.text else None)
+    seite.goto(f"{server}/rezepte/drucker_einrichten?ziel=bash")
+    seite.fill("[name='f.druckername']", "Empfang")
+    seite.fill("[name='f.drucker_ip']", "10.0.0.5")
+    seite.click("button[type=submit].knopf-primaer")
+    warte_editor(seite, "Benötigte Rechte:")
+    assert _zustand(seite) == "generiert"
+    assert seite.is_visible("#script-editor .CodeMirror")  # CodeMirror ist geladen (CSP-konform)
+    assert seite.is_hidden("[data-editor-banner]")
+    generiert = seite.evaluate("() => window.OkmEditor.wert()")
+
+    # Bearbeiten → Zustand, Banner, einmaliger Sicherheitshinweis
+    _tippen_am_ende(seite, "echo ergaenzt")
+    assert _zustand(seite) == "manuell"
+    assert seite.is_visible("[data-editor-banner]")
+    assert seite.is_visible("[data-editor-sicherheit]")
+    seite.click("[data-editor=verstanden]")
+    assert seite.is_hidden("[data-editor-sicherheit]")
+    assert seite.evaluate("() => localStorage.getItem('okm-editor-hinweis-gelesen')") == "1"
+
+    # Diff
+    seite.click("[data-editor=diff]")
+    assert "+ echo ergaenzt" in seite.inner_text("[data-editor-diff]")
+
+    # Download über den Export-Endpunkt: bearbeiteter Text + Kopfzeile
+    with seite.expect_download() as dl:
+        seite.click("#ergebnis a.knopf-primaer[data-editor-bezug]")
+    inhalt = Path(dl.value.path()).read_text(encoding="utf-8")
+    assert "# Manuell bearbeitet: ja (nicht vom Baukasten geprüft)" in inhalt
+    assert inhalt.rstrip().endswith("echo ergaenzt")
+    assert "SHA-256" in seite.inner_text("[data-editor-hash]")
+
+    # Syntax prüfen: Fehler mit Zeile wird markiert
+    if shutil.which("bash"):
+        _tippen_am_ende(seite, "\nif true; then")
+        seite.click("[data-editor=pruefen]")
+        seite.locator("[data-editor-pruefung] .editor-befunde li").first.wait_for(timeout=15000)
+        assert "bash -n" in seite.inner_text("[data-editor-pruefung]")
+        assert seite.locator("#script-editor .editor-fehlerzeile").count() >= 1
+
+    # Rückgängig bis zur generierten Fassung → Zustand wieder „generiert“
+    for _ in range(20):
+        if _zustand(seite) == "generiert":
+            break
+        seite.click("[data-editor=rueckgaengig]")
+    assert _zustand(seite) == "generiert"
+    seite.click("[data-editor=wiederholen]")
+    assert _zustand(seite) == "manuell"
+
+    # Neu generieren verwirft die Änderungen
+    seite.click("[data-editor=neu]")
+    assert _zustand(seite) == "generiert"
+    assert seite.evaluate("() => window.OkmEditor.wert()") == generiert
+    assert js_fehler == []
+
+
+def test_editor_bibliothek_und_erneut_oeffnen(server: str, browser) -> None:
+    seite = browser.new_page(viewport={"width": 1280, "height": 1000})
+    js_fehler: list[str] = []
+    seite.on("pageerror", lambda e: js_fehler.append(str(e)))
+    seite.goto(f"{server}/baukasten?ziel=bash")
+    seite.evaluate("() => localStorage.setItem('okm-editor-hinweis-gelesen', '1')")
+    seite.click("[data-hinzufuegen=systeminfo]")
+    warte_editor(seite, "Systeminfo")
+    _tippen_am_ende(seite, "echo aus_dem_editor")
+    assert _zustand(seite) == "manuell"
+    assert seite.is_hidden("[data-editor-sicherheit]")  # schon einmal bestätigt
+
+    # Live-Vorschau ändert sich (Titel) → bearbeiteter Text bleibt, Banner bleibt
+    seite.click("details.optionen summary")
+    seite.fill("#bk-titel", "Neuer Titel")
+    seite.press("#bk-titel", "Tab")  # change-Ereignis jetzt, nicht erst beim Klick auf „Erzeugen“
+    seite.wait_for_timeout(400)
+    seite.wait_for_function("() => window.OkmEditor.generiert().includes('Neuer Titel')", timeout=5000)
+    assert "echo aus_dem_editor" in seite.evaluate("() => window.OkmEditor.wert()")
+    assert "Neuer Titel" not in seite.evaluate("() => window.OkmEditor.wert()")
+    assert _zustand(seite) == "manuell"
+
+    # Erzeugen + in Bibliothek speichern → bearbeiteter Text wird gespeichert
+    seite.click("#bk-vorschau button.knopf-primaer")
+    seite.locator("#bk-ergebnis a.knopf-primaer").wait_for(timeout=5000)
+    sid = seite.get_attribute("#bk-ergebnis a.knopf-primaer", "href").split("/")[-2]
+    seite.click("#bk-ergebnis .bib-speichern summary")
+    seite.click("#bk-ergebnis .bib-speichern button")
+    seite.locator("#bk-ergebnis .bib-status", has_text="gespeichert").wait_for(timeout=5000)
+    text = seite.evaluate(f"() => fetch('/skripte/{sid}/download').then(r => r.text())")
+    assert "echo aus_dem_editor" in text and "Manuell bearbeitet: ja" in text
+
+    # Erneut öffnen → Editor startet mit dem bearbeiteten Text und Banner
+    seite.goto(f"{server}/baukasten?aus={sid}")
+    seite.wait_for_function(
+        "() => window.OkmEditor && window.OkmEditor.wert().includes('echo aus_dem_editor')"
+    )
+    seite.wait_for_function("() => window.OkmEditor.generiert().includes('Neuer Titel')", timeout=5000)
+    assert _zustand(seite) == "manuell"
+    assert seite.is_visible("[data-editor-banner]")
+    assert "echo aus_dem_editor" in seite.evaluate("() => window.OkmEditor.wert()")
     assert js_fehler == []

@@ -27,9 +27,13 @@
   </div>
   {% if script %}
   <p class="feldhilfe">Live-Vorschau · {{ ziel_anzeige_aktuell }} · gespeichert wird erst beim Erzeugen</p>
-  <pre class="code"><code class="language-{{ sprache }}">{{ script.text.replace("\r\n", "\n") }}</code></pre>
+  {# Der Editor (#script-editor) steht außerhalb dieses Fragments und übernimmt den Text von hier #}
+  <textarea hidden data-editor-generiert data-ziel="{{ script.ziel.value }}" data-dateiname="{{ script.dateiname }}">
+{{ script.text.replace("\r\n", "\n") }}</textarea>
+  {% else %}<span hidden data-editor-leer></span>
   {% endif %}
 {% endif %}
+{% if not formular.uids %}<span hidden data-editor-leer></span>{% endif %}
 {% for s in schritte %}
 <div id="status-{{ s.uid }}" hx-swap-oob="innerHTML">{% for m in pro_schritt.get(s.uid, []) %}<span class="fehlertext">{{ m }}</span>{% endfor %}</div>
 {% for pid in s.genutzt | sort %}<div id="status-{{ s.uid }}-{{ pid }}" hx-swap-oob="innerHTML">{% if pro_feld.get(s.uid ~ "-" ~ pid) %}<span class="fehlertext">{{ pro_feld[s.uid ~ "-" ~ pid] }}</span>{% endif %}</div>{% endfor %}

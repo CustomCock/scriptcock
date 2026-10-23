@@ -16,6 +16,8 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     create_engine,
+    inspect,
+    text,
 )
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
@@ -44,6 +46,9 @@ class GespeichertesScript(Basis):
     in_bibliothek: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     tags: Mapped[str] = mapped_column(String(500), default="")
     funktioniert: Mapped[int] = mapped_column(Integer, default=0)
+    # Editor: im Browser geänderter Text (ohne Kopf-Markierung) – None = unverändert generiert
+    editor_text: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
+    manuell_bearbeitet: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class GespeichertesRezept(Basis):
@@ -87,6 +92,25 @@ class Datenbank:
         )
         self._sitzung = sessionmaker(bind=self.engine, expire_on_commit=False)
         Basis.metadata.create_all(self.engine)
+        self._migrieren()
+
+    # Spalten, die nach dem ersten Release dazukamen: (Tabelle, Spalte, SQL-Definition)
+    NACHTRAEGLICHE_SPALTEN = (
+        ("skripte", "editor_text", "TEXT"),
+        ("skripte", "manuell_bearbeitet", "BOOLEAN NOT NULL DEFAULT 0"),
+    )
+
+    def _migrieren(self) -> None:
+        """Mini-Migration für bestehende Datenbanken: fehlende Spalten per ALTER TABLE ergänzen."""
+        vorhanden = {
+            (tabelle, s["name"])
+            for tabelle in {t for t, _, _ in self.NACHTRAEGLICHE_SPALTEN}
+            for s in inspect(self.engine).get_columns(tabelle)
+        }
+        with self.engine.begin() as con:
+            for tabelle, spalte, definition in self.NACHTRAEGLICHE_SPALTEN:
+                if (tabelle, spalte) not in vorhanden:
+                    con.execute(text(f"ALTER TABLE {tabelle} ADD COLUMN {spalte} {definition}"))
 
     def sitzung(self) -> Iterator[Session]:
         with self._sitzung() as s:

@@ -58,10 +58,12 @@ async def blockly_seite(
     except ValueError:
         z = Ziel.POWERSHELL
     vorbelegung: dict[str, Any] | None = None
+    editor: dict[str, object] | None = None
     if aus is not None:
         try:
             eintrag = bibliothek.hole(sitzung, aus, benutzer)
             ir, schritte, hinweise = bibliothek.baum_wiederherstellen(reg, eintrag)
+            editor = bibliothek.editor_vorbelegung(eintrag)
         except bibliothek.KeinZugriffAufScript:
             raise HTTPException(404, "Script nicht gefunden") from None
         except FehlerSammlung as e:
@@ -86,7 +88,14 @@ async def blockly_seite(
         "vorbelegung": vorbelegung,
     }
     return _render(
-        request, "blockly.html", benutzer, daten=daten, ziel=z, ziele=list(Ziel), vorbelegung=vorbelegung
+        request,
+        "blockly.html",
+        benutzer,
+        daten=daten,
+        ziel=z,
+        ziele=list(Ziel),
+        vorbelegung=vorbelegung,
+        editor_vorbelegung=editor,
     )
 
 

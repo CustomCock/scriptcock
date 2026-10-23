@@ -2,6 +2,7 @@
 {% import "_icons.html" as i %}
 {% block titel %}{{ rezept.name }}{% endblock %}
 {% block breit %} inhalt-breit{% endblock %}
+{% block kopf %}{% include "_editor_kopf.html" %}{% endblock %}
 {% block inhalt %}
 {% set aktiv_schritt = 3 %}{% include "_schritte.html" %}
 <a class="zurueck" href="{{ basis }}/rezepte?ziel={{ ziel.value }}">{{ i.icon("zurueck") }} anderes Rezept</a>

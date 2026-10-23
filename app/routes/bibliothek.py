@@ -106,6 +106,7 @@ async def in_bibliothek(
             titel=str(form.get("titel", "")),
             beschreibung=str(form.get("beschreibung", "")),
             tags=str(form.get("tags", "")),
+            editor_text=str(form.get("editor_text", "")),
         )
     except FehlerSammlung as e:
         return _render(request, "_fehler.html", benutzer, fehler=e.fehler, ohne_oob=True)

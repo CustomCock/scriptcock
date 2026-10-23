@@ -2,3 +2,4 @@ htmx 2.0.4 (BSD-2-Clause)
 highlight.js 11.10.0 (BSD-3-Clause)
 SortableJS 1.15.6 (MIT)
 Blockly 11.2.1 (Apache-2.0)
+CodeMirror 5.65.18 (MIT) – lib, mode/powershell, mode/shell, addon/mode/simple, addon/search, addon/dialog

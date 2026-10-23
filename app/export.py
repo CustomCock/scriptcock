@@ -14,6 +14,8 @@ from app.escaping import Ziel
 
 BOM = b"\xef\xbb\xbf"
 CHCP = "chcp 65001 >nul"
+# Im Editor geänderte Scripte tragen diese Zeile im Kopf (19 Zeichen breites Feld wie die übrigen).
+MANUELL_ZEILE = "Manuell bearbeitet: ja (nicht vom Baukasten geprüft)"
 
 
 def _normalisiert(text: str) -> list[str]:
@@ -33,20 +35,41 @@ def _mit_chcp(zeilen: list[str]) -> list[str]:
     return [CHCP, *zeilen]
 
 
+def _mit_markierung(zeilen: list[str], ziel: Ziel) -> list[str]:
+    """``MANUELL_ZEILE`` nach „Benötigte Rechte:“ einfügen – fehlt der Kopf, nach Shebang/@echo off/chcp."""
+    if any(MANUELL_ZEILE in z for z in zeilen):
+        return zeilen
+    kommentar = "rem " if ziel is Ziel.CMD else "# "
+    for i, z in enumerate(zeilen[:60]):
+        if "Benötigte Rechte:" in z and z.lstrip().lower().startswith(("#", "rem")):
+            praefix = z[: z.index("Benötigte Rechte:")]
+            return [*zeilen[: i + 1], praefix + MANUELL_ZEILE, *zeilen[i + 1 :]]
+    pos = 0
+    while pos < len(zeilen) and pos < 3:
+        z = zeilen[pos].strip().lower()
+        if (pos == 0 and z.startswith(("#!", "#requires", "@echo off"))) or z == CHCP:
+            pos += 1
+        else:
+            break
+    return [*zeilen[:pos], kommentar + MANUELL_ZEILE, *zeilen[pos:]]
+
+
 def zeilenende(ziel: Ziel) -> str:
     return "\n" if ziel in (Ziel.BASH, Ziel.ZSH) else "\r\n"
 
 
-def text_fuer(text: str, ziel: Ziel) -> str:
+def text_fuer(text: str, ziel: Ziel, *, manuell_bearbeitet: bool = False) -> str:
     """Text mit den Zeilenenden des Ziels (ohne BOM), endet mit genau einem Zeilenende."""
     zeilen = _normalisiert(text)
     if ziel is Ziel.CMD:
         zeilen = _mit_chcp(zeilen)
+    if manuell_bearbeitet:
+        zeilen = _mit_markierung(zeilen, ziel)
     ende = zeilenende(ziel)
     return ende.join(zeilen) + ende
 
 
-def exportiere(text: str, ziel: Ziel) -> bytes:
-    """Exakter Dateiinhalt für ``ziel``."""
-    inhalt = text_fuer(text, ziel).encode("utf-8")
+def exportiere(text: str, ziel: Ziel, *, manuell_bearbeitet: bool = False) -> bytes:
+    """Exakter Dateiinhalt für ``ziel``; ``manuell_bearbeitet`` ergänzt die Kopfzeile (idempotent)."""
+    inhalt = text_fuer(text, ziel, manuell_bearbeitet=manuell_bearbeitet).encode("utf-8")
     return BOM + inhalt if ziel is Ziel.POWERSHELL else inhalt
