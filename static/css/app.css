@@ -411,15 +411,25 @@ fieldset { min-width: 0; }
 .katalog-schalter { font: inherit; font-size: .88rem; padding: .35rem .8rem; border: 0; border-right: 1px solid var(--rand-stark);
   background: var(--flaeche-2); color: var(--text-leise); cursor: pointer; }
 .katalog-schalter:last-child { border-right: 0; }
-.katalog-schalter:hover { background: var(--flaeche-3); color: var(--text); }
-.katalog-schalter[aria-pressed="true"] { background: var(--rot); color: #fff; }
+.katalog-schalter:hover { background: var(--flaeche-3); color: var(--text); box-shadow: inset 0 -2px 0 var(--sand); }
 .katalog-kategorien summary { cursor: pointer; color: var(--text-leise); font-size: .88rem; }
 .katalog-kategorien[open] summary { margin-bottom: .4rem; }
 .katalog-chips { display: flex; flex-wrap: wrap; gap: .3rem; }
 .chip { font: inherit; font-size: .78rem; padding: .15rem .55rem; border-radius: 999px; border: 1px solid var(--rand-stark);
   background: transparent; color: var(--text-leise); cursor: pointer; }
-.chip:hover { color: var(--text); border-color: var(--sand-dunkel); }
-.chip[aria-pressed="true"] { background: var(--sand-flaeche); border-color: var(--sand); color: var(--sand); }
+.chip:hover { color: var(--sand); border-color: var(--sand); }
+/* Aktiver Filter: gefüllt in okm-Rot, weiß, fett und mit ✓ – auch ohne Farbe erkennbar */
+.chip[aria-pressed="true"], .katalog-schalter[aria-pressed="true"] { background: var(--rot); border-color: var(--rot);
+  color: #fff; font-weight: 700; box-shadow: none; }
+.chip[aria-pressed="true"]::before, .katalog-schalter[aria-pressed="true"]::before { content: "✓ "; }
+.chip[aria-pressed="true"]:hover, .katalog-schalter[aria-pressed="true"]:hover { background: var(--rot-hell); }
+.katalog-filter { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .4rem; font-size: .85rem;
+  color: var(--text-leise); }
+.katalog-filter-marke { font: inherit; font-weight: 700; color: var(--text); background: var(--flaeche-3);
+  border: 1px solid var(--rand-stark); border-radius: 999px; padding: .05rem .5rem; cursor: pointer; }
+.katalog-filter-marke:hover { border-color: var(--rot-hell); color: #fff; }
+.katalog-filter-reset { font: inherit; background: none; border: 0; color: var(--sand); text-decoration: underline;
+  cursor: pointer; padding: 0; }
 .katalog-status { display: flex; align-items: center; justify-content: space-between; gap: .5rem; min-height: 2.2rem;
   color: var(--text-leise); font-size: .9rem; }
 .katalog-tasten, .katalog-fuss { color: var(--text-schwach); font-size: .78rem; margin: 0; }

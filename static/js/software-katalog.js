@@ -67,6 +67,8 @@
     var meldung = document.getElementById("katalog-meldung");
     var auswahlKnopf = wurzel.querySelector("[data-katalog-auswahl]");
     var oeffnen = document.querySelectorAll("[data-katalog-oeffnen]");
+    var filterZeile = wurzel.querySelector(".katalog-filter");
+    var PLATTFORM_NAME = { windows: "Windows", macos: "macOS", linux: "Linux" };
 
     var zustand = { plattform: "alle", kategorien: [], treffer: [], aktiv: -1, auswahl: {} };
     var letztesPaketfeld = null;
@@ -253,7 +255,39 @@
       return li;
     }
 
+    /* „Gefiltert: PDF ×, Backup × · Windows × · Filter zurücksetzen“ – jeder Filter einzeln entfernbar */
+    function filterZeigen() {
+      if (!filterZeile) { return; }
+      filterZeile.textContent = "";
+      var aktiv = zustand.kategorien.length > 0 || zustand.plattform !== "alle";
+      filterZeile.hidden = !aktiv;
+      if (!aktiv) { return; }
+      function marke(text, beschriftung, entfernen) {
+        var k = el("button", "katalog-filter-marke", text + " ×");
+        k.type = "button";
+        k.setAttribute("aria-label", beschriftung);
+        k.addEventListener("click", function () { entfernen(); zeigen(); });
+        filterZeile.appendChild(k);
+      }
+      filterZeile.appendChild(el("span", null, "Gefiltert:"));
+      zustand.kategorien.forEach(function (k) {
+        marke(k, "Filter " + k + " entfernen", function () {
+          kategorienSetzen(zustand.kategorien.filter(function (x) { return x !== k; }));
+        });
+      });
+      if (zustand.plattform !== "alle") {
+        if (zustand.kategorien.length) { filterZeile.appendChild(el("span", null, "·")); }
+        marke(PLATTFORM_NAME[zustand.plattform], "Plattformfilter entfernen", function () { plattformSetzen("alle", true); });
+      }
+      filterZeile.appendChild(el("span", null, "·"));
+      var reset = el("button", "katalog-filter-reset", "Filter zurücksetzen");
+      reset.type = "button";
+      reset.addEventListener("click", function () { kategorienSetzen([]); plattformSetzen("alle", true); zeigen(); });
+      filterZeile.appendChild(reset);
+    }
+
     function zeigen() {
+      filterZeigen();
       var anfrage = suchfeld.value;
       zustand.treffer = S.suche(index, { anfrage: anfrage, plattform: zustand.plattform, kategorien: zustand.kategorien });
       zustand.aktiv = -1;

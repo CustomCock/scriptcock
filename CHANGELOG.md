@@ -2,6 +2,18 @@
 
 ## Fehlerbehebung Runde 1
 
+### 4. Software-Katalog: aktiver Filter erkennbar
+
+- **Ursache:** Aktive Kategorie-Chips waren nur dunkelsand hinterlegt (kaum Kontrast zu inaktiv),
+  ohne zweites Merkmal – in Graustufen bzw. bei Farbsehschwäche nicht unterscheidbar.
+- **Lösung:** Aktive Chips und Plattform-Umschalter gefüllt in okm-Rot, weiße fette Schrift und
+  ✓ davor; inaktiv nur Umriss, Hover sandgelb. `aria-pressed` wie bisher. Neue Zeile über der
+  Trefferliste: „Gefiltert: **PDF** ×, **Backup & Cloud** × · **Windows** × · Filter
+  zurücksetzen“ – jeder Filter einzeln entfernbar.
+- **Test:** Playwright prüft Hintergrund, Schriftfarbe/-stärke, ✓ (`::before`) aktiv vs. inaktiv,
+  die Filterzeile, Entfernen einzelner Filter und „Filter zurücksetzen“.
+- **Neu:** `tools/screenshots.py` legt Screenshots in vier Breiten unter `docs/screenshots/` ab.
+
 ### 3. Admin-/sudo-Rechte automatisch im Script
 
 - **Vorher:** Fehlten Rechte, brach das Script mit „bitte als Administrator starten“ ab; die

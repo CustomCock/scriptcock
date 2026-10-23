@@ -264,3 +264,91 @@ def test_software_katalog_im_browser(server: str, browser) -> None:
     assert seite.input_value("select[name='f.paketmanager']") == "brew_cask"
     assert js_fehler == []
     kontext.close()
+
+
+def test_katalog_aktiver_filter_eindeutig(server: str, browser) -> None:
+    """Punkt 4: aktive Chips/Umschalter gefüllt (okm-Rot) mit ✓ und fett; Filterzeile mit ×."""
+    seite = browser.new_page(viewport={"width": 1280, "height": 900})
+    seite.goto(f"{server}/software")
+    seite.locator("#katalog-anzahl", has_text="259 Treffer").wait_for()
+    seite.click("[data-kategorie=PDF]")
+    seite.click("[data-kategorie='Backup & Cloud']")
+    seite.click("[data-plattform=windows]")
+    seite.mouse.move(0, 0)  # kein Hover-Zustand
+
+    def stil(selektor: str, pseudo: str | None = None) -> dict[str, str]:
+        return seite.eval_on_selector(
+            selektor,
+            "(el, p) => { const s = getComputedStyle(el, p); "
+            "return {bg: s.backgroundColor, farbe: s.color, gewicht: s.fontWeight, inhalt: s.content}; }",
+            pseudo,
+        )
+
+    rot = "rgb(227, 38, 46)"
+    for sel in ("[data-kategorie=PDF]", "[data-plattform=windows]"):
+        assert seite.get_attribute(sel, "aria-pressed") == "true"
+        s = stil(sel)
+        assert s["bg"] == rot and s["farbe"] == "rgb(255, 255, 255)" and int(s["gewicht"]) >= 700, s
+        assert "✓" in stil(sel, "::before")["inhalt"]
+    inaktiv = stil("[data-kategorie=Browser]")
+    assert (
+        inaktiv["bg"] in ("rgba(0, 0, 0, 0)", "transparent")
+        and "✓" not in stil("[data-kategorie=Browser]", "::before")["inhalt"]
+    )
+
+    zeile = seite.locator(".katalog-filter")
+    assert zeile.is_visible()
+    assert zeile.inner_text().startswith("Gefiltert:")
+    for text in ("PDF", "Backup & Cloud", "Windows", "Filter zurücksetzen"):
+        assert text in zeile.inner_text()
+    # Einzeln entfernen
+    zeile.locator("button", has_text="PDF").click()
+    assert seite.get_attribute("[data-kategorie=PDF]", "aria-pressed") == "false"
+    assert "PDF" not in zeile.inner_text()
+    zeile.locator("button", has_text="Windows").click()
+    assert seite.get_attribute("[data-plattform=alle]", "aria-pressed") == "true"
+    # Alles zurücksetzen
+    zeile.locator("button", has_text="Filter zurücksetzen").click()
+    assert not zeile.is_visible()
+    seite.locator("#katalog-anzahl", has_text="259 Treffer").wait_for()
+
+
+@pytest.mark.parametrize("breite", [360, 768, 1280, 1920])
+@pytest.mark.parametrize("ort", ["seite", "panel"])
+def test_katalog_zeilen_brechen_nicht_chaotisch(server: str, browser, breite: int, ort: str) -> None:
+    """Punkt 5: ID-Zeilen als Grid – ID ohne Umbruch (Ellipsis + title), Knöpfe in derselben Zeile."""
+    seite = browser.new_page(viewport={"width": breite, "height": 900})
+    if ort == "seite":
+        seite.goto(f"{server}/software")
+    else:
+        seite.goto(f"{server}/baukasten?ziel=powershell")
+        seite.click("[data-katalog-oeffnen]")
+    seite.click("[data-plattform=alle]")
+    seite.locator(".katalog-eintrag").first.wait_for()
+    seite.fill("#katalog-suche", "visual c++")  # lange IDs wie Microsoft.VCRedist.2015+.x64
+    seite.locator("#katalog-anzahl").filter(has_text="Treffer").wait_for()
+    seite.wait_for_timeout(300)
+    ergebnis = seite.evaluate(
+        """() => [...document.querySelectorAll('.katalog-id')].slice(0, 40).map(z => {
+            const code = z.querySelector('code').getBoundingClientRect();
+            const knoepfe = [...z.querySelectorAll('button')].map(b => b.getBoundingClientRect());
+            const c = z.querySelector('code');
+            return {
+              id: c.textContent, title: c.title,
+              ws: getComputedStyle(c).whiteSpace, wb: getComputedStyle(c).wordBreak,
+              codeHoehe: code.height, codeOben: code.top, codeUnten: code.bottom,
+              knoepfe: knoepfe.map(k => ({oben: k.top, unten: k.bottom, breite: k.width})),
+            };
+        })"""
+    )
+    assert ergebnis, "keine ID-Zeilen"
+    for z in ergebnis:
+        assert z["title"] == z["id"], z
+        assert z["ws"] == "nowrap" and z["wb"] != "break-all", z
+        assert z["codeHoehe"] < 30, f"ID bricht um: {z}"
+        for k in z["knoepfe"]:
+            assert k["breite"] >= 28, z
+            # Knopf liegt in derselben Zeile wie die ID (bzw. bei Kartenlayout direkt daneben)
+            assert k["oben"] < z["codeUnten"] + 2 and k["unten"] > z["codeOben"] - 2, (
+                f"Knopf rutscht weg: {z}"
+            )
