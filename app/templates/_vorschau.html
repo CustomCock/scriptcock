@@ -2,6 +2,7 @@
 {% set s = ergebnis.script %}
 <section class="vorschau">
   <h2>{{ i.icon("check") }} {% if ohne_code %}Script erzeugt{% else %}Fertig{% endif %}{% if ergebnis.ir.optionen.dry_run %} (Simulation){% endif %}: {{ ergebnis.ir.meta.titel }}</h2>
+  {% if rechte %}<p><span class="marke marke-rot" title="{{ rechte.schritte }}">Braucht {{ rechte.art }}</span> <span class="feldhilfe">für {{ rechte.schritte }}</span></p>{% endif %}
   <div class="aktionen">
     <a class="knopf-primaer" href="{{ basis }}/skripte/{{ ergebnis.gespeichert.id }}/download" download="{{ s.dateiname }}">{{ i.icon("download") }} {{ s.dateiname }} herunterladen</a>
     <button type="button" class="knopf" data-kopieren="#code-{{ ergebnis.gespeichert.id }}" data-ziel="{{ ziel.value }}">{{ i.icon("kopieren") }} In Zwischenablage kopieren</button>

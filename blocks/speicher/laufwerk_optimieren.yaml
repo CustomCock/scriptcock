@@ -4,8 +4,11 @@ name: Laufwerk optimieren (TRIM/Defragmentierung)
 kategorie: Speicher
 beschreibung: Führt bei SSDs TRIM und bei Festplatten eine Defragmentierung aus.
 risiko: gelb
-admin_noetig: true
 fortschritt: "Laufwerk wird optimiert"
+rechte:
+  powershell: admin
+  cmd: admin
+  bash: root
 parameter:
   - id: laufwerk
     label: Laufwerk (Windows)
@@ -17,4 +20,4 @@ ziele:
   cmd: |
     defrag {{ laufwerk }} /O
   bash: |
-    fstrim -av
+    {{ sudo }}fstrim -av

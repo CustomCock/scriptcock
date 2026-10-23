@@ -4,8 +4,9 @@ name: SMBv1-Status
 kategorie: Sicherheit
 beschreibung: Prüft, ob das veraltete und unsichere Protokoll SMBv1 noch aktiviert ist.
 risiko: gruen
-admin_noetig: true
 fortschritt: SMBv1-Status wird geprüft
+rechte:
+  powershell: admin
 ziele:
   powershell: |
     $okmServer = (Get-SmbServerConfiguration).EnableSMB1Protocol

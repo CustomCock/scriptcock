@@ -8,9 +8,12 @@ hilfe: |
   Windows: Der Treiber muss bereits installiert sein; ohne Angabe wird der Windows-Standardtreiber "Microsoft IPP Class Driver" verwendet.
   Linux/macOS: Es wird "IPP Everywhere" (treiberlos) genutzt – das unterstützen fast alle aktuellen Netzwerkdrucker.
 risiko: gelb
-admin_noetig: true
 fortschritt: "Drucker {{ name }} ({{ ip }}) wird eingerichtet"
 tipp: Prüfe, ob der Drucker per Ping erreichbar ist und ob der gewählte Treiber installiert ist.
+rechte:
+  powershell: admin
+  bash: root
+  zsh: root
 parameter:
   - id: name
     label: Druckername
@@ -33,9 +36,9 @@ ziele:
     }
     Add-Printer -Name {{ name }} -PortName $okmPort -DriverName {{ treiber }}{{ whatif }}
   bash: |
-    lpadmin -p {{ name }} -E -v ipp://{{ ip }}/ipp/print -m everywhere
+    {{ sudo }}lpadmin -p {{ name }} -E -v ipp://{{ ip }}/ipp/print -m everywhere
   zsh: |
-    lpadmin -p {{ name }} -E -v ipp://{{ ip }}/ipp/print -m everywhere
+    {{ sudo }}lpadmin -p {{ name }} -E -v ipp://{{ ip }}/ipp/print -m everywhere
 pruefung:
   powershell: |
     Get-Printer -Name {{ name }} | Format-Table Name, PortName, DriverName -AutoSize

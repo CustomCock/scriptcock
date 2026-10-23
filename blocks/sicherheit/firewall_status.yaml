@@ -4,9 +4,9 @@ name: Firewall-Status anzeigen
 kategorie: Sicherheit
 beschreibung: Zeigt, ob die Firewall eingeschaltet ist (unter Windows je Profil Domäne/Privat/Öffentlich).
 risiko: gruen
-admin_noetig:
-  bash: true
 fortschritt: Firewall-Status wird gelesen
+rechte:
+  bash: root
 ziele:
   powershell: |
     Get-NetFirewallProfile | Format-Table Name, Enabled, DefaultInboundAction, DefaultOutboundAction -AutoSize
@@ -14,12 +14,12 @@ ziele:
     netsh advfirewall show allprofiles state
   bash: |
     if command -v ufw >/dev/null 2>&1; then
-      ufw status verbose
+      {{ sudo }}ufw status verbose
     elif command -v firewall-cmd >/dev/null 2>&1; then
-      firewall-cmd --state || true
-      firewall-cmd --list-all || true
+      {{ sudo }}firewall-cmd --state || true
+      {{ sudo }}firewall-cmd --list-all || true
     elif command -v nft >/dev/null 2>&1; then
-      nft list ruleset
+      {{ sudo }}nft list ruleset
     else
       printf '%s\n' 'Keine bekannte Firewall-Verwaltung (ufw, firewalld, nftables) gefunden.'
     fi

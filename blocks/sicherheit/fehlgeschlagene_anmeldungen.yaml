@@ -4,8 +4,10 @@ name: Fehlgeschlagene Anmeldungen
 kategorie: Sicherheit
 beschreibung: Zeigt die letzten fehlgeschlagenen Anmeldeversuche (falsches Passwort, gesperrtes Konto …).
 risiko: gruen
-admin_noetig: true
 fortschritt: "Fehlgeschlagene Anmeldungen der letzten {{ stunden }} Stunden werden gesucht"
+rechte:
+  powershell: admin
+  bash: root
 parameter:
   - id: stunden
     label: Zeitraum (Stunden)
@@ -25,4 +27,4 @@ ziele:
         Write-Host 'Keine fehlgeschlagenen Anmeldungen gefunden.' -ForegroundColor Green
     }
   bash: |
-    journalctl --since=-{{ stunden }}h --no-pager -q | grep -E 'Failed password|authentication failure|Invalid user' || printf '%s\n' 'Keine fehlgeschlagenen Anmeldungen gefunden.'
+    {{ sudo }}journalctl --since=-{{ stunden }}h --no-pager -q | grep -E 'Failed password|authentication failure|Invalid user' || printf '%s\n' 'Keine fehlgeschlagenen Anmeldungen gefunden.'

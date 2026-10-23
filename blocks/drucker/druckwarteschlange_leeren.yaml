@@ -6,8 +6,12 @@ beschreibung: Löscht alle hängenden Druckaufträge. Unter Windows wird dazu de
 hilfe: |
   Alle wartenden Aufträge aller Drucker gehen verloren und müssen neu gedruckt werden.
 risiko: gelb
-admin_noetig: true
 fortschritt: Druckwarteschlange wird geleert
+rechte:
+  powershell: admin
+  cmd: admin
+  bash: root
+  zsh: root
 ziele:
   powershell: |
     Stop-Service -Name Spooler -Force{{ whatif }}
@@ -19,8 +23,8 @@ ziele:
     del /Q /F "%SystemRoot%\System32\spool\PRINTERS\*.*"
     net start spooler
   bash: |
-    cancel -a
+    {{ sudo }}cancel -a
     printf '%s\n' 'Alle Druckaufträge wurden gelöscht.'
   zsh: |
-    cancel -a
+    {{ sudo }}cancel -a
     printf '%s\n' 'Alle Druckaufträge wurden gelöscht.'

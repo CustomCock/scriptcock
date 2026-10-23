@@ -4,9 +4,13 @@ name: Passwort eines lokalen Benutzers zurücksetzen
 kategorie: Benutzer
 beschreibung: Setzt das Passwort eines lokalen Kontos neu. Das neue Passwort wird beim Ausführen abgefragt und steht nie im Script.
 risiko: rot
-admin_noetig: true
 interaktiv: true
 fortschritt: "Passwort von {{ benutzer }} wird zurückgesetzt"
+rechte:
+  powershell: admin
+  cmd: admin
+  bash: root
+  zsh: root
 parameter:
   - id: benutzer
     label: Benutzername
@@ -21,9 +25,9 @@ ziele:
     echo Bitte das neue Passwort zweimal eingeben:
     net user {{ benutzer }} *
   bash: |
-    passwd {{ benutzer }}
+    {{ sudo }}passwd {{ benutzer }}
   zsh: |
     printf '%s\n' 'Bitte das neue Passwort eingeben:'
-    dscl . -passwd /Users/{{ benutzer }}
+    {{ sudo }}dscl . -passwd /Users/{{ benutzer }}
 hinweise:
   zsh: Achtung macOS – der Schlüsselbund des Benutzers wird dabei nicht geändert und muss ggf. neu angelegt werden.

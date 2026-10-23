@@ -6,6 +6,7 @@
 # Erstellt am:       15.01.2026 09:30:00
 # Baukasten-Version: 0.1.0
 # Zielsystem:        macOS (zsh)
+# Benötigte Rechte:  nicht als root starten (Schritt 1)
 # Enthaltene Schritte:
 #    1. Paket/Software installieren [Risiko: gelb]
 #
@@ -26,6 +27,7 @@ OKM_NR=0
 OKM_SCHRITT='-'
 OKM_STATUS=laeuft
 OKM_TIPP=''
+OKM_SUDO_PID=''
 
 # Meldungen: Werte immer als Argumente übergeben, nie in den Formatstring einsetzen.
 # Keine Farben – die Ausgabe geht auch ins Protokoll.
@@ -73,6 +75,7 @@ okm_ende() {
     fi
   fi
   okm_zusammenfassung
+  if [ -n "$OKM_SUDO_PID" ]; then kill "$OKM_SUDO_PID" 2>/dev/null || true; fi
   okm_pause
   # Ausgabe schließen und kurz auf tee warten, sonst fehlen beim Schließen des Fensters
   # die letzten Zeilen (höchstens 2 s – ein Hintergrundprozess darf nichts aufhalten)
@@ -99,6 +102,15 @@ okm_info '=============================================='
 okm_info ' okm Script-Baukasten · Software installieren'
 okm_info ' Erstellt: 15.01.2026 09:30 · von pytest'
 okm_info '=============================================='
+
+# Schritte, die NICHT als root laufen dürfen (z. B. Homebrew verweigert root)
+if [ "$(id -u)" -eq 0 ]; then
+  okm_fehler 'Dieses Script darf nicht als root (mit sudo) gestartet werden: Schritt 1 (Paket/Software installieren).'
+  okm_info '      Bitte ohne sudo starten – das Script fragt selbst, wenn es sudo braucht.'
+  OKM_STATUS=rechte
+  exit 1
+fi
+okm_info 'Rechte: ohne erhöhte Rechte'
 
 # --------------------------------------------------------------------
 # Schritt 1/1: Paket/Software installieren (Risiko: gelb)

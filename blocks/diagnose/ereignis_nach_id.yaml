@@ -4,8 +4,9 @@ name: Ereignisprotokoll nach ID durchsuchen
 kategorie: Diagnose
 beschreibung: Sucht Einträge mit einer bestimmten Ereignis-ID im gewählten Windows-Protokoll.
 risiko: gruen
-admin_noetig: true
 fortschritt: "Ereignis-ID {{ ereignis_id }} wird gesucht"
+rechte:
+  powershell: admin
 parameter:
   - id: protokoll
     label: Protokoll

@@ -6,9 +6,9 @@ beschreibung: Zeigt den Gesundheitszustand der eingebauten Festplatten bzw. SSDs
 hilfe: |
   Linux: Für Details muss smartmontools installiert sein (apt install smartmontools).
 risiko: gruen
-admin_noetig:
-  bash: true
 fortschritt: Festplatten-Gesundheit wird geprüft
+rechte:
+  bash: root
 ziele:
   powershell: |
     Get-PhysicalDisk | Format-Table FriendlyName, MediaType, HealthStatus, OperationalStatus, @{ Name = 'Größe (GB)'; Expression = { [math]::Round($_.Size / 1GB) } } -AutoSize
@@ -18,7 +18,7 @@ ziele:
       for okm_disk in /dev/sd? /dev/nvme?n1; do
         if [ -e "$okm_disk" ]; then
           printf '\n%s:\n' "$okm_disk"
-          smartctl -H "$okm_disk" || true
+          {{ sudo }}smartctl -H "$okm_disk" || true
         fi
       done
     else

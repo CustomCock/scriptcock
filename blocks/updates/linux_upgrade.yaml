@@ -4,15 +4,16 @@ name: "Linux: Updates installieren"
 kategorie: Updates
 beschreibung: Aktualisiert die Paketquellen und installiert alle verfügbaren Updates (apt oder dnf, automatisch erkannt).
 risiko: gelb
-admin_noetig: true
 fortschritt: Linux-Updates werden installiert
+rechte:
+  bash: root
 ziele:
   bash: |
     if command -v apt-get >/dev/null 2>&1; then
-      apt-get update
-      DEBIAN_FRONTEND=noninteractive apt-get -y upgrade
+      {{ sudo }}apt-get update
+      {{ sudo }}env DEBIAN_FRONTEND=noninteractive apt-get -y upgrade
     elif command -v dnf >/dev/null 2>&1; then
-      dnf -y upgrade
+      {{ sudo }}dnf -y upgrade
     else
       printf '%s\n' 'Kein unterstützter Paketmanager (apt, dnf) gefunden.'
       false

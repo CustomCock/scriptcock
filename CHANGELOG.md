@@ -2,6 +2,31 @@
 
 ## Fehlerbehebung Runde 1
 
+### 3. Admin-/sudo-Rechte automatisch im Script
+
+- **Vorher:** Fehlten Rechte, brach das Script mit „bitte als Administrator starten“ ab; die
+  Anleitung empfahl unter Linux/macOS `sudo ./script.sh` – damit liefen auch Homebrew-Befehle
+  als root (brew verweigert das) und `~` zeigte auf `/root`.
+- **Lösung:**
+  - Neues Schema `rechte:` pro Ziel (`admin` | `root` | `benutzer` | `nie_root`) statt
+    `admin_noetig`; der alte Schlüssel wird mit klarer Meldung abgelehnt. Alle Blöcke migriert
+    (`paket_installieren`/`paket_cache_leeren` unter macOS: `nie_root`).
+  - PowerShell/CMD: erklären, für welche Schritte Adminrechte nötig sind, und starten sich per
+    UAC neu (`Start-Process … -Verb RunAs`, Pfad mit Leerzeichen sicher). UAC abgelehnt →
+    Meldung + Zusammenfassung + Pause.
+  - bash/zsh: kein Neustart als root. Einmal `sudo -v` mit Erklärung, Keepalive im Hintergrund
+    (wird am Ende beendet), privilegierte Befehle über `{{ sudo }}` → `okm_sudo` (die Registry
+    erzwingt den Platzhalter in `root`-Blöcken und verbietet ihn sonst). Als root gestartet mit
+    `nie_root`-Block → Abbruch mit Erklärung. Protokoll im Benutzerkontext.
+  - Kopfkommentar `Benötigte Rechte: …`, Ausgabe/Protokoll `Rechte: als Administrator gestartet` /
+    `sudo erfolgreich` / `ohne erhöhte Rechte`.
+  - UI: Badge „Braucht Admin“/„Braucht sudo“ mit Schritten als Tooltip, Anleitung angepasst
+    („Das Script fragt einmal nach deinem Passwort“, Start **ohne** sudo).
+- **Tests (`tests/test_rechte.py`):** Schema/Registry-Regeln, alle Kombinationen im Generator,
+  bash-Ausführung als `nobody` mit sudo-Attrappe (erfolgreich / abgelehnt, Protokoll gehört dem
+  Benutzer), root + `nie_root` → Abbruch, Badge und Anleitung.
+- **Golden-Files** neu erzeugt (Rechte-Zeile im Kopf, sudo/UAC-Logik – gewollt).
+
 ### 2. Scripte beenden sich ohne Meldung
 
 - **Ursachen (reproduziert):**

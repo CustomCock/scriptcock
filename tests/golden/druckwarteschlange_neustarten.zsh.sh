@@ -6,8 +6,9 @@
 # Erstellt am:       15.01.2026 09:30:00
 # Baukasten-Version: 0.1.0
 # Zielsystem:        macOS (zsh)
+# Benötigte Rechte:  sudo (Schritt 1)
 # Enthaltene Schritte:
-#    1. Dienst neu starten [Risiko: gelb, Admin]
+#    1. Dienst neu starten [Risiko: gelb, sudo]
 #
 # Generiert mit dem okm Script-Baukasten
 # ======================================================================
@@ -26,6 +27,7 @@ OKM_NR=0
 OKM_SCHRITT='-'
 OKM_STATUS=laeuft
 OKM_TIPP=''
+OKM_SUDO_PID=''
 
 # Meldungen: Werte immer als Argumente übergeben, nie in den Formatstring einsetzen.
 # Keine Farben – die Ausgabe geht auch ins Protokoll.
@@ -34,6 +36,7 @@ okm_info() { printf '%s\n' "$*"; }
 okm_ok() { if [ $# -gt 0 ]; then printf '      OK  %s\n' "$*"; else printf '%s\n' '      OK'; fi; }
 okm_warn() { printf '      WARNUNG  %s\n' "$*"; }
 okm_fehler() { printf '      FEHLER  %s\n' "$*"; }
+okm_sudo() { if [ "$(id -u)" -eq 0 ]; then "$@"; else sudo -- "$@"; fi; }
 okm_zusammenfassung() {
   okm_info '----------------------------------------------'
   case "$OKM_STATUS" in
@@ -73,6 +76,7 @@ okm_ende() {
     fi
   fi
   okm_zusammenfassung
+  if [ -n "$OKM_SUDO_PID" ]; then kill "$OKM_SUDO_PID" 2>/dev/null || true; fi
   okm_pause
   # Ausgabe schließen und kurz auf tee warten, sonst fehlen beim Schließen des Fensters
   # die letzten Zeilen (höchstens 2 s – ein Hintergrundprozess darf nichts aufhalten)
@@ -100,12 +104,27 @@ okm_info ' okm Script-Baukasten · Druckwarteschlange neu starten'
 okm_info ' Erstellt: 15.01.2026 09:30 · von pytest'
 okm_info '=============================================='
 
-# Prüfung: root-Rechte
-if [ "$(id -u)" -ne 0 ]; then
-  okm_fehler 'Dieses Script braucht Administratorrechte (root).'
-  okm_info '      Bitte so starten: sudo zsh ./script.sh'
-  OKM_STATUS=rechte
-  exit 1
+# Rechte: sudo für Schritt 1 (Dienst neu starten)
+okm_info 'Für diese Schritte werden Administratorrechte (sudo) gebraucht:'
+okm_info '      Schritt 1 (Dienst neu starten)'
+if [ "$(id -u)" -eq 0 ]; then
+  okm_info 'Rechte: als root gestartet'
+else
+  if ! command -v sudo >/dev/null 2>&1; then
+    okm_fehler 'sudo ist nicht installiert – bitte die IT fragen.'
+    OKM_STATUS=rechte
+    exit 1
+  fi
+  okm_info 'sudo fragt jetzt einmal nach deinem Passwort (die Eingabe bleibt unsichtbar).'
+  if ! sudo -v; then
+    okm_fehler 'sudo wurde abgelehnt oder das Passwort war falsch.'
+    OKM_STATUS=rechte
+    exit 1
+  fi
+  okm_info 'Rechte: sudo erfolgreich'
+  # sudo-Zeitstempel frisch halten, damit lange Scripte nicht noch einmal fragen
+  while true; do sudo -n true; sleep 50; kill -0 "$$" || exit; done >/dev/null 2>&1 &
+  OKM_SUDO_PID=$!
 fi
 
 # --------------------------------------------------------------------
@@ -115,7 +134,7 @@ OKM_NR=1
 OKM_SCHRITT='1/1 (Dienst neu starten)'
 OKM_TIPP='Dienstnamen prüfen (nicht den Anzeigenamen) und ob das Script mit Administratorrechten läuft.'
 okm_info '[1/1] Dienst org.cups.cupsd wird neu gestartet ...'
-launchctl kickstart -k system/'org.cups.cupsd'
+okm_sudo launchctl kickstart -k system/'org.cups.cupsd'
 OKM_OK=$((OKM_OK + 1))
 okm_ok
 

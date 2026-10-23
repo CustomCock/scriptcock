@@ -76,11 +76,14 @@ erneut durch dieselbe Validierung.
 
 ## 5. Weitere Schutzmaßnahmen im Script
 
-- **Admin-Prüfung** am Anfang, wenn ein Block Adminrechte braucht – das Script bricht
-  verständlich ab, statt halb durchzulaufen.
-- **Fehlerabbruch**: `set -Eeuo pipefail` + `trap ERR` (bash), `ERR_EXIT NO_UNSET PIPE_FAIL`
-  (zsh), `$ErrorActionPreference='Stop'` + `try/catch` je Schritt + `$LASTEXITCODE` (PowerShell),
-  `if errorlevel 1` / `if not errorlevel 0` je Schritt (CMD).
+- **Rechte** (`rechte:` pro Ziel): Windows fordert Administratorrechte per UAC an (Neustart des
+  Scripts), Linux/macOS fragen einmal `sudo -v` ab – das Script selbst läuft nie komplett als
+  root; nur Befehle mit `{{ sudo }}` (→ `okm_sudo`) laufen erhöht. Abgelehnt → Meldung + Abbruch
+  vor Schritt 1. Das Protokoll gehört immer dem angemeldeten Benutzer.
+- **Fehlerabbruch**: `set -Eeuo pipefail` + `trap ERR` + `trap EXIT` (bash), `ERR_EXIT PIPE_FAIL`
+  + `trap ZERR` + `trap EXIT` (zsh), `$ErrorActionPreference='Stop'` + `try/catch` je Schritt +
+  `$LASTEXITCODE` + globales `trap` (PowerShell), gesicherter `%ERRORLEVEL%` je Schritt (CMD).
+  Am Ende steht immer eine Zusammenfassung.
 - **Dry-Run**: PowerShell nutzt `-WhatIf`, wo das Template es vorsieht; sonst wird jede Zeile
   eines gelben/roten Blocks zu einer Ausgabe „[SIMULATION] würde ausführen: …“.
 - **Protokoll** jedes Laufs (`%TEMP%` bzw. `/tmp`), Pfad wird am Ende ausgegeben.

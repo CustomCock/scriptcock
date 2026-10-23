@@ -6,9 +6,10 @@
 # Erstellt am:       15.01.2026 09:30:00
 # Baukasten-Version: 0.1.0
 # Zielsystem:        Linux (Bash 4+)
+# Benötigte Rechte:  sudo (Schritt 1, 2)
 # Enthaltene Schritte:
-#    1. Firewall-Status anzeigen [Risiko: gruen, Admin]
-#    2. Linux: SSH-Konfiguration prüfen [Risiko: gruen, Admin]
+#    1. Firewall-Status anzeigen [Risiko: gruen, sudo]
+#    2. Linux: SSH-Konfiguration prüfen [Risiko: gruen, sudo]
 #    3. Lokale Administratoren anzeigen [Risiko: gruen]
 #
 # Generiert mit dem okm Script-Baukasten
@@ -28,6 +29,7 @@ OKM_NR=0
 OKM_SCHRITT='-'
 OKM_STATUS=laeuft
 OKM_TIPP=''
+OKM_SUDO_PID=''
 
 # Meldungen: Werte immer als Argumente übergeben, nie in den Formatstring einsetzen.
 # Keine Farben – die Ausgabe geht auch ins Protokoll.
@@ -36,6 +38,7 @@ okm_info() { printf '%s\n' "$*"; }
 okm_ok() { if [ $# -gt 0 ]; then printf '      OK  %s\n' "$*"; else printf '%s\n' '      OK'; fi; }
 okm_warn() { printf '      WARNUNG  %s\n' "$*"; }
 okm_fehler() { printf '      FEHLER  %s\n' "$*"; }
+okm_sudo() { if [ "$(id -u)" -eq 0 ]; then "$@"; else sudo -- "$@"; fi; }
 okm_zusammenfassung() {
   okm_info '----------------------------------------------'
   case "$OKM_STATUS" in
@@ -76,6 +79,7 @@ okm_ende() {
     fi
   fi
   okm_zusammenfassung
+  if [ -n "$OKM_SUDO_PID" ]; then kill "$OKM_SUDO_PID" 2>/dev/null || true; fi
   okm_pause
   # Ausgabe schließen und kurz auf tee warten, sonst fehlen beim Schließen des Fensters
   # die letzten Zeilen (höchstens 2 s – ein Hintergrundprozess darf nichts aufhalten)
@@ -103,12 +107,28 @@ okm_info ' okm Script-Baukasten · Sicherheits-Schnellprüfung'
 okm_info ' Erstellt: 15.01.2026 09:30 · von pytest'
 okm_info '=============================================='
 
-# Prüfung: root-Rechte
-if [ "$(id -u)" -ne 0 ]; then
-  okm_fehler 'Dieses Script braucht Administratorrechte (root).'
-  okm_info '      Bitte so starten: sudo bash ./script.sh'
-  OKM_STATUS=rechte
-  exit 1
+# Rechte: sudo für Schritt 1 (Firewall-Status anzeigen), Schritt 2 (Linux: SSH-Konfiguration prüfen)
+okm_info 'Für diese Schritte werden Administratorrechte (sudo) gebraucht:'
+okm_info '      Schritt 1 (Firewall-Status anzeigen)'
+okm_info '      Schritt 2 (Linux: SSH-Konfiguration prüfen)'
+if [ "$(id -u)" -eq 0 ]; then
+  okm_info 'Rechte: als root gestartet'
+else
+  if ! command -v sudo >/dev/null 2>&1; then
+    okm_fehler 'sudo ist nicht installiert – bitte die IT fragen.'
+    OKM_STATUS=rechte
+    exit 1
+  fi
+  okm_info 'sudo fragt jetzt einmal nach deinem Passwort (die Eingabe bleibt unsichtbar).'
+  if ! sudo -v; then
+    okm_fehler 'sudo wurde abgelehnt oder das Passwort war falsch.'
+    OKM_STATUS=rechte
+    exit 1
+  fi
+  okm_info 'Rechte: sudo erfolgreich'
+  # sudo-Zeitstempel frisch halten, damit lange Scripte nicht noch einmal fragen
+  while true; do sudo -n true; sleep 50; kill -0 "$$" || exit; done >/dev/null 2>&1 &
+  OKM_SUDO_PID=$!
 fi
 
 # --------------------------------------------------------------------
@@ -119,12 +139,12 @@ OKM_SCHRITT='1/3 (Firewall-Status anzeigen)'
 OKM_TIPP=''
 okm_info '[1/3] Firewall-Status wird gelesen ...'
 if command -v ufw >/dev/null 2>&1; then
-  ufw status verbose
+  okm_sudo ufw status verbose
 elif command -v firewall-cmd >/dev/null 2>&1; then
-  firewall-cmd --state || true
-  firewall-cmd --list-all || true
+  okm_sudo firewall-cmd --state || true
+  okm_sudo firewall-cmd --list-all || true
 elif command -v nft >/dev/null 2>&1; then
-  nft list ruleset
+  okm_sudo nft list ruleset
 else
   printf '%s\n' 'Keine bekannte Firewall-Verwaltung (ufw, firewalld, nftables) gefunden.'
 fi
@@ -141,7 +161,7 @@ okm_info '[2/3] SSH-Konfiguration wird gelesen ...'
 if ! command -v sshd >/dev/null 2>&1; then
   printf '%s\n' 'Kein SSH-Server installiert.'
 else
-  sshd -T 2>/dev/null | grep -Ei '^(port|permitrootlogin|passwordauthentication|pubkeyauthentication|permitemptypasswords|x11forwarding|maxauthtries) ' || true
+  okm_sudo sshd -T 2>/dev/null | grep -Ei '^(port|permitrootlogin|passwordauthentication|pubkeyauthentication|permitemptypasswords|x11forwarding|maxauthtries) ' || true
 fi
 OKM_OK=$((OKM_OK + 1))
 okm_ok

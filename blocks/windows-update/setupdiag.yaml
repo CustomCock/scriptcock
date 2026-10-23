@@ -6,8 +6,9 @@ beschreibung: Lädt das Microsoft-Werkzeug SetupDiag nach C:\temp, analysiert fe
 hilfe: |
   Braucht Internetzugang zu go.microsoft.com. Das Ergebnis steht danach auch in C:\temp\setupdiag.log.
 risiko: gelb
-admin_noetig: true
 fortschritt: SetupDiag wird heruntergeladen und ausgeführt
+rechte:
+  powershell: admin
 ziele:
   powershell: |
     New-Item -ItemType Directory -Path C:\temp -Force | Out-Null

@@ -4,8 +4,10 @@ name: Schattenkopien anzeigen
 kategorie: Speicher
 beschreibung: Listet die vorhandenen Schattenkopien (Volumenschattenkopien) auf.
 risiko: gruen
-admin_noetig: true
 fortschritt: Schattenkopien werden aufgelistet
+rechte:
+  powershell: admin
+  cmd: admin
 ziele:
   powershell: |
     vssadmin.exe list shadows

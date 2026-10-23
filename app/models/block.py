@@ -12,7 +12,19 @@ from app.escaping import Ziel
 ID_MUSTER = r"^[a-z][a-z0-9_]*$"
 
 # Namen, die der Generator selbst in Code-Templates bereitstellt.
-EINGEBAUTE_VARIABLEN = frozenset({"whatif"})
+EINGEBAUTE_VARIABLEN = frozenset({"whatif", "sudo"})
+
+WINDOWS = frozenset({Ziel.POWERSHELL, Ziel.CMD})
+UNIX = frozenset({Ziel.BASH, Ziel.ZSH})
+
+
+class Recht(StrEnum):
+    """Benötigte Rechte eines Blocks pro Ziel (``rechte:`` im YAML)."""
+
+    BENUTZER = "benutzer"  # Standard
+    ADMIN = "admin"  # Windows: Administrator (UAC)
+    ROOT = "root"  # Linux/macOS: Befehle mit {{ sudo }}
+    NIE_ROOT = "nie_root"  # Linux/macOS: darf NICHT als root laufen (z. B. Homebrew)
 
 
 class Risiko(StrEnum):
@@ -105,7 +117,7 @@ class BlockDef(BaseModel):
     beschreibung: str
     hilfe: str = ""
     risiko: Risiko
-    admin_noetig: bool | dict[Ziel, bool] = False
+    rechte: dict[Ziel, Recht] = Field(default_factory=dict)
     # Interaktive Blöcke (Eingaben/Pausen) werden in CMD nicht umgeleitet,
     # damit der Benutzer die Ausgabe sofort sieht.
     interaktiv: bool = False
@@ -123,6 +135,17 @@ class BlockDef(BaseModel):
     # Wird von der Registry gesetzt (relativer Pfad, für Fehlermeldungen).
     quelle: str = ""
 
+    @model_validator(mode="before")
+    @classmethod
+    def _altes_schema(cls, daten: Any) -> Any:
+        if isinstance(daten, dict) and "admin_noetig" in daten:
+            raise ValueError(
+                "'admin_noetig' gibt es nicht mehr – bitte 'rechte' pro Ziel angeben, z. B. "
+                "rechte: {powershell: admin, cmd: admin, bash: root, zsh: root} "
+                "(siehe docs/neuen-block-anlegen.md)"
+            )
+        return daten
+
     @model_validator(mode="after")
     def _konsistent(self) -> BlockDef:
         if not self.ziele:
@@ -137,19 +160,28 @@ class BlockDef(BaseModel):
             if fremd:
                 namen = ", ".join(sorted(z.value for z in fremd))
                 raise ValueError(f"'{feld}' enthält Ziele ohne Eintrag in 'ziele': {namen}")
-        if isinstance(self.admin_noetig, dict):
-            fremd = set(self.admin_noetig) - set(self.ziele)
-            if fremd:
-                raise ValueError("'admin_noetig' enthält Ziele ohne Eintrag in 'ziele'")
+        fremd = set(self.rechte) - set(self.ziele)
+        if fremd:
+            namen = ", ".join(sorted(z.value for z in fremd))
+            raise ValueError(f"'rechte' enthält Ziele ohne Eintrag in 'ziele': {namen}")
+        for ziel, recht in self.rechte.items():
+            if recht is Recht.ADMIN and ziel not in WINDOWS:
+                raise ValueError(f"rechte.{ziel.value}: 'admin' gibt es nur für powershell/cmd – hier 'root'")
+            if recht in (Recht.ROOT, Recht.NIE_ROOT) and ziel not in UNIX:
+                raise ValueError(
+                    f"rechte.{ziel.value}: '{recht.value}' gibt es nur für bash/zsh – hier 'admin'"
+                )
         return self
 
     def verfuegbar(self, ziel: Ziel) -> bool:
         return ziel in self.ziele
 
+    def recht(self, ziel: Ziel) -> Recht:
+        return self.rechte.get(ziel, Recht.BENUTZER)
+
     def braucht_admin(self, ziel: Ziel) -> bool:
-        if isinstance(self.admin_noetig, dict):
-            return self.admin_noetig.get(ziel, False)
-        return self.admin_noetig
+        """Erhöhte Rechte nötig (Windows: Administrator, Linux/macOS: sudo)."""
+        return self.recht(ziel) in (Recht.ADMIN, Recht.ROOT)
 
     def param(self, param_id: str) -> ParameterDef | None:
         return next((p for p in self.parameter if p.id == param_id), None)

@@ -7,10 +7,11 @@ hilfe: |
   Die richtige Paket-ID steht im Software-Katalog (Knopf „Software-Katalog“ bzw. Seite „Software“).
   Windows: winget-ID, z. B. Mozilla.Firefox. Linux: Paketname, z. B. firefox-esr. macOS: Homebrew-Name, z. B. firefox.
 risiko: gelb
-admin_noetig:
-  bash: true
 fortschritt: "{{ paket }} wird installiert"
 tipp: Paket-ID im Software-Katalog prüfen. Ist das Programm schon installiert, meldet der Paketmanager ebenfalls einen Fehler.
+rechte:
+  bash: root
+  zsh: nie_root
 parameter:
   - id: paket
     label: Paketname bzw. Paket-ID
@@ -49,12 +50,12 @@ ziele:
       printf '%s\n' 'Flatpak ist nicht installiert (z. B. „apt install flatpak“, danach Flathub einrichten). Bitte an die IT wenden.'
       false
     fi
-    flatpak install -y --noninteractive flathub {{ paket }}
+    {{ sudo }}flatpak install -y --noninteractive flathub {{ paket }}
     {% elif paketmanager.wert == 'dnf' %}
-    dnf install -y {{ paket }}
+    {{ sudo }}dnf install -y {{ paket }}
     {% else %}
-    apt-get update
-    apt-get install -y {{ paket }}
+    {{ sudo }}apt-get update
+    {{ sudo }}apt-get install -y {{ paket }}
     {% endif %}
   zsh: |
     {% if paketmanager.wert in ('winget', 'apt', 'dnf', 'flatpak') %}

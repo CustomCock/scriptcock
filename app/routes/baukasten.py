@@ -24,7 +24,7 @@ from app.generators.base import ZIEL_ANZEIGE
 from app.models.block import BlockDef, Risiko
 from app.registry import Registry
 from app.routes.pages import HLJS_SPRACHE, _render, _sitzung
-from app.service import Benutzer, erzeuge, generiere
+from app.service import Benutzer, erzeuge, generiere, rechte_hinweis
 from app.validation import FehlerSammlung, Feldfehler
 
 router = APIRouter()
@@ -207,9 +207,7 @@ async def baukasten_erzeugen(
         ergebnis=ergebnis,
         ziel=formular.ziel,
         sprache=HLJS_SPRACHE[formular.ziel],
-        braucht_admin=any(
-            reg.bloecke[s.block_id].braucht_admin(formular.ziel) for s in ergebnis.ir.bloecke()
-        ),
+        rechte=rechte_hinweis(reg, ergebnis.ir, formular.ziel),
         ohne_code=True,
     )
 

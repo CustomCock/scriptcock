@@ -6,8 +6,10 @@ beschreibung: Entfernt veraltete Update-Komponenten aus dem Windows-Komponentens
 hilfe: |
   Danach lassen sich bereits installierte Updates nicht mehr deinstallieren. Dauert einige Minuten.
 risiko: gelb
-admin_noetig: true
 fortschritt: Komponentenspeicher wird bereinigt
+rechte:
+  powershell: admin
+  cmd: admin
 ziele:
   powershell: |
     DISM.exe /Online /Cleanup-Image /StartComponentCleanup

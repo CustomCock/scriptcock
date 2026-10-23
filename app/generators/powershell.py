@@ -71,6 +71,7 @@ class PowerShellGenerator(Generator):
             "            Write-Host ' Abgebrochen durch Benutzer. Es wurde nichts weiter ausgeführt.' "
             "-ForegroundColor Yellow",
             "        }",
+            "        'neustart' { Write-Host ' Läuft im neuen Fenster mit Administratorrechten weiter.' }",
             "        'rechte' {",
             "            Write-Host ' Abgebrochen: fehlende Administratorrechte.' -ForegroundColor Red",
             "        }",
@@ -82,7 +83,7 @@ class PowerShellGenerator(Generator):
             "    Write-Host (' Protokoll: ' + $OkmLog)",
             f"    Write-Host {_lit(LINIE)}",
             "    try { Stop-Transcript | Out-Null } catch { $null = $_ }",
-            "    Wait-OkmEnde",
+            "    if ($script:OkmStatus -ne 'neustart') { Wait-OkmEnde }",
             "    exit $Code",
             "}",
         ]
@@ -128,23 +129,52 @@ class PowerShellGenerator(Generator):
             *[f"Write-OkmInfo {_lit(z)}" for z in self.kopf_ausgabe(ir)],
             "",
         ]
-        if braucht_admin:
-            meldung = (
-                "Dieses Script braucht Administratorrechte. Bitte PowerShell mit Rechtsklick > "
-                '"Als Administrator ausführen" öffnen und das Script erneut starten.'
-            )
-            zeilen += [
-                "# Prüfung: Administratorrechte",
-                "$OkmPrincipal = New-Object Security.Principal.WindowsPrincipal("
-                "[Security.Principal.WindowsIdentity]::GetCurrent())",
-                "if (-not $OkmPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {",
-                f"    Write-OkmFehler {_lit(meldung)}",
-                "    $OkmStatus = 'rechte'",
-                "    Exit-OkmScript 1",
-                "}",
-                "",
-            ]
+        zeilen += self._rechte() if braucht_admin else ["Write-OkmInfo 'Rechte: ohne erhöhte Rechte'", ""]
         return zeilen
+
+    def _rechte(self) -> list[str]:
+        """Fehlen Administratorrechte, startet sich das Script per UAC selbst neu."""
+        liste = self.schritt_liste(self._admin_schritte)
+        kein_pfad = (
+            'Bitte PowerShell mit Rechtsklick > "Als Administrator ausführen" öffnen und das Script '
+            "erneut starten."
+        )
+        abgelehnt = (
+            "Die Administratorrechte wurden abgelehnt (Benutzerkontensteuerung). Ohne sie kann das "
+            "Script nicht weitermachen."
+        )
+        return [
+            f"# Rechte: Administrator für {liste}",
+            "$OkmPrincipal = New-Object Security.Principal.WindowsPrincipal("
+            "[Security.Principal.WindowsIdentity]::GetCurrent())",
+            "if ($OkmPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {",
+            "    Write-OkmInfo 'Rechte: als Administrator gestartet'",
+            "} else {",
+            f"    Write-OkmInfo {_lit(f'Dieses Script braucht Administratorrechte für: {liste}.')}",
+            "    if (-not $PSCommandPath) {",
+            f"        Write-OkmFehler {_lit(kein_pfad)}",
+            "        $OkmStatus = 'rechte'",
+            "        Exit-OkmScript 1",
+            "    }",
+            "    Write-OkmInfo 'Es wird jetzt mit Administratorrechten neu gestartet "
+            "(Windows fragt gleich nach).'",
+            "    # Pfad in Anführungszeichen: Start-Process quotet Argumente mit Leerzeichen nicht",
+            "    $OkmArgumente = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "
+            "('\"' + $PSCommandPath + '\"'))",
+            "    if ($OkmKeinePause) { $OkmArgumente += '-NoPause' }",
+            "    try {",
+            "        Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $OkmArgumente "
+            "| Out-Null",
+            "        $OkmStatus = 'neustart'",
+            "        Exit-OkmScript 0",
+            "    } catch {",
+            f"        Write-OkmFehler {_lit(abgelehnt)}",
+            "        $OkmStatus = 'rechte'",
+            "        Exit-OkmScript 1",
+            "    }",
+            "}",
+            "",
+        ]
 
     def schritt(self, info: SchrittInfo) -> list[str]:
         b = info.block

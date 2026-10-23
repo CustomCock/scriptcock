@@ -4,8 +4,10 @@ name: WLAN-Diagnosebericht
 kategorie: Netzwerk
 beschreibung: Erstellt den Windows-WLAN-Bericht der letzten drei Tage (Verbindungsabbrüche, Fehler) als HTML-Datei.
 risiko: gruen
-admin_noetig: true
 fortschritt: WLAN-Bericht wird erstellt
+rechte:
+  powershell: admin
+  cmd: admin
 ziele:
   powershell: |
     netsh.exe wlan show wlanreport

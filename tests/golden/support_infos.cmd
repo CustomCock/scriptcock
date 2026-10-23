@@ -8,6 +8,7 @@ rem Erstellt von:      pytest
 rem Erstellt am:       15.01.2026 09:30:00
 rem Baukasten-Version: 0.1.0
 rem Zielsystem:        Windows Eingabeaufforderung (CMD)
+rem Benötigte Rechte:  keine
 rem Enthaltene Schritte:
 rem    1. Support-Infos anzeigen [Risiko: gruen]
 rem    2. Meldung/Pause für den Benutzer [Risiko: gruen]
@@ -35,6 +36,9 @@ echo( Erstellt: 15.01.2026 09:30 · von pytest
 >>"%OKM_LOG%" echo( Erstellt: 15.01.2026 09:30 · von pytest
 echo(==============================================
 >>"%OKM_LOG%" echo(==============================================
+
+echo(Rechte: ohne erhöhte Rechte
+>>"%OKM_LOG%" echo(Rechte: ohne erhöhte Rechte
 
 rem --------------------------------------------------------------------
 rem Schritt 1/2: Support-Infos anzeigen (Risiko: gruen)
@@ -120,21 +124,3 @@ del "%OKM_TMP%" >nul 2>&1
 if not defined OKM_KEINE_PAUSE pause
 endlocal
 exit /b 2
-
-:okm_kein_admin
-echo(      FEHLER  Dieses Script braucht Administratorrechte.
->>"%OKM_LOG%" echo(      FEHLER  Dieses Script braucht Administratorrechte.
-echo(      Bitte die Eingabeaufforderung mit Rechtsklick ^> "Als Administrator ausführen" öffnen
-echo(      und das Script erneut starten.
-echo(----------------------------------------------
->>"%OKM_LOG%" echo(----------------------------------------------
-echo( Abgebrochen: fehlende Administratorrechte.
->>"%OKM_LOG%" echo( Abgebrochen: fehlende Administratorrechte.
-echo( Protokoll: "%OKM_LOG%"
->>"%OKM_LOG%" echo( Protokoll: "%OKM_LOG%"
-echo(----------------------------------------------
->>"%OKM_LOG%" echo(----------------------------------------------
-del "%OKM_TMP%" >nul 2>&1
-if not defined OKM_KEINE_PAUSE pause
-endlocal
-exit /b 1

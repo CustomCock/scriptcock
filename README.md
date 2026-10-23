@@ -43,7 +43,7 @@ Die Anwendung **erzeugt** Scripte, sie führt sie **nicht** selbst aus.
   „Sicherheits-Schnellprüfung“, „Server-Gesundheitscheck“, „Drucker einrichten“.
   Umsetzungsstand der Vorlagen-Ideen: [docs/vorlagen-status.md](docs/vorlagen-status.md).
 - Jedes Script hat Kopfkommentar, Fehlerbehandlung, Protokolldatei, Fortschrittsanzeige,
-  Admin-Prüfung, Abschlusszusammenfassung; rote (destruktive) Schritte fragen nach „JA“.
+  automatische Rechteanforderung (UAC bzw. einmal sudo), Abschlusszusammenfassung; rote (destruktive) Schritte fragen nach „JA“.
 - Modus **„Nur simulieren“** (Dry-Run).
 - SHA-256 jedes Scripts wird gespeichert und angezeigt.
 - Login über **Keycloak (OIDC)**, Rollen `nutzer` und `admin`.

@@ -4,10 +4,10 @@ name: Drucker entfernen
 kategorie: Drucker
 beschreibung: Entfernt einen eingerichteten Drucker.
 risiko: gelb
-admin_noetig:
-  bash: true
-  zsh: true
 fortschritt: "Drucker {{ name }} wird entfernt"
+rechte:
+  bash: root
+  zsh: root
 parameter:
   - id: name
     label: Druckername
@@ -19,6 +19,6 @@ ziele:
   cmd: |
     rundll32 printui.dll,PrintUIEntry /dl /n {{ name }}
   bash: |
-    lpadmin -x {{ name }}
+    {{ sudo }}lpadmin -x {{ name }}
   zsh: |
-    lpadmin -x {{ name }}
+    {{ sudo }}lpadmin -x {{ name }}

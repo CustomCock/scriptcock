@@ -4,16 +4,17 @@ name: "Linux: Docker-Übersicht"
 kategorie: Linux-Server
 beschreibung: Zeigt laufende und gestoppte Container, deren Ressourcenverbrauch und den belegten Speicherplatz.
 risiko: gruen
-admin_noetig: true
 fortschritt: Docker-Übersicht wird erstellt
+rechte:
+  bash: root
 ziele:
   bash: |
     if ! command -v docker >/dev/null 2>&1; then
       printf '%s\n' 'Docker ist nicht installiert.'
     else
-      docker ps -a
+      {{ sudo }}docker ps -a
       printf '\n'
-      docker stats --no-stream
+      {{ sudo }}docker stats --no-stream
       printf '\n'
-      docker system df
+      {{ sudo }}docker system df
     fi

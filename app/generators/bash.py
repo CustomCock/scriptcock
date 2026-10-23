@@ -14,6 +14,8 @@ from app.generators.base import EINZUG, LINIE, Generator, SchrittInfo, einruecke
 from app.ir import ScriptIR
 from app.models.block import BlockDef
 
+NIE_ROOT_TEXT = "Dieses Script darf nicht als root (mit sudo) gestartet werden: "
+NIE_ROOT_HINWEIS = "Bitte ohne sudo starten – das Script fragt selbst, wenn es sudo braucht."
 ABBRUCH_TEXT = " Abgebrochen durch Benutzer. Es wurde nichts weiter ausgeführt."
 
 
@@ -25,7 +27,6 @@ class ShGenerator(Generator):
     zeilenende: ClassVar[str] = "\n"
     endung: ClassVar[str] = ".sh"
     shebang: ClassVar[str]
-    sudo_hinweis: ClassVar[str]
     errexit_aus: ClassVar[str]
     errexit_an: ClassVar[str]
     # Exit-Code, mit dem eine rote Abfrage einen „Versuche“-Block (Subshell) verlässt;
@@ -63,6 +64,7 @@ class ShGenerator(Generator):
             "OKM_SCHRITT='-'",
             "OKM_STATUS=laeuft",
             "OKM_TIPP=''",
+            "OKM_SUDO_PID=''",
             "",
             "# Meldungen: Werte immer als Argumente übergeben, nie in den Formatstring einsetzen.",
             "# Keine Farben – die Ausgabe geht auch ins Protokoll.",
@@ -72,6 +74,11 @@ class ShGenerator(Generator):
             f"else printf '%s\\n' '{EINZUG}OK'; fi; }}",
             f"okm_warn() {{ printf '{EINZUG}WARNUNG  %s\\n' \"$*\"; }}",
             f"okm_fehler() {{ printf '{EINZUG}FEHLER  %s\\n' \"$*\"; }}",
+            *(
+                ['okm_sudo() { if [ "$(id -u)" -eq 0 ]; then "$@"; else sudo -- "$@"; fi; }']
+                if self._admin_schritte
+                else []
+            ),
             *self._zusammenfassung(),
             "# Fenster/Terminal offen halten – nur wenn ein Mensch davor sitzt",
             "okm_pause() {",
@@ -107,6 +114,7 @@ class ShGenerator(Generator):
             "    fi",
             "  fi",
             "  okm_zusammenfassung",
+            '  if [ -n "$OKM_SUDO_PID" ]; then kill "$OKM_SUDO_PID" 2>/dev/null || true; fi',
             *(['  rm -f "$OKM_ZAEHLER"'] if self.mit_kontrolle else []),
             "  okm_pause",
             "  # Ausgabe schließen und kurz auf tee warten, sonst fehlen beim Schließen des Fensters",
@@ -133,18 +141,51 @@ class ShGenerator(Generator):
             *[f"okm_info {_lit(z)}" for z in self.kopf_ausgabe(ir)],
             "",
         ]
-        if braucht_admin:
+        zeilen += self._rechte()
+        return zeilen
+
+    def _rechte(self) -> list[str]:
+        """sudo einmal am Anfang statt Neustart als root (sonst kaputtes brew und ~ = /root)."""
+        zeilen: list[str] = []
+        if self._nie_root_schritte:
+            liste = self.schritt_liste(self._nie_root_schritte)
             zeilen += [
-                "# Prüfung: root-Rechte",
-                'if [ "$(id -u)" -ne 0 ]; then',
-                f"  okm_fehler {_lit('Dieses Script braucht Administratorrechte (root).')}",
-                f"  okm_info {_lit(EINZUG + self.sudo_hinweis)}",
+                "# Schritte, die NICHT als root laufen dürfen (z. B. Homebrew verweigert root)",
+                'if [ "$(id -u)" -eq 0 ]; then',
+                f"  okm_fehler {_lit(NIE_ROOT_TEXT + liste + '.')}",
+                f"  okm_info {_lit(EINZUG + NIE_ROOT_HINWEIS)}",
                 "  OKM_STATUS=rechte",
                 "  exit 1",
                 "fi",
-                "",
             ]
-        return zeilen
+        if not self._admin_schritte:
+            return [*zeilen, "okm_info 'Rechte: ohne erhöhte Rechte'", ""]
+        return [
+            *zeilen,
+            f"# Rechte: sudo für {self.schritt_liste(self._admin_schritte)}",
+            "okm_info 'Für diese Schritte werden Administratorrechte (sudo) gebraucht:'",
+            *[f"okm_info {_lit(f'{EINZUG}Schritt {i} ({b.name})')}" for i, b in self._admin_schritte],
+            'if [ "$(id -u)" -eq 0 ]; then',
+            "  okm_info 'Rechte: als root gestartet'",
+            "else",
+            "  if ! command -v sudo >/dev/null 2>&1; then",
+            "    okm_fehler 'sudo ist nicht installiert – bitte die IT fragen.'",
+            "    OKM_STATUS=rechte",
+            "    exit 1",
+            "  fi",
+            "  okm_info 'sudo fragt jetzt einmal nach deinem Passwort (die Eingabe bleibt unsichtbar).'",
+            "  if ! sudo -v; then",
+            "    okm_fehler 'sudo wurde abgelehnt oder das Passwort war falsch.'",
+            "    OKM_STATUS=rechte",
+            "    exit 1",
+            "  fi",
+            "  okm_info 'Rechte: sudo erfolgreich'",
+            "  # sudo-Zeitstempel frisch halten, damit lange Scripte nicht noch einmal fragen",
+            '  while true; do sudo -n true; sleep 50; kill -0 "$$" || exit; done >/dev/null 2>&1 &',
+            "  OKM_SUDO_PID=$!",
+            "fi",
+            "",
+        ]
 
     def _zusammenfassung(self) -> list[str]:
         if self.mit_kontrolle:
@@ -279,7 +320,6 @@ class ShGenerator(Generator):
 class BashGenerator(ShGenerator):
     ziel: ClassVar[Ziel] = Ziel.BASH
     shebang: ClassVar[str] = "#!/usr/bin/env bash"
-    sudo_hinweis: ClassVar[str] = "Bitte so starten: sudo bash ./script.sh"
     errexit_aus: ClassVar[str] = "set +e"
     errexit_an: ClassVar[str] = "set -e"
 
@@ -310,7 +350,6 @@ class BashGenerator(ShGenerator):
 class ZshGenerator(ShGenerator):
     ziel: ClassVar[Ziel] = Ziel.ZSH
     shebang: ClassVar[str] = "#!/bin/zsh"
-    sudo_hinweis: ClassVar[str] = "Bitte so starten: sudo zsh ./script.sh"
     errexit_aus: ClassVar[str] = "unsetopt ERR_EXIT"
     errexit_an: ClassVar[str] = "setopt ERR_EXIT"
 

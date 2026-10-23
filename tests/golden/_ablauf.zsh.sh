@@ -5,6 +5,7 @@
 # Erstellt am:       15.01.2026 09:30:00
 # Baukasten-Version: 0.1.0
 # Zielsystem:        macOS (zsh)
+# Benötigte Rechte:  keine
 # Enthaltene Schritte:
 #    1. Meldung/Pause für den Benutzer [Risiko: gruen]
 #   Versuche:
@@ -39,6 +40,7 @@ OKM_NR=0
 OKM_SCHRITT='-'
 OKM_STATUS=laeuft
 OKM_TIPP=''
+OKM_SUDO_PID=''
 
 # Meldungen: Werte immer als Argumente übergeben, nie in den Formatstring einsetzen.
 # Keine Farben – die Ausgabe geht auch ins Protokoll.
@@ -101,6 +103,7 @@ okm_ende() {
     fi
   fi
   okm_zusammenfassung
+  if [ -n "$OKM_SUDO_PID" ]; then kill "$OKM_SUDO_PID" 2>/dev/null || true; fi
   rm -f "$OKM_ZAEHLER"
   okm_pause
   # Ausgabe schließen und kurz auf tee warten, sonst fehlen beim Schließen des Fensters
@@ -128,6 +131,8 @@ okm_info '=============================================='
 okm_info ' okm Script-Baukasten · Ablauf'
 okm_info ' Erstellt: 15.01.2026 09:30 · von pytest'
 okm_info '=============================================='
+
+okm_info 'Rechte: ohne erhöhte Rechte'
 
 # --------------------------------------------------------------------
 # Schritt 1/8: Meldung/Pause für den Benutzer (Risiko: gruen)

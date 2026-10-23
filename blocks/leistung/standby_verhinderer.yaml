@@ -4,12 +4,15 @@ name: Was verhindert den Standby?
 kategorie: Leistung
 beschreibung: Zeigt, welche Programme oder Treiber gerade verhindern, dass der Rechner in den Energiesparmodus geht.
 risiko: gruen
-admin_noetig: true
 fortschritt: Standby-Verhinderer werden ermittelt
+rechte:
+  powershell: admin
+  cmd: admin
+  zsh: root
 ziele:
   powershell: |
     powercfg.exe /requests
   cmd: |
     powercfg /requests
   zsh: |
-    pmset -g assertions
+    {{ sudo }}pmset -g assertions

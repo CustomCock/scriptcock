@@ -7,9 +7,13 @@ hilfe: |
   Windows: Den Dienstnamen findest du in services.msc (Spalte "Name" bzw. Feld "Dienstname", nicht der Anzeigename).
   Linux: Name der systemd-Unit, z. B. cups. macOS: launchd-Label, z. B. org.cups.cupsd.
 risiko: gelb
-admin_noetig: true
 fortschritt: "Dienst {{ dienst }} wird neu gestartet"
 tipp: Dienstnamen prüfen (nicht den Anzeigenamen) und ob das Script mit Administratorrechten läuft.
+rechte:
+  powershell: admin
+  cmd: admin
+  bash: root
+  zsh: root
 parameter:
   - id: dienst
     label: Dienstname
@@ -22,9 +26,9 @@ ziele:
     net stop {{ dienst }}
     net start {{ dienst }}
   bash: |
-    systemctl restart {{ dienst }}
+    {{ sudo }}systemctl restart {{ dienst }}
   zsh: |
-    launchctl kickstart -k system/{{ dienst }}
+    {{ sudo }}launchctl kickstart -k system/{{ dienst }}
 pruefung:
   powershell: |
     $okmDienst = Get-Service -Name {{ dienst }}

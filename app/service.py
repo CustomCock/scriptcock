@@ -57,6 +57,25 @@ def rezept_felder(registry: Registry, rezept: RezeptDef, ziel: Ziel) -> list[Par
     return [f for f in rezept.felder if f.id in relevant]
 
 
+@dataclass
+class RechteHinweis:
+    """Für Badge und Anleitung: welche Rechte das Script braucht und für welche Schritte."""
+
+    art: str  # "Admin" (Windows) oder "sudo" (Linux/macOS)
+    schritte: str  # "Schritt 2 (Dienst neu starten), Schritt 4 (…)"
+
+
+def rechte_hinweis(registry: Registry, ir: ScriptIR, ziel: Ziel) -> RechteHinweis | None:
+    schritte = [
+        f"Schritt {i} ({b.name})"
+        for i, s in enumerate(ir.bloecke(), 1)
+        if (b := registry.bloecke.get(s.block_id)) is not None and b.braucht_admin(ziel)
+    ]
+    if not schritte:
+        return None
+    return RechteHinweis("Admin" if ziel in (Ziel.POWERSHELL, Ziel.CMD) else "sudo", ", ".join(schritte))
+
+
 def rezept_bloecke(registry: Registry, rezept: RezeptDef, ziel: Ziel) -> list[BlockDef]:
     return [registry.bloecke[s.block] for s in rezept.schritte_fuer(ziel)]
 

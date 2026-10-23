@@ -4,9 +4,10 @@ name: "macOS: Spotlight-Index neu aufbauen"
 kategorie: macOS
 beschreibung: Löscht den Spotlight-Suchindex des Startvolumes und baut ihn neu auf – hilft, wenn die Suche Dateien nicht findet.
 risiko: gelb
-admin_noetig: true
 fortschritt: Spotlight-Index wird neu aufgebaut
+rechte:
+  zsh: root
 ziele:
   zsh: |
-    mdutil -E /
-    mdutil -s /
+    {{ sudo }}mdutil -E /
+    {{ sudo }}mdutil -s /

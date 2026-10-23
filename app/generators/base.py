@@ -20,7 +20,7 @@ from app import escaping
 from app.escaping import Escaped, UnsicherError, Ziel
 from app.export import exportiere, text_fuer
 from app.ir import BlockSchritt, Knoten, ScriptIR, WennFehler, Wiederhole
-from app.models.block import BlockDef, Risiko
+from app.models.block import WINDOWS, BlockDef, Recht, Risiko
 from app.registry import Registry
 from app.validation import ValidierungsFehler, pruefe_wert_fuer_ziel
 
@@ -107,7 +107,12 @@ class Generator(ABC):
                     f"„{block.name}“ ist unter {ZIEL_ANZEIGE[self.ziel]} nicht verfügbar."
                 )
             defs.append(block)
-        braucht_admin = any(b.braucht_admin(self.ziel) for b in defs)
+        # Schrittnummern (Vorordnung) der Blöcke mit besonderen Rechten
+        self._admin_schritte = [(i, b) for i, b in enumerate(defs, 1) if b.braucht_admin(self.ziel)]
+        self._nie_root_schritte = [
+            (i, b) for i, b in enumerate(defs, 1) if b.recht(self.ziel) is Recht.NIE_ROOT
+        ]
+        braucht_admin = bool(self._admin_schritte)
 
         # Zustand für die rekursive Ausgabe
         self._ir = ir
@@ -235,6 +240,8 @@ class Generator(ABC):
             else:
                 kontext[name] = escaping.literal(self.ziel, unc_zu_smb_url(quelle.wert))
         kontext["whatif"] = escaping.vertraut(" -WhatIf" if dry and self.ziel is Ziel.POWERSHELL else "")
+        # Linux/macOS: privilegierte Befehle laufen über okm_sudo (root: direkt, sonst sudo)
+        kontext["sudo"] = escaping.vertraut("okm_sudo " if block.recht(self.ziel) is Recht.ROOT else "")
         return kontext
 
     def rendere(self, block: BlockDef, art: str, kontext: dict[str, Escaped]) -> list[str]:
@@ -288,6 +295,7 @@ class Generator(ABC):
             f"Baukasten-Version: {k(ir.meta.baukasten_version)}",
             f"Zielsystem:        {ZIEL_ANZEIGE[self.ziel]}",
         ]
+        zeilen.append(f"Benötigte Rechte:  {self.rechte_kopfzeile()}")
         if ir.optionen.dry_run:
             zeilen.append("Modus:             NUR SIMULATION - es wird nichts verändert")
         zeilen.append("Enthaltene Schritte:")
@@ -307,7 +315,7 @@ class Generator(ABC):
                     liste(kn.rumpf, einzug + 3)
                 else:
                     b = self.registry.bloecke[kn.block_id]
-                    admin = ", Admin" if b.braucht_admin(self.ziel) else ""
+                    admin = f", {self.rechte_name}" if b.braucht_admin(self.ziel) else ""
                     zeilen.append(
                         " " * einzug + f"{next(zaehler):>2}. {k(b.name)} [Risiko: {b.risiko.value}{admin}]"
                     )
@@ -315,6 +323,30 @@ class Generator(ABC):
         liste(ir.schritte, 2)
         zeilen += ["", "Generiert mit dem okm Script-Baukasten", "=" * 70]
         return zeilen
+
+    # --- Rechte -----------------------------------------------------------------
+
+    @property
+    def rechte_name(self) -> str:
+        return "Admin" if self.ziel in WINDOWS else "sudo"
+
+    @staticmethod
+    def schritt_liste(schritte: list[tuple[int, BlockDef]], mit_namen: bool = True) -> str:
+        if mit_namen:
+            return ", ".join(f"Schritt {i} ({b.name})" for i, b in schritte)
+        return ", ".join(str(i) for i, _ in schritte)
+
+    def rechte_kopfzeile(self) -> str:
+        """``Administrator (Schritt 2, 4)`` / ``sudo (Schritt 1)`` / ``keine`` für den Kopfkommentar."""
+        teile = []
+        if self._admin_schritte:
+            art = "Administrator" if self.ziel in WINDOWS else "sudo"
+            teile.append(f"{art} (Schritt {self.schritt_liste(self._admin_schritte, False)})")
+        if self._nie_root_schritte:
+            teile.append(
+                f"nicht als root starten (Schritt {self.schritt_liste(self._nie_root_schritte, False)})"
+            )
+        return "; ".join(teile) or "keine"
 
     def echo(self, text: str) -> str:
         return escaping.echo(self.ziel, text)

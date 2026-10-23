@@ -6,6 +6,7 @@
 # Erstellt am:       15.01.2026 09:30:00
 # Baukasten-Version: 0.1.0
 # Zielsystem:        Windows PowerShell 5.1
+# Benötigte Rechte:  Administrator (Schritt 1)
 # Enthaltene Schritte:
 #    1. Windows-11-Kompatibilität prüfen [Risiko: gruen, Admin]
 #    2. Windows-Version (Feature-Update) [Risiko: gruen]
@@ -58,6 +59,7 @@ function Exit-OkmScript {
         'abbruch' {
             Write-Host ' Abgebrochen durch Benutzer. Es wurde nichts weiter ausgeführt.' -ForegroundColor Yellow
         }
+        'neustart' { Write-Host ' Läuft im neuen Fenster mit Administratorrechten weiter.' }
         'rechte' {
             Write-Host ' Abgebrochen: fehlende Administratorrechte.' -ForegroundColor Red
         }
@@ -69,7 +71,7 @@ function Exit-OkmScript {
     Write-Host (' Protokoll: ' + $OkmLog)
     Write-Host '----------------------------------------------'
     try { Stop-Transcript | Out-Null } catch { $null = $_ }
-    Wait-OkmEnde
+    if ($script:OkmStatus -ne 'neustart') { Wait-OkmEnde }
     exit $Code
 }
 
@@ -85,12 +87,30 @@ Write-OkmInfo ' okm Script-Baukasten · Windows-11-Tauglichkeit prüfen'
 Write-OkmInfo ' Erstellt: 15.01.2026 09:30 · von pytest'
 Write-OkmInfo '=============================================='
 
-# Prüfung: Administratorrechte
+# Rechte: Administrator für Schritt 1 (Windows-11-Kompatibilität prüfen)
 $OkmPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
-if (-not $OkmPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-OkmFehler 'Dieses Script braucht Administratorrechte. Bitte PowerShell mit Rechtsklick > "Als Administrator ausführen" öffnen und das Script erneut starten.'
-    $OkmStatus = 'rechte'
-    Exit-OkmScript 1
+if ($OkmPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-OkmInfo 'Rechte: als Administrator gestartet'
+} else {
+    Write-OkmInfo 'Dieses Script braucht Administratorrechte für: Schritt 1 (Windows-11-Kompatibilität prüfen).'
+    if (-not $PSCommandPath) {
+        Write-OkmFehler 'Bitte PowerShell mit Rechtsklick > "Als Administrator ausführen" öffnen und das Script erneut starten.'
+        $OkmStatus = 'rechte'
+        Exit-OkmScript 1
+    }
+    Write-OkmInfo 'Es wird jetzt mit Administratorrechten neu gestartet (Windows fragt gleich nach).'
+    # Pfad in Anführungszeichen: Start-Process quotet Argumente mit Leerzeichen nicht
+    $OkmArgumente = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $PSCommandPath + '"'))
+    if ($OkmKeinePause) { $OkmArgumente += '-NoPause' }
+    try {
+        Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $OkmArgumente | Out-Null
+        $OkmStatus = 'neustart'
+        Exit-OkmScript 0
+    } catch {
+        Write-OkmFehler 'Die Administratorrechte wurden abgelehnt (Benutzerkontensteuerung). Ohne sie kann das Script nicht weitermachen.'
+        $OkmStatus = 'rechte'
+        Exit-OkmScript 1
+    }
 }
 
 # --------------------------------------------------------------------

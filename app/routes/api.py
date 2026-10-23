@@ -36,6 +36,7 @@ async def bloecke(request: Request, benutzer: Benutzer = Depends(aktueller_benut
                 "risiko": b.risiko.value,
                 "ziele": [z.value for z in b.ziele],
                 "admin": {z.value: b.braucht_admin(z) for z in b.ziele},
+                "rechte": {z.value: b.recht(z).value for z in b.ziele},
                 "hinweise": {z.value: t for z, t in b.hinweise.items()},
                 "parameter_je_ziel": {z.value: sorted(benutzte_parameter(reg, b, z)) for z in b.ziele},
                 "parameter": [p.model_dump(mode="json") for p in b.parameter],

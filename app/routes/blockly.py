@@ -19,7 +19,7 @@ from app.generators.base import ZIEL_ANZEIGE, GeneratedScript
 from app.ir import ScriptIR
 from app.registry import Registry
 from app.routes.pages import HLJS_SPRACHE, _render, _sitzung
-from app.service import Benutzer, Ergebnis
+from app.service import Benutzer, Ergebnis, rechte_hinweis
 from app.validation import MAX_TIEFE, MAX_WIEDERHOLUNGEN, FehlerSammlung
 
 router = APIRouter()
@@ -120,8 +120,6 @@ async def ergebnis(
         ergebnis=Ergebnis(ir=ir, script=script, gespeichert=eintrag),
         ziel=ziel,
         sprache=HLJS_SPRACHE[ziel],
-        braucht_admin=any(
-            (b := reg.bloecke.get(s.block_id)) is not None and b.braucht_admin(ziel) for s in ir.bloecke()
-        ),
+        rechte=rechte_hinweis(reg, ir, ziel),
         ohne_code=True,
     )

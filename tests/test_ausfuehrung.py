@@ -133,11 +133,13 @@ def test_rote_bestaetigung(
 @pytest.mark.parametrize(("shell", "ziel"), SH_ZIELE)
 def test_admin_pruefung_ohne_root(registry: Registry, tmp_path: Path, shell: str, ziel: Ziel) -> None:
     if os.geteuid() == 0:
-        pytest.skip("Test läuft als root – Admin-Prüfung würde bestehen")
+        pytest.skip("Test läuft als root – sudo wäre nicht nötig (siehe tests/test_rechte.py)")
     s = erzeuge(registry, ziel, [("dienst_neustarten", {"dienst": "cups"})])
     r = ausfuehren(shell, s.inhalt, tmp_path)
+    # Ohne Terminal kann sudo kein Passwort abfragen → verständlicher Abbruch statt stillem Ende
     assert r.returncode == 1
-    assert "braucht Administratorrechte" in r.stdout
+    assert "Administratorrechte (sudo)" in r.stdout
+    assert " Abgebrochen: fehlende Rechte." in r.stdout
 
 
 # --- PowerShell (pwsh unter Linux; nur plattformneutrale Blöcke) ---------------

@@ -4,8 +4,12 @@ name: Lokalen Benutzer deaktivieren
 kategorie: Benutzer
 beschreibung: Sperrt ein lokales Benutzerkonto (z. B. bei Austritt). Das Konto und seine Daten bleiben erhalten.
 risiko: rot
-admin_noetig: true
 fortschritt: "Benutzer {{ benutzer }} wird deaktiviert"
+rechte:
+  powershell: admin
+  cmd: admin
+  bash: root
+  zsh: root
 parameter:
   - id: benutzer
     label: Benutzername
@@ -18,6 +22,6 @@ ziele:
   cmd: |
     net user {{ benutzer }} /active:no
   bash: |
-    usermod -L -e 1 {{ benutzer }}
+    {{ sudo }}usermod -L -e 1 {{ benutzer }}
   zsh: |
-    pwpolicy -u {{ benutzer }} -disableuser
+    {{ sudo }}pwpolicy -u {{ benutzer }} -disableuser

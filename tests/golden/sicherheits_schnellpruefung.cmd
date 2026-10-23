@@ -8,6 +8,7 @@ rem Erstellt von:      pytest
 rem Erstellt am:       15.01.2026 09:30:00
 rem Baukasten-Version: 0.1.0
 rem Zielsystem:        Windows Eingabeaufforderung (CMD)
+rem Benötigte Rechte:  Administrator (Schritt 2)
 rem Enthaltene Schritte:
 rem    1. Firewall-Status anzeigen [Risiko: gruen]
 rem    2. BitLocker-Status [Risiko: gruen, Admin]
@@ -37,9 +38,11 @@ echo( Erstellt: 15.01.2026 09:30 · von pytest
 echo(==============================================
 >>"%OKM_LOG%" echo(==============================================
 
-rem Prüfung: Administratorrechte
+rem Rechte: Administrator für Schritt 2 (BitLocker-Status)
 net session >nul 2>&1
-if errorlevel 1 goto :okm_kein_admin
+if errorlevel 1 goto :okm_rechte_anfordern
+echo(Rechte: als Administrator gestartet
+>>"%OKM_LOG%" echo(Rechte: als Administrator gestartet
 
 rem --------------------------------------------------------------------
 rem Schritt 1/3: Firewall-Status anzeigen (Risiko: gruen)
@@ -145,11 +148,22 @@ if not defined OKM_KEINE_PAUSE pause
 endlocal
 exit /b 2
 
-:okm_kein_admin
-echo(      FEHLER  Dieses Script braucht Administratorrechte.
->>"%OKM_LOG%" echo(      FEHLER  Dieses Script braucht Administratorrechte.
-echo(      Bitte die Eingabeaufforderung mit Rechtsklick ^> "Als Administrator ausführen" öffnen
-echo(      und das Script erneut starten.
+:okm_rechte_anfordern
+echo(Dieses Script braucht Administratorrechte für: Schritt 2 ^(BitLocker-Status^).
+>>"%OKM_LOG%" echo(Dieses Script braucht Administratorrechte für: Schritt 2 ^(BitLocker-Status^).
+echo(Es wird jetzt mit Administratorrechten neu gestartet ^(Windows fragt gleich nach^).
+>>"%OKM_LOG%" echo(Es wird jetzt mit Administratorrechten neu gestartet ^(Windows fragt gleich nach^).
+set "OKM_SELBST=%~f0"
+powershell -NoProfile -Command "Start-Process -FilePath $env:OKM_SELBST -Verb RunAs"
+if errorlevel 1 goto :okm_rechte_abgelehnt
+echo(Läuft im neuen Fenster mit Administratorrechten weiter.
+>>"%OKM_LOG%" echo(Läuft im neuen Fenster mit Administratorrechten weiter.
+endlocal
+exit /b 0
+
+:okm_rechte_abgelehnt
+echo(      FEHLER  Die Administratorrechte wurden abgelehnt (Benutzerkontensteuerung).
+>>"%OKM_LOG%" echo(      FEHLER  Die Administratorrechte wurden abgelehnt (Benutzerkontensteuerung).
 echo(----------------------------------------------
 >>"%OKM_LOG%" echo(----------------------------------------------
 echo( Abgebrochen: fehlende Administratorrechte.

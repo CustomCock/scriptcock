@@ -7,8 +7,9 @@ hilfe: |
   Rechner NICHT ausschalten, bevor die Sicherung fertig ist. Den Ordner danach auf einen USB-Stick kopieren
   und an die IT-Sicherheit übergeben. Für jede Datei wird ein SHA-256-Hash in hashes.txt abgelegt.
 risiko: gruen
-admin_noetig: true
 fortschritt: Flüchtige Informationen werden gesichert
+rechte:
+  powershell: admin
 ziele:
   powershell: |
     $okmZiel = Join-Path ([Environment]::GetFolderPath('Desktop')) ('okm-incident-' + $env:COMPUTERNAME + '-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))

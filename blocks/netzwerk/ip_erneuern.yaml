@@ -7,11 +7,9 @@ hilfe: |
   Die Netzwerkverbindung ist dabei kurz unterbrochen – nicht über eine Fernwartung ausführen,
   die über genau diese Verbindung läuft!
 risiko: gelb
-admin_noetig:
-  powershell: false
-  cmd: false
-  zsh: true
 fortschritt: IP-Adresse wird erneuert
+rechte:
+  zsh: root
 parameter:
   - id: schnittstelle
     label: Netzwerkschnittstelle (nur macOS)
@@ -25,7 +23,7 @@ ziele:
     ipconfig /release
     ipconfig /renew
   zsh: |
-    ipconfig set {{ schnittstelle }} DHCP
+    {{ sudo }}ipconfig set {{ schnittstelle }} DHCP
     ipconfig getifaddr {{ schnittstelle }} || printf '%s\n' 'Noch keine Adresse erhalten.'
 hinweise:
   zsh: "Schnittstelle meist en0 (WLAN bzw. integriertes Ethernet). Liste: networksetup -listallhardwareports"

@@ -6,9 +6,9 @@ beschreibung: Plant einen Neustart in der angegebenen Zeit und zeigt dem Benutze
 hilfe: |
   Windows: Abbrechen mit „shutdown /a“. Linux: „shutdown -c“. Für macOS gibt es diesen Baustein nicht.
 risiko: rot
-admin_noetig:
-  bash: true
 fortschritt: "Neustart in {{ minuten }} Minuten wird geplant"
+rechte:
+  bash: root
 parameter:
   - id: minuten
     label: Neustart in (Minuten)
@@ -27,4 +27,4 @@ ziele:
     set /a OKM_SEKUNDEN={{ minuten }}*60
     shutdown /r /t %OKM_SEKUNDEN% /c {{ meldung }}
   bash: |
-    shutdown -r +{{ minuten }} {{ meldung }}
+    {{ sudo }}shutdown -r +{{ minuten }} {{ meldung }}

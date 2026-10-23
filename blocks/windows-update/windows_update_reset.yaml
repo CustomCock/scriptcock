@@ -7,8 +7,10 @@ hilfe: |
   Hilft, wenn Windows Update dauerhaft hängt oder Fehler meldet. Die alten Ordner bleiben als *.old erhalten
   und können nach erfolgreichem Update gelöscht werden. Danach den Rechner neu starten und Windows Update erneut ausführen.
 risiko: rot
-admin_noetig: true
 fortschritt: Windows-Update-Komponenten werden zurückgesetzt
+rechte:
+  powershell: admin
+  cmd: admin
 ziele:
   powershell: |
     $okmDienste = 'wuauserv', 'cryptSvc', 'bits', 'msiserver'

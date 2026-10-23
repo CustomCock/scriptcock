@@ -24,7 +24,7 @@ from pydantic import ValidationError
 
 from app.codeenv import code_umgebung, text_umgebung
 from app.escaping import Ziel
-from app.models.block import EINGEBAUTE_VARIABLEN, BlockDef, ParameterDef
+from app.models.block import EINGEBAUTE_VARIABLEN, BlockDef, ParameterDef, Recht
 from app.models.recipe import RezeptDef, RezeptSchritt, feld_verweis, konstante
 from app.validation import ValidierungsFehler, pruefe_wert_fuer_ziel, validiere_wert
 
@@ -59,7 +59,10 @@ _VERBOTE: dict[Ziel, list[tuple[re.Pattern[str], str]]] = {
         (re.compile(r"\beval\b"), "'eval' ist verboten"),
         (re.compile(r"`"), "Backticks sind verboten, $(…) verwenden"),
         (re.compile(r"^\s*exit\b", re.M), "'exit' ist verboten – der Generator steuert den Ablauf"),
-        (re.compile(r"^\s*sudo\b", re.M), "'sudo' im Template ist verboten – 'admin_noetig' setzen"),
+        (
+            re.compile(r"(^|[;&|(]\s*)sudo\b", re.M),
+            "'sudo' im Template ist verboten – 'rechte: root' setzen und {{ sudo }} voranstellen",
+        ),
     ],
 }
 _VERBOTE[Ziel.ZSH] = _VERBOTE[Ziel.BASH]
@@ -232,6 +235,12 @@ def _pruefe_block(block: BlockDef, reg: Registry, fehler: list[str]) -> None:
                 fehler.append(f"{ort}: unbekannte Platzhalter: {', '.join(sorted(unbekannt))}")
             if "whatif" in variablen and ziel is not Ziel.POWERSHELL:
                 fehler.append(f"{ort}: {{{{ whatif }}}} gibt es nur für PowerShell")
+            if "sudo" in variablen and block.recht(ziel) is not Recht.ROOT:
+                fehler.append(f"{ort}: {{{{ sudo }}}} nur in Blöcken mit 'rechte: {{{ziel.value}: root}}'")
+            if art == "ziele" and block.recht(ziel) is Recht.ROOT and "sudo" not in variablen:
+                fehler.append(
+                    f"{ort}: Block braucht root – privilegierte Befehle mit {{{{ sudo }}}} beginnen"
+                )
             for zeile in platzhalter_in_quotes(quelle, ziel):
                 fehler.append(
                     f"{ort}: Zeile {zeile}: Platzhalter steht in Anführungszeichen – Werte werden "

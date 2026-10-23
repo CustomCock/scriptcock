@@ -4,8 +4,10 @@ name: Defender-Schnellscan
 kategorie: Sicherheit
 beschreibung: Startet einen Schnellscan mit Microsoft Defender. Nur sinnvoll, wenn Defender der aktive Virenschutz ist.
 risiko: gelb
-admin_noetig: true
 fortschritt: Defender-Schnellscan läuft
+rechte:
+  powershell: admin
+  cmd: admin
 ziele:
   powershell: |
     Start-MpScan -ScanType QuickScan

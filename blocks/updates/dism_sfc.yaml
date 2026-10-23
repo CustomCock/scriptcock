@@ -9,8 +9,10 @@ hilfe: |
 risiko: gelb
 # CMD: ohne Umleitung ausführen – sfc schreibt umgeleitet UTF-16, das „type“ als Zeichensalat zeigt.
 interaktiv: true
-admin_noetig: true
 fortschritt: Systemdateien werden geprüft und repariert (dauert)
+rechte:
+  powershell: admin
+  cmd: admin
 ziele:
   powershell: |
     DISM.exe /Online /Cleanup-Image /RestoreHealth

@@ -4,12 +4,13 @@ name: "macOS: Rosetta 2 installieren"
 kategorie: macOS
 beschreibung: Installiert Rosetta 2, damit Intel-Programme auf Macs mit Apple-Chip laufen.
 risiko: gelb
-admin_noetig: true
 fortschritt: Rosetta 2 wird installiert
+rechte:
+  zsh: root
 ziele:
   zsh: |
     if [ "$(uname -m)" != "arm64" ]; then
       printf '%s\n' 'Kein Apple-Chip – Rosetta wird nicht benötigt.'
     else
-      softwareupdate --install-rosetta --agree-to-license
+      {{ sudo }}softwareupdate --install-rosetta --agree-to-license
     fi

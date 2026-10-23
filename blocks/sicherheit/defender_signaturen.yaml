@@ -4,8 +4,10 @@ name: Defender-Signaturen aktualisieren
 kategorie: Sicherheit
 beschreibung: Lädt die neuesten Virensignaturen für Microsoft Defender herunter.
 risiko: gelb
-admin_noetig: true
 fortschritt: Defender-Signaturen werden aktualisiert
+rechte:
+  powershell: admin
+  cmd: admin
 ziele:
   powershell: |
     Update-MpSignature

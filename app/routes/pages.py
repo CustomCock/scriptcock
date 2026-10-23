@@ -20,6 +20,7 @@ from app.service import (
     erzeuge,
     max_risiko,
     pruefe_feld,
+    rechte_hinweis,
     rezept_bloecke,
     rezept_felder,
     rezept_zu_request,
@@ -229,7 +230,7 @@ async def rezept_erzeugen(
         ergebnis=ergebnis,
         ziel=z,
         sprache=HLJS_SPRACHE[z],
-        braucht_admin=any(reg.bloecke[s.block_id].braucht_admin(z) for s in ergebnis.ir.bloecke()),
+        rechte=rechte_hinweis(reg, ergebnis.ir, z),
     )
 
 

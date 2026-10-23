@@ -6,9 +6,10 @@
 # Erstellt am:       15.01.2026 09:30:00
 # Baukasten-Version: 0.1.0
 # Zielsystem:        macOS (zsh)
+# Benötigte Rechte:  sudo (Schritt 2)
 # Enthaltene Schritte:
 #    1. Ping auf Ziel [Risiko: gruen]
-#    2. Drucker per IP hinzufügen [Risiko: gelb, Admin]
+#    2. Drucker per IP hinzufügen [Risiko: gelb, sudo]
 #
 # Generiert mit dem okm Script-Baukasten
 # ======================================================================
@@ -27,6 +28,7 @@ OKM_NR=0
 OKM_SCHRITT='-'
 OKM_STATUS=laeuft
 OKM_TIPP=''
+OKM_SUDO_PID=''
 
 # Meldungen: Werte immer als Argumente übergeben, nie in den Formatstring einsetzen.
 # Keine Farben – die Ausgabe geht auch ins Protokoll.
@@ -35,6 +37,7 @@ okm_info() { printf '%s\n' "$*"; }
 okm_ok() { if [ $# -gt 0 ]; then printf '      OK  %s\n' "$*"; else printf '%s\n' '      OK'; fi; }
 okm_warn() { printf '      WARNUNG  %s\n' "$*"; }
 okm_fehler() { printf '      FEHLER  %s\n' "$*"; }
+okm_sudo() { if [ "$(id -u)" -eq 0 ]; then "$@"; else sudo -- "$@"; fi; }
 okm_zusammenfassung() {
   okm_info '----------------------------------------------'
   case "$OKM_STATUS" in
@@ -74,6 +77,7 @@ okm_ende() {
     fi
   fi
   okm_zusammenfassung
+  if [ -n "$OKM_SUDO_PID" ]; then kill "$OKM_SUDO_PID" 2>/dev/null || true; fi
   okm_pause
   # Ausgabe schließen und kurz auf tee warten, sonst fehlen beim Schließen des Fensters
   # die letzten Zeilen (höchstens 2 s – ein Hintergrundprozess darf nichts aufhalten)
@@ -101,12 +105,27 @@ okm_info ' okm Script-Baukasten · Drucker einrichten'
 okm_info ' Erstellt: 15.01.2026 09:30 · von pytest'
 okm_info '=============================================='
 
-# Prüfung: root-Rechte
-if [ "$(id -u)" -ne 0 ]; then
-  okm_fehler 'Dieses Script braucht Administratorrechte (root).'
-  okm_info '      Bitte so starten: sudo zsh ./script.sh'
-  OKM_STATUS=rechte
-  exit 1
+# Rechte: sudo für Schritt 2 (Drucker per IP hinzufügen)
+okm_info 'Für diese Schritte werden Administratorrechte (sudo) gebraucht:'
+okm_info '      Schritt 2 (Drucker per IP hinzufügen)'
+if [ "$(id -u)" -eq 0 ]; then
+  okm_info 'Rechte: als root gestartet'
+else
+  if ! command -v sudo >/dev/null 2>&1; then
+    okm_fehler 'sudo ist nicht installiert – bitte die IT fragen.'
+    OKM_STATUS=rechte
+    exit 1
+  fi
+  okm_info 'sudo fragt jetzt einmal nach deinem Passwort (die Eingabe bleibt unsichtbar).'
+  if ! sudo -v; then
+    okm_fehler 'sudo wurde abgelehnt oder das Passwort war falsch.'
+    OKM_STATUS=rechte
+    exit 1
+  fi
+  okm_info 'Rechte: sudo erfolgreich'
+  # sudo-Zeitstempel frisch halten, damit lange Scripte nicht noch einmal fragen
+  while true; do sudo -n true; sleep 50; kill -0 "$$" || exit; done >/dev/null 2>&1 &
+  OKM_SUDO_PID=$!
 fi
 
 # --------------------------------------------------------------------
@@ -127,7 +146,7 @@ OKM_NR=2
 OKM_SCHRITT='2/2 (Drucker per IP hinzufügen)'
 OKM_TIPP='Prüfe, ob der Drucker per Ping erreichbar ist und ob der gewählte Treiber installiert ist.'
 okm_info '[2/2] Drucker Drucker-Empfang (192.168.1.50) wird eingerichtet ...'
-lpadmin -p 'Drucker-Empfang' -E -v ipp://'192.168.1.50'/ipp/print -m everywhere
+okm_sudo lpadmin -p 'Drucker-Empfang' -E -v ipp://'192.168.1.50'/ipp/print -m everywhere
 # Prüfung
 lpstat -p 'Drucker-Empfang'
 OKM_OK=$((OKM_OK + 1))

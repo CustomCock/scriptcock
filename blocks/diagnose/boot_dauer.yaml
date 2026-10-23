@@ -4,9 +4,9 @@ name: Startdauer analysieren
 kategorie: Diagnose
 beschreibung: Zeigt, wie lange die letzten Systemstarts gedauert haben und welche Dienste bzw. Programme bremsen.
 risiko: gruen
-admin_noetig:
-  powershell: true
 fortschritt: Startdauer wird ausgewertet
+rechte:
+  powershell: admin
 ziele:
   powershell: |
     $okmStarts = Get-WinEvent -FilterHashtable @{ LogName = 'Microsoft-Windows-Diagnostics-Performance/Operational'; Id = 100 } -MaxEvents 5 -ErrorAction SilentlyContinue

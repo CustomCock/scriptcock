@@ -26,13 +26,13 @@ qm snapshot <vmid> sauber --description "Grundinstallation für Script-Baukasten
 4. SHA-256 vergleichen:
    - Windows: `Get-FileHash .\datei.ps1 -Algorithm SHA256`
    - Linux: `sha256sum datei.sh` · macOS: `shasum -a 256 datei.sh`
-5. Ausführen wie in der UI beschrieben (PowerShell als Admin, `Set-ExecutionPolicy -Scope Process Bypass`; Linux/macOS `chmod +x` bzw. `sudo`).
+5. Ausführen wie in der UI beschrieben (`Set-ExecutionPolicy -Scope Process Bypass`; Linux/macOS `chmod +x`, **ohne** sudo – das Script fragt selbst).
 6. Prüfen:
-   - Fortschrittsausgaben `[n/m]` erscheinen, am Ende „Fertig, X von X Schritten erfolgreich.“
+   - Fortschrittsausgaben `[n/m]` erscheinen, am Ende „Fertig: X von X Schritten erfolgreich.“
    - Das Protokoll existiert am ausgegebenen Pfad und enthält alle Ausgaben.
    - Rote Schritte fragen nach „JA“; jede andere Eingabe bricht ab.
-   - Admin-Prüfung: einmal **ohne** Adminrechte starten → verständlicher Abbruch vor Schritt 1.
-   - Fehlerfall: einen Wert absichtlich falsch wählen (z. B. nicht existierender Dienst) → Abbruch mit „FEHLER in Schritt …“.
+   - Rechte: ohne Adminrechte starten → Erklärung + UAC-Abfrage bzw. sudo-Passwort; abgelehnt → verständlicher Abbruch vor Schritt 1.
+   - Fehlerfall: einen Block absichtlich fehlschlagen lassen (z. B. Datei kopieren mit falscher Quelle) → „FEHLER  Schritt …“ + Zusammenfassung.
    - Bei Windows: das Script einmal mit Windows PowerShell **5.1** (`powershell.exe`) und – falls vorhanden – mit PowerShell 7 starten.
    - Umlaute in Ausgabe und Protokoll sind korrekt (BOM / `chcp 65001`).
 7. Ergebnis im Abschnitt „Protokoll der Prüfungen“ unten eintragen. Gefundene Probleme in

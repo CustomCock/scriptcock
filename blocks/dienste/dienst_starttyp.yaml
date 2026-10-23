@@ -4,8 +4,11 @@ name: Starttyp eines Dienstes ändern
 kategorie: Dienste
 beschreibung: Legt fest, ob ein Dienst automatisch, manuell oder gar nicht startet.
 risiko: gelb
-admin_noetig: true
 fortschritt: "Starttyp von {{ dienst }} wird geändert"
+rechte:
+  powershell: admin
+  cmd: admin
+  bash: root
 parameter:
   - id: dienst
     label: Dienstname
@@ -42,13 +45,13 @@ ziele:
     {% endif %}
   bash: |
     {% if starttyp.wert == 'manuell' %}
-    systemctl disable {{ dienst }}
+    {{ sudo }}systemctl disable {{ dienst }}
     {% elif starttyp.wert == 'deaktiviert' %}
-    systemctl disable {{ dienst }}
-    systemctl mask {{ dienst }}
+    {{ sudo }}systemctl disable {{ dienst }}
+    {{ sudo }}systemctl mask {{ dienst }}
     {% else %}
-    systemctl unmask {{ dienst }}
-    systemctl enable {{ dienst }}
+    {{ sudo }}systemctl unmask {{ dienst }}
+    {{ sudo }}systemctl enable {{ dienst }}
     {% endif %}
 hinweise:
   bash: "Linux: „Manuell“ = disable, „Deaktiviert“ = disable + mask (kann dann gar nicht mehr gestartet werden)."

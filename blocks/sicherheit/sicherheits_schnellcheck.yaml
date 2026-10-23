@@ -4,8 +4,9 @@ name: Sicherheits-Schnellcheck (Ampel)
 kategorie: Sicherheit
 beschreibung: Prüft auf einen Blick Firewall, Virenschutz, BitLocker, Updates, UAC, SMBv1 und Remotedesktop und zeigt eine Ampel.
 risiko: gruen
-admin_noetig: true
 fortschritt: Sicherheits-Schnellcheck läuft
+rechte:
+  powershell: admin
 ziele:
   powershell: |
     function Write-OkmAmpel([string]$Punkt, [string]$Status, [string]$Text) {

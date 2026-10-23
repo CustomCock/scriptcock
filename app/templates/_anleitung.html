@@ -1,30 +1,33 @@
-{# erwartet: ziel, dateiname, braucht_admin #}
+{# erwartet: ziel, dateiname, rechte (RechteHinweis oder none) #}
 <details class="hilfe anleitung" open>
   <summary>So führst du das Script aus</summary>
   {% if ziel.value == "powershell" %}
   <ol>
     <li>Script herunterladen (landet meist im Ordner <em>Downloads</em>).</li>
-    <li>Startmenü öffnen, <kbd>PowerShell</kbd> eintippen{% if braucht_admin %}, <strong>Rechtsklick → „Als Administrator ausführen“</strong>{% else %} und öffnen (<strong>nicht</strong> als Administrator nötig){% endif %}.</li>
+    <li>Startmenü öffnen, <kbd>PowerShell</kbd> eintippen und öffnen (<strong>nicht</strong> als Administrator nötig).</li>
     <li>Diese Zeile eingeben (erlaubt Scripte nur für dieses eine Fenster):<br><code>Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass</code></li>
     <li>Script starten:<br><code>&amp; "$env:USERPROFILE\Downloads\{{ dateiname }}"</code></li>
+    {% if rechte %}<li>Das Script fordert für {{ rechte.schritte }} selbst Administratorrechte an – Windows fragt dann nach („Ja“ klicken).</li>{% endif %}
   </ol>
   {% elif ziel.value == "cmd" %}
   <ol>
     <li>Script herunterladen (landet meist im Ordner <em>Downloads</em>).</li>
-    <li>{% if braucht_admin %}Im Explorer <strong>Rechtsklick</strong> auf <em>{{ dateiname }}</em> → <strong>„Als Administrator ausführen“</strong>.{% else %}Im Explorer doppelt auf <em>{{ dateiname }}</em> klicken.{% endif %}</li>
+    <li>Im Explorer doppelt auf <em>{{ dateiname }}</em> klicken.{% if rechte %} Das Script fordert danach selbst Administratorrechte an – Windows fragt nach („Ja“ klicken).{% endif %}</li>
     <li>Falls Windows SmartScreen warnt: „Weitere Informationen“ → „Trotzdem ausführen“ (nur bei Scripten aus dem Baukasten!).</li>
   </ol>
   {% elif ziel.value == "bash" %}
   <ol>
     <li>Script herunterladen und ein Terminal öffnen.</li>
     <li>Ausführbar machen:<br><code>chmod +x ~/Downloads/{{ dateiname }}</code></li>
-    <li>Starten:<br><code>{% if braucht_admin %}sudo {% endif %}~/Downloads/{{ dateiname }}</code></li>
+    <li>Starten (<strong>ohne</strong> sudo):<br><code>~/Downloads/{{ dateiname }}</code></li>
+    {% if rechte %}<li>Das Script fragt einmal nach deinem Passwort (sudo) – für {{ rechte.schritte }}.</li>{% endif %}
   </ol>
   {% else %}
   <ol>
     <li>Script herunterladen und das Programm <em>Terminal</em> öffnen (Programme → Dienstprogramme).</li>
     <li>Ausführbar machen:<br><code>chmod +x ~/Downloads/{{ dateiname }}</code></li>
-    <li>Starten:<br><code>{% if braucht_admin %}sudo {% endif %}zsh ~/Downloads/{{ dateiname }}</code></li>
+    <li>Starten (<strong>ohne</strong> sudo):<br><code>zsh ~/Downloads/{{ dateiname }}</code></li>
+    {% if rechte %}<li>Das Script fragt einmal nach deinem Passwort (sudo) – für {{ rechte.schritte }}.</li>{% endif %}
   </ol>
   {% endif %}
   <p class="feldhilfe">Am Ende zeigt das Script, wo das Protokoll liegt. Bei Problemen dieses Protokoll an den Support schicken.</p>

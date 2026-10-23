@@ -4,9 +4,9 @@ name: Festplattenbelegung anzeigen
 kategorie: System
 beschreibung: Zeigt für jedes Laufwerk, wie viel Speicherplatz belegt und frei ist.
 risiko: gruen
-admin_noetig:
-  cmd: true
 fortschritt: Festplattenbelegung wird ermittelt
+rechte:
+  cmd: admin
 ziele:
   powershell: |
     Get-PSDrive -PSProvider FileSystem |

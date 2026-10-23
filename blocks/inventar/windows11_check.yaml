@@ -7,8 +7,9 @@ hilfe: |
   Ob der Prozessor offiziell unterstützt wird, kann das Script nicht prüfen – bitte das Modell
   mit der Microsoft-Liste der unterstützten Prozessoren vergleichen.
 risiko: gruen
-admin_noetig: true
 fortschritt: Windows-11-Voraussetzungen werden geprüft
+rechte:
+  powershell: admin
 ziele:
   powershell: |
     function Write-OkmPruefpunkt([string]$Name, [bool]$Ok, [string]$Wert) {

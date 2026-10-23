@@ -7,9 +7,13 @@ hilfe: |
   Nur für lokale Konten – Domänen- bzw. Keycloak-Konten werden zentral verwaltet.
   Wird "Administrator" gewählt, bekommt der Benutzer volle Rechte auf diesem Rechner.
 risiko: rot
-admin_noetig: true
 interaktiv: true
 fortschritt: "Benutzer {{ benutzer }} wird angelegt"
+rechte:
+  powershell: admin
+  cmd: admin
+  bash: root
+  zsh: root
 parameter:
   - id: benutzer
     label: Benutzername
@@ -41,13 +45,13 @@ ziele:
     net localgroup Administratoren {{ benutzer }} /add 2>nul || net localgroup Administrators {{ benutzer }} /add
     {% endif %}
   bash: |
-    useradd -m -s /bin/bash{% if vollname %} -c {{ vollname }}{% endif %} {{ benutzer }}
+    {{ sudo }}useradd -m -s /bin/bash{% if vollname %} -c {{ vollname }}{% endif %} {{ benutzer }}
     printf '%s\n' 'Bitte das Passwort für den neuen Benutzer festlegen:'
-    passwd {{ benutzer }}
+    {{ sudo }}passwd {{ benutzer }}
     {% if administrator %}
-    if getent group sudo >/dev/null; then usermod -aG sudo {{ benutzer }}; else usermod -aG wheel {{ benutzer }}; fi
+    if getent group sudo >/dev/null; then {{ sudo }}usermod -aG sudo {{ benutzer }}; else {{ sudo }}usermod -aG wheel {{ benutzer }}; fi
     {% endif %}
   zsh: |
     printf '%s\n' 'Bitte das Passwort für den neuen Benutzer festlegen:'
-    sysadminctl -addUser {{ benutzer }}{% if vollname %} -fullName {{ vollname }}{% endif %} -password -{% if administrator %} -admin{% endif %}
+    {{ sudo }}sysadminctl -addUser {{ benutzer }}{% if vollname %} -fullName {{ vollname }}{% endif %} -password -{% if administrator %} -admin{% endif %}
     id {{ benutzer }}

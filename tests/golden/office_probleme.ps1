@@ -6,6 +6,7 @@
 # Erstellt am:       15.01.2026 09:30:00
 # Baukasten-Version: 0.1.0
 # Zielsystem:        Windows PowerShell 5.1
+# Benötigte Rechte:  keine
 # Enthaltene Schritte:
 #    1. Office-Version und Updatekanal [Risiko: gruen]
 #    2. Entra-ID-/Azure-AD-Status [Risiko: gruen]
@@ -58,6 +59,7 @@ function Exit-OkmScript {
         'abbruch' {
             Write-Host ' Abgebrochen durch Benutzer. Es wurde nichts weiter ausgeführt.' -ForegroundColor Yellow
         }
+        'neustart' { Write-Host ' Läuft im neuen Fenster mit Administratorrechten weiter.' }
         'rechte' {
             Write-Host ' Abgebrochen: fehlende Administratorrechte.' -ForegroundColor Red
         }
@@ -69,7 +71,7 @@ function Exit-OkmScript {
     Write-Host (' Protokoll: ' + $OkmLog)
     Write-Host '----------------------------------------------'
     try { Stop-Transcript | Out-Null } catch { $null = $_ }
-    Wait-OkmEnde
+    if ($script:OkmStatus -ne 'neustart') { Wait-OkmEnde }
     exit $Code
 }
 
@@ -84,6 +86,8 @@ Write-OkmInfo '=============================================='
 Write-OkmInfo ' okm Script-Baukasten · Office-Probleme eingrenzen'
 Write-OkmInfo ' Erstellt: 15.01.2026 09:30 · von pytest'
 Write-OkmInfo '=============================================='
+
+Write-OkmInfo 'Rechte: ohne erhöhte Rechte'
 
 # --------------------------------------------------------------------
 # Schritt 1/2: Office-Version und Updatekanal (Risiko: gruen)

@@ -20,7 +20,11 @@ beschreibung: Stoppt einen Systemdienst und startet ihn wieder.
 hilfe: |                       # optional, erscheint als Hilfetext
   Den Dienstnamen findest du unter Windows in services.msc (Feld "Dienstname").
 risiko: gelb                   # gruen = nur lesen | gelb = ändert etwas | rot = löscht/destruktiv
-admin_noetig: true             # oder pro Ziel, siehe unten
+rechte:                        # optional, pro Ziel – siehe unten
+  powershell: admin
+  cmd: admin
+  bash: root
+  zsh: root
 fortschritt: "Dienst {{ dienst }} wird neu gestartet"   # optional, Text für "[3/7] …"
 parameter:
   - id: dienst
@@ -36,9 +40,9 @@ ziele:
     net stop {{ dienst }}
     net start {{ dienst }}
   bash: |
-    systemctl restart {{ dienst }}
+    {{ sudo }}systemctl restart {{ dienst }}
   zsh: |
-    launchctl kickstart -k system/{{ dienst }}
+    {{ sudo }}launchctl kickstart -k system/{{ dienst }}
 pruefung:                      # optional: läuft nach dem Block (nicht in der Simulation)
   powershell: |
     if ((Get-Service -Name {{ dienst }}).Status -ne 'Running') { throw 'Dienst läuft nicht.' }
@@ -89,7 +93,7 @@ Weitere Regeln, die beim Start geprüft werden:
   kein `call` mit Platzhaltern, Klammern müssen ausgeglichen sein. Das Ergebnis eines
   Schritts ist der Fehlercode des **letzten** Befehls.
 - **bash/zsh:** kein `eval`, keine Backticks, kein `exit`, kein `sudo` (stattdessen
-  `admin_noetig: true` – das Script prüft dann am Anfang auf root). Achtung: Die Scripte
+  `rechte: {bash: root}` und `{{ sudo }}` vor die privilegierten Befehle, siehe Abschnitt 5). Achtung: Die Scripte
   laufen mit `set -e`; ein Befehl, der „nichts gefunden“ mit Fehlercode meldet (`grep`,
   `pgrep`), braucht `|| true` oder eine `if`-Abfrage.
 - **Prüf-Blöcke dürfen das Script nicht abbrechen**, nur weil das Ergebnis negativ ist (Ping ohne
@@ -173,16 +177,31 @@ Für `unc_pfad`-Parameter gibt es zusätzlich `{{ <id>_smb }}` – die Freigabe 
 Parameter, die das Template eines Ziels gar nicht verwendet, werden für dieses Ziel in der
 UI ausgeblendet und sind dort keine Pflicht.
 
-## 5. `admin_noetig` pro Ziel
+## 5. `rechte` pro Ziel
 
 ```yaml
-admin_noetig:
-  powershell: true
-  cmd: false
-  bash: true
+rechte:
+  powershell: admin     # Windows: Administrator
+  cmd: admin
+  bash: root            # Linux/macOS: privilegierte Befehle mit {{ sudo }}
+  zsh: nie_root         # darf NICHT als root laufen (z. B. Homebrew)
 ```
 
-Nicht genannte Ziele gelten als „kein Admin nötig“.
+Werte: `benutzer` (Standard für nicht genannte Ziele), `admin` (nur powershell/cmd), `root`
+und `nie_root` (nur bash/zsh). Der alte Schlüssel `admin_noetig` wird mit Fehlermeldung abgelehnt.
+
+Was das Script daraus macht:
+
+- **Windows:** Fehlen die Rechte, erklärt das Script, für welche Schritte es sie braucht, und
+  startet sich per UAC selbst als Administrator neu. Abgelehnt → Meldung, kein stiller Abbruch.
+- **Linux/macOS:** Kein Neustart mit sudo (das würde `brew` kaputtmachen und `~` auf `/root`
+  umbiegen). Stattdessen fragt das Script am Anfang einmal `sudo -v` ab und hält sudo im
+  Hintergrund frisch. In `root`-Blöcken **muss** jeder privilegierte Befehl mit `{{ sudo }}`
+  beginnen (die Registry prüft das): `{{ sudo }}systemctl restart {{ dienst }}`. Für
+  Umgebungsvariablen `{{ sudo }}env DEBIAN_FRONTEND=noninteractive apt-get …`.
+- Enthält ein Script einen `nie_root`-Block und wird trotzdem als root gestartet, bricht es mit
+  Erklärung ab.
+- Kopfkommentar: `Benötigte Rechte:  Administrator (Schritt 2, 4)` bzw. `sudo (…)` bzw. `keine`.
 
 ## 6. Dry-Run (Simulation)
 

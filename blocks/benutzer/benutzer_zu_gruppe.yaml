@@ -4,8 +4,12 @@ name: Benutzer zu lokaler Gruppe hinzufügen
 kategorie: Benutzer
 beschreibung: Nimmt einen Benutzer in eine lokale Gruppe auf.
 risiko: rot
-admin_noetig: true
 fortschritt: "Benutzer {{ benutzer }} wird zur Gruppe {{ gruppe }} hinzugefügt"
+rechte:
+  powershell: admin
+  cmd: admin
+  bash: root
+  zsh: root
 parameter:
   - id: benutzer
     label: Benutzername
@@ -22,7 +26,7 @@ ziele:
   cmd: |
     net localgroup {{ gruppe }} {{ benutzer }} /add
   bash: |
-    usermod -aG {{ gruppe }} {{ benutzer }}
+    {{ sudo }}usermod -aG {{ gruppe }} {{ benutzer }}
     id {{ benutzer }}
   zsh: |
-    dseditgroup -o edit -a {{ benutzer }} -t user {{ gruppe }}
+    {{ sudo }}dseditgroup -o edit -a {{ benutzer }} -t user {{ gruppe }}

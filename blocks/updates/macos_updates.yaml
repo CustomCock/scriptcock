@@ -4,8 +4,9 @@ name: "macOS: Softwareupdates installieren"
 kategorie: Updates
 beschreibung: Installiert alle verfügbaren macOS-Softwareupdates. Neu gestartet wird nicht automatisch.
 risiko: gelb
-admin_noetig: true
 fortschritt: macOS-Updates werden installiert
+rechte:
+  zsh: root
 ziele:
   zsh: |
-    softwareupdate --install --all
+    {{ sudo }}softwareupdate --install --all

@@ -6,8 +6,12 @@ beschreibung: Startet oder stoppt einen Systemdienst.
 hilfe: |
   Windows: Dienstname aus services.msc (Feld „Dienstname“). Linux: systemd-Unit. macOS: launchd-Label.
 risiko: gelb
-admin_noetig: true
 fortschritt: "Dienst {{ dienst }} wird {{ 'gestartet' if aktion == 'starten' else 'gestoppt' }}"
+rechte:
+  powershell: admin
+  cmd: admin
+  bash: root
+  zsh: root
 parameter:
   - id: dienst
     label: Dienstname
@@ -38,14 +42,14 @@ ziele:
     {% endif %}
   bash: |
     {% if aktion.wert == 'stoppen' %}
-    systemctl stop {{ dienst }}
+    {{ sudo }}systemctl stop {{ dienst }}
     {% else %}
-    systemctl start {{ dienst }}
+    {{ sudo }}systemctl start {{ dienst }}
     {% endif %}
     systemctl is-active {{ dienst }} || true
   zsh: |
     {% if aktion.wert == 'stoppen' %}
-    launchctl kill TERM system/{{ dienst }}
+    {{ sudo }}launchctl kill TERM system/{{ dienst }}
     {% else %}
-    launchctl kickstart system/{{ dienst }}
+    {{ sudo }}launchctl kickstart system/{{ dienst }}
     {% endif %}

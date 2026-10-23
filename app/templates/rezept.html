@@ -51,7 +51,7 @@
       <ol>
         {% for b in bloecke %}
         <li><span class="risiko risiko-{{ b.risiko.value }}" title="{{ b.risiko.anzeige }}">{{ b.risiko.value }}</span>
-          {{ b.name }}{% if b.braucht_admin(ziel) %} <span class="marke">Admin</span>{% endif %}
+          {{ b.name }}{% if b.braucht_admin(ziel) %} <span class="marke">{{ "Admin" if ziel.value in ("powershell", "cmd") else "sudo" }}</span>{% endif %}
           <span class="schritt-text">{{ b.beschreibung }}</span></li>
         {% endfor %}
       </ol>
@@ -60,7 +60,7 @@
       {% elif risiko == Risiko.GELB %}
       <p class="hinweis hinweis-gelb">Dieses Script <strong>verändert</strong> etwas an deinem Rechner.</p>
       {% endif %}
-      {% if admin %}<p class="hinweis">Braucht <strong>Administratorrechte</strong> auf dem Zielrechner.</p>{% endif %}
+      {% if admin %}<p class="hinweis">Braucht <strong>{{ "Administratorrechte" if ziel.value in ("powershell", "cmd") else "sudo" }}</strong> – das Script fordert sie beim Start selbst an.</p>{% endif %}
       {% for name, text in hinweise %}<p class="hinweis"><strong>{{ name }}:</strong> {{ text }}</p>{% endfor %}
       {% if rezept.hilfe %}<p class="feldhilfe">{{ rezept.hilfe }}</p>{% endif %}
     </section>

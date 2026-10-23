@@ -4,12 +4,11 @@ name: DNS-Cache leeren
 kategorie: Netzwerk
 beschreibung: Löscht zwischengespeicherte Namensauflösungen, z. B. wenn eine Webseite nach einer Umstellung nicht erreichbar ist.
 risiko: gelb
-admin_noetig:
-  powershell: true
-  cmd: false
-  bash: true
-  zsh: true
 fortschritt: DNS-Cache wird geleert
+rechte:
+  powershell: admin
+  bash: root
+  zsh: root
 ziele:
   powershell: |
     Clear-DnsClientCache
@@ -18,14 +17,14 @@ ziele:
     ipconfig /flushdns
   bash: |
     if command -v resolvectl >/dev/null 2>&1 && systemctl is-active --quiet systemd-resolved; then
-      resolvectl flush-caches
+      {{ sudo }}resolvectl flush-caches
       printf '%s\n' 'DNS-Cache wurde geleert.'
     else
       printf '%s\n' 'systemd-resolved ist nicht aktiv - es gibt keinen lokalen DNS-Cache zu leeren.'
     fi
   zsh: |
-    dscacheutil -flushcache
-    killall -HUP mDNSResponder
+    {{ sudo }}dscacheutil -flushcache
+    {{ sudo }}killall -HUP mDNSResponder
     printf '%s\n' 'DNS-Cache wurde geleert.'
 hinweise:
   bash: Leert den Cache von systemd-resolved. Ohne systemd-resolved gibt es meist keinen lokalen DNS-Cache.

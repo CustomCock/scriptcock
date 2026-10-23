@@ -3,7 +3,7 @@
   <div class="schritt-kopf">
     <span class="griff" title="Ziehen zum Verschieben" aria-hidden="true">⠿</span>
     <span class="risiko risiko-{{ block.risiko.value }}" title="{{ block.risiko.anzeige }}">{{ block.risiko.value }}</span>
-    <strong class="schritt-name">{{ block.name }}</strong>{% if admin %} <span class="marke">Admin</span>{% endif %}
+    <strong class="schritt-name">{{ block.name }}</strong>{% if admin %} <span class="marke">{{ "Admin" if ziel.value in ("powershell", "cmd") else "sudo" }}</span>{% endif %}
     <span class="schritt-knoepfe">
       <button type="button" class="knopf-klein" data-hoch aria-label="{{ block.name }} nach oben">↑</button>
       <button type="button" class="knopf-klein" data-runter aria-label="{{ block.name }} nach unten">↓</button>

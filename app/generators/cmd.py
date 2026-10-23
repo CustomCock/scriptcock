@@ -62,11 +62,15 @@ class CmdGenerator(Generator):
         ]
         if braucht_admin:
             zeilen += [
-                "rem Prüfung: Administratorrechte",
+                "rem Rechte: Administrator für "
+                + kommentar_text(Ziel.CMD, self.schritt_liste(self._admin_schritte)),
                 "net session >nul 2>&1",
-                "if errorlevel 1 goto :okm_kein_admin",
+                "if errorlevel 1 goto :okm_rechte_anfordern",
+                *_echo_beides("Rechte: als Administrator gestartet"),
                 "",
             ]
+        else:
+            zeilen += [*_echo_beides("Rechte: ohne erhöhte Rechte"), ""]
         return zeilen
 
     @property
@@ -181,6 +185,36 @@ class CmdGenerator(Generator):
                 "endlocal",
             ]
 
+        rechte = (
+            [
+                ":okm_rechte_anfordern",
+                *_echo_beides(
+                    "Dieses Script braucht Administratorrechte für: "
+                    + self.schritt_liste(self._admin_schritte)
+                    + "."
+                ),
+                *_echo_beides(
+                    "Es wird jetzt mit Administratorrechten neu gestartet (Windows fragt gleich nach)."
+                ),
+                # Pfad über eine Umgebungsvariable an PowerShell – so stören Leerzeichen und ' im Pfad nicht
+                'set "OKM_SELBST=%~f0"',
+                'powershell -NoProfile -Command "Start-Process -FilePath $env:OKM_SELBST -Verb RunAs"',
+                "if errorlevel 1 goto :okm_rechte_abgelehnt",
+                *_echo_beides("Läuft im neuen Fenster mit Administratorrechten weiter."),
+                "endlocal",
+                "exit /b 0",
+                "",
+                ":okm_rechte_abgelehnt",
+                *beides(
+                    EINZUG + "FEHLER  Die Administratorrechte wurden abgelehnt (Benutzerkontensteuerung)."
+                ),
+                *fuss(" Abgebrochen: fehlende Administratorrechte."),
+                "exit /b 1",
+            ]
+            if self._admin_schritte
+            else []
+        )
+
         return [
             *fuss(fertig),
             "exit /b 0",
@@ -196,11 +230,5 @@ class CmdGenerator(Generator):
             *fuss(" Abgebrochen durch Benutzer. Es wurde nichts weiter ausgeführt."),
             "exit /b 2",
             "",
-            ":okm_kein_admin",
-            *beides(EINZUG + "FEHLER  Dieses Script braucht Administratorrechte."),
-            f"echo({EINZUG}Bitte die Eingabeaufforderung mit Rechtsklick ^> "
-            '"Als Administrator ausführen" öffnen',
-            f"echo({EINZUG}und das Script erneut starten.",
-            *fuss(" Abgebrochen: fehlende Administratorrechte."),
-            "exit /b 1",
+            *rechte,
         ]
