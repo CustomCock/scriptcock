@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -126,6 +127,82 @@ def _rezepte_fuer(reg: Registry, ziel: Ziel, q: str, kategorie: str) -> list[Rez
     return treffer
 
 
+RISIKO_TEXT = {Risiko.GRUEN: "nur lesen", Risiko.GELB: "ändert etwas", Risiko.ROT: "kritisch"}
+ZIEL_KURZNAME = {Ziel.POWERSHELL: "Windows", Ziel.CMD: "Windows", Ziel.BASH: "Linux", Ziel.ZSH: "macOS"}
+
+
+@dataclass
+class RezeptKarte:
+    rezept: RezeptDef
+    verfuegbar: bool
+    systeme: list[tuple[str, bool]]  # ("Windows", verfügbar?) …
+    risiko: Risiko
+    risiko_text: str
+    schritte: int
+    rechte: str  # "braucht Admin" / "braucht sudo" / ""
+    suche: str  # Name, Beschreibung, Kategorie, Schlagworte (clientseitige Suche)
+
+
+def _karte(reg: Registry, r: RezeptDef, ziel: Ziel) -> RezeptKarte:
+    ziele = reg.rezept_ziele(r)
+    verfuegbar = ziel in ziele
+    # Für nicht verfügbare Rezepte Schritte/Risiko/Rechte am ersten verfügbaren Ziel zeigen
+    bezug = ziel if verfuegbar else ziele[0]
+    bloecke = rezept_bloecke(reg, r, bezug)
+    risiko = max_risiko(bloecke)
+    rechte = ""
+    if any(b.braucht_admin(bezug) for b in bloecke):
+        rechte = "braucht Admin" if bezug in (Ziel.POWERSHELL, Ziel.CMD) else "braucht sudo"
+    systeme = [
+        ("Windows", Ziel.POWERSHELL in ziele or Ziel.CMD in ziele),
+        ("macOS", Ziel.ZSH in ziele),
+        ("Linux", Ziel.BASH in ziele),
+    ]
+    return RezeptKarte(
+        rezept=r,
+        verfuegbar=verfuegbar,
+        systeme=systeme,
+        risiko=risiko,
+        risiko_text=RISIKO_TEXT[risiko],
+        schritte=len(bloecke),
+        rechte=rechte,
+        suche=" ".join([r.name, r.beschreibung, r.kategorie, *r.schlagworte]),
+    )
+
+
+def _rezepte_fuer(reg: Registry, ziel: Ziel, q: str, kategorie: str) -> list[RezeptDef]:
+    """Server-Filter (ohne JavaScript bzw. für ?q=…); mit JavaScript filtert die Seite live."""
+    suchwoerter = q.lower().split()
+    treffer = []
+    for r in sorted(reg.rezepte.values(), key=lambda r: (r.kategorie, r.name)):
+        if not r.freigegeben or not reg.rezept_ziele(r):
+            continue
+        if kategorie and r.kategorie != kategorie:
+            continue
+        text = " ".join([r.name, r.beschreibung, r.kategorie, *r.schlagworte]).lower()
+        if all(w in text for w in suchwoerter):
+            treffer.append(r)
+    return treffer
+
+
+def _zuletzt(sitzung: Any, benutzer: Benutzer, reg: Registry, ziel: Ziel) -> list[RezeptKarte]:
+    """Die letzten (bis zu vier) Rezepte, aus denen dieser Benutzer Scripte erzeugt hat."""
+    ids: list[str] = []
+    for quelle in sitzung.scalars(
+        select(GespeichertesScript.quelle)
+        .where(GespeichertesScript.autor == benutzer.name, GespeichertesScript.quelle.like("rezept:%"))
+        .order_by(GespeichertesScript.erstellt_am.desc(), GespeichertesScript.id.desc())
+        .limit(50)
+    ):
+        rid = quelle.removeprefix("rezept:")
+        r = reg.rezepte.get(rid)
+        if r is not None and r.freigegeben and rid not in ids and ziel in reg.rezept_ziele(r):
+            ids.append(rid)
+        if len(ids) == 4:
+            break
+    return [_karte(reg, reg.rezepte[rid], ziel) for rid in ids]
+
+
 @router.get("/rezepte", name="rezepte", response_class=HTMLResponse)
 async def rezepte(
     request: Request,
@@ -133,26 +210,32 @@ async def rezepte(
     q: str = "",
     kategorie: str = "",
     benutzer: Benutzer = Depends(aktueller_benutzer),
+    sitzung: Any = Depends(_sitzung),
 ) -> Response:
     z = _ziel(ziel)
     if z is None:
         # Schritt 1 des Rezept-Ablaufs: Betriebssystem wählen
         return _render(request, "betriebssystem.html", benutzer, kacheln=ZIEL_KACHELN)
     reg = _registry(request)
-    liste = _rezepte_fuer(reg, z, q[:100], kategorie[:100])
-    if request.headers.get("HX-Request") and request.headers.get("HX-Target") == "rezeptliste":
-        return _render(request, "_rezeptliste.html", benutzer, rezepte=liste, ziel=z, reg=reg)
-    kategorien = sorted({r.kategorie for r in reg.rezepte.values() if z in reg.rezept_ziele(r)})
+    karten = [_karte(reg, r, z) for r in _rezepte_fuer(reg, z, q[:100], kategorie[:100])]
+    gruppen: dict[str, list[RezeptKarte]] = {}
+    for k in karten:
+        if k.verfuegbar:
+            gruppen.setdefault(k.rezept.kategorie, []).append(k)
     return _render(
         request,
         "rezepte.html",
         benutzer,
-        rezepte=liste,
         ziel=z,
+        ziel_kurz=ZIEL_KURZNAME[z],
         q=q,
         kategorie=kategorie,
-        kategorien=kategorien,
-        reg=reg,
+        kategorien=sorted(
+            {r.kategorie for r in reg.rezepte.values() if r.freigegeben and reg.rezept_ziele(r)}
+        ),
+        gruppen=gruppen,
+        nicht_verfuegbar=[k for k in karten if not k.verfuegbar],
+        zuletzt=[] if q or kategorie else _zuletzt(sitzung, benutzer, reg, z),
     )
 
 

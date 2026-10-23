@@ -1,0 +1,23 @@
+{# Eine Rezept-Karte. erwartet: k (RezeptKarte), ziel, ziel_kurz #}
+{% import "_icons.html" as i %}
+<li class="rezept-karte{% if not k.verfuegbar %} nicht-verfuegbar{% endif %}" data-rezept="{{ k.rezept.id }}"
+    data-kategorie="{{ k.rezept.kategorie }}" data-suche="{{ k.suche }}">
+  {% if k.verfuegbar %}<a class="rezept-link" href="{{ basis }}/rezepte/{{ k.rezept.id }}?ziel={{ ziel.value }}">{% else %}<div class="rezept-link" aria-disabled="true">{% endif %}
+    <span class="rezept-kopf">
+      {{ i.kategorie_icon(k.rezept.kategorie) }}
+      <span class="rezept-titel">{{ k.rezept.name }}</span>
+    </span>
+    <span class="rezept-beschreibung">{{ k.rezept.beschreibung }}</span>
+    <span class="rezept-meta">
+      <span class="ziel-badges" aria-label="Zielsysteme">
+        {% for name, ok in k.systeme %}<span class="ziel-badge{% if not ok %} aus{% endif %}"{% if not ok %} title="Für {{ name }} nicht verfügbar"{% endif %}>{{ name }}</span>{% endfor %}
+      </span>
+      <span class="rezept-fakten">
+        <span class="risiko-hinweis"><span class="risiko-punkt risiko-{{ k.risiko.value }}" aria-hidden="true"></span>{{ k.risiko_text }}</span>
+        <span>{{ k.schritte }} {{ "Schritt" if k.schritte == 1 else "Schritte" }}</span>
+        {% if k.rechte %}<span class="rezept-rechte">{{ k.rechte }}</span>{% endif %}
+      </span>
+    </span>
+    {% if not k.verfuegbar %}<span class="rezept-gesperrt">Nicht für {{ ziel_kurz }} verfügbar</span>{% endif %}
+  {% if k.verfuegbar %}</a>{% else %}</div>{% endif %}
+</li>

@@ -1,6 +1,6 @@
 id: windows_update_reparieren
 name: Windows Update reparieren
-kategorie: Windows Update
+kategorie: Updates
 beschreibung: Setzt die Windows-Update-Komponenten zurück. In PowerShell wird zusätzlich SetupDiag zur Fehleranalyse ausgeführt.
 hilfe: Danach den Rechner neu starten und Windows Update erneut ausführen. Nur nach Rücksprache mit der IT verwenden.
 schlagworte: [windows update, update, hängt, fehler, upgrade, setupdiag]

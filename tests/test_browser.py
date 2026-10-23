@@ -447,3 +447,53 @@ def test_katalog_ist_eine_komponente(server: str, browser) -> None:
         assert seite.evaluate("() => typeof window.SoftwareKatalog.mount") == "function"
         assert seite.get_attribute("#software-katalog", "data-modus") == modus
         assert seite.locator("#software-katalog").count() == 1
+
+
+def test_rezeptuebersicht_live_suche(server: str, browser) -> None:
+    """Punkt 8: Karten-Raster, umlauttolerante Live-Suche, Kategorie-Chips, sichtbarer Fokus."""
+    seite = browser.new_page(viewport={"width": 1280, "height": 900})
+    js_fehler: list[str] = []
+    seite.on("pageerror", lambda e: js_fehler.append(str(e)))
+    seite.goto(f"{server}/rezepte?ziel=zsh")
+    sichtbar = "() => [...document.querySelectorAll('#rezeptliste .rezept-karte:not([hidden])')].map(k => k.dataset.rezept)"
+    alle = seite.evaluate(sichtbar)
+    assert len(alle) > 10
+    seite.fill("#suchfeld", "langsam")
+    seite.wait_for_timeout(250)
+    treffer = seite.evaluate(sichtbar)
+    assert "pc_ist_langsam" in treffer and len(treffer) < len(alle)
+    # umlauttolerant: „groesse“ findet „Größe“, „loeschen“ = „löschen“
+    seite.fill("#suchfeld", "loeschen")
+    seite.wait_for_timeout(250)
+    mit_oe = seite.evaluate(sichtbar)
+    seite.fill("#suchfeld", "löschen")
+    seite.wait_for_timeout(250)
+    assert seite.evaluate(sichtbar) == mit_oe
+    seite.fill("#suchfeld", "")
+    seite.wait_for_timeout(250)
+    # Kategorie-Chip: aktiv eindeutig (okm-Rot + ✓), filtert die Karten
+    seite.click(".rezept-filter [data-kategorie=Drucker]")
+    seite.mouse.move(0, 0)
+    assert seite.get_attribute(".rezept-filter [data-kategorie=Drucker]", "aria-pressed") == "true"
+    assert seite.eval_on_selector(
+        ".rezept-filter [data-kategorie=Drucker]", "e => getComputedStyle(e).backgroundColor"
+    ) == ("rgb(227, 38, 46)")
+    kategorien = seite.evaluate(
+        "() => [...document.querySelectorAll('#rezeptliste .rezept-karte:not([hidden])')].map(k => k.dataset.kategorie)"
+    )
+    assert kategorien and set(kategorien) == {"Drucker"}
+    assert "passende" in seite.inner_text("#rezept-anzahl")
+    seite.fill("#suchfeld", "gibtesnichtxyz")
+    seite.wait_for_timeout(250)
+    assert seite.is_visible("#rezept-leer")
+    # Tastaturfokus sichtbar
+    seite.fill("#suchfeld", "")
+    seite.click(".rezept-filter [data-kategorie=Drucker]")
+    seite.wait_for_timeout(250)
+    seite.focus("#suchfeld")
+    for _ in range(40):  # mit Tab bis zur ersten Karte – wie ein Tastaturnutzer
+        seite.keyboard.press("Tab")
+        if seite.evaluate("() => document.activeElement.matches('a.rezept-link')"):
+            break
+    assert seite.evaluate("() => getComputedStyle(document.activeElement).outlineStyle") == "solid"
+    assert js_fehler == []

@@ -50,11 +50,12 @@ def test_startseite_zeigt_letzte_scripte(client: TestClient) -> None:
 
 def test_rezeptliste_und_suche(client: TestClient) -> None:
     r = client.get("/rezepte?ziel=cmd")
-    assert "Windows Update reparieren" in r.text
-    assert "Drucker einrichten" not in r.text  # für CMD nicht verfügbar
-    r = client.get("/rezepte?ziel=bash&q=drucker", headers={**HX, "HX-Target": "rezeptliste"})
-    assert "Drucker einrichten" in r.text and "<html" not in r.text
-    assert "Windows Update" not in client.get("/rezepte?ziel=bash").text
+    oben, unten = r.text.split('id="nicht-verfuegbar"')
+    assert "Windows Update reparieren" in oben
+    assert "Drucker einrichten" in unten and "Drucker einrichten" not in oben  # für CMD nicht verfügbar
+    # Suche ohne JavaScript (Server-Filter)
+    r = client.get("/rezepte?ziel=bash&q=drucker")
+    assert "Drucker einrichten" in r.text and "Windows Update" not in r.text
 
 
 def test_formular_zeigt_nur_relevante_felder(client: TestClient) -> None:
@@ -169,3 +170,48 @@ def test_rezeptfeld_namens_ziel_kollidiert_nicht(client: TestClient) -> None:
     r = client.post("/rezepte/netzwerkproblem_diagnostizieren/erzeugen", data=daten, headers=HX)
     assert r.status_code == 200 and "SHA-256" in r.text
     assert "server01.okm.local" in r.text and "8443" in r.text
+
+
+# --- Rezept-Übersicht (Punkt 8) -------------------------------------------------------------
+
+
+def test_rezeptuebersicht_karten(client: TestClient) -> None:
+    import re
+
+    seite = client.get("/rezepte?ziel=zsh").text
+    # Gruppiert nach Kategorie mit Zwischenüberschriften
+    assert '<h2 class="rezept-gruppe-titel"' in seite and ">Drucker</h2>" in seite
+    karte = seite[seite.index('data-rezept="drucker_einrichten"') :].split("</li>")[0]
+    assert 'class="kategorie-icon"' in karte  # Icon der Kategorie
+    assert "Drucker einrichten" in karte and "rezept-beschreibung" in karte
+    # Zielsysteme als Badges, nicht verfügbare ausgegraut
+    assert 'class="ziel-badge">Windows' in karte and 'class="ziel-badge">macOS' in karte
+    assert 'class="ziel-badge">Linux' in karte
+    # Risiko als Farbpunkt mit Text, Schrittzahl, Rechte-Hinweis
+    assert "risiko-punkt risiko-gelb" in karte and "ändert etwas" in karte
+    assert re.search(r"\d+ Schritte", karte)
+    assert "braucht sudo" in karte
+    # Nicht verfügbare Rezepte stehen unten, abgeschwächt, mit Hinweis
+    unten = seite.index('id="nicht-verfuegbar"')
+    assert seite.index('data-rezept="windows_update_reparieren"') > unten
+    assert seite.index('data-rezept="drucker_einrichten"') < unten
+    gesperrt = seite[seite.index('data-rezept="windows_update_reparieren"') :].split("</li>")[0]
+    assert (
+        "nicht-verfuegbar"
+        in seite[: seite.index('data-rezept="windows_update_reparieren"')].rsplit("<li", 1)[1]
+    )
+    assert "Nicht für macOS verfügbar" in gesperrt and "href=" not in gesperrt
+    # Suchtext enthält Schlagworte (für die clientseitige, umlauttolerante Suche)
+    assert 'data-suche="' in karte
+    # Kategorie-Chips mit aria-pressed
+    assert 'class="chip" data-kategorie="Drucker" aria-pressed="false"' in seite
+
+
+def test_rezeptuebersicht_zuletzt_benutzt(client: TestClient) -> None:
+    assert 'id="zuletzt-benutzt"' not in client.get("/rezepte?ziel=zsh").text
+    client.post("/rezepte/diagnosepaket_support/erzeugen", data={"ziel": "zsh"}, headers=HX)
+    seite = client.get("/rezepte?ziel=zsh").text
+    zuletzt = seite[
+        seite.index('id="zuletzt-benutzt"') : seite.index("</section>", seite.index('id="zuletzt-benutzt"'))
+    ]
+    assert 'data-rezept="diagnosepaket_support"' in zuletzt

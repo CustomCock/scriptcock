@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "_icons.html" as i %}
 {% block titel %}Rezept wählen{% endblock %}
+{% block breit %} inhalt-breit{% endblock %}
 {% block inhalt %}
 {% set aktiv_schritt = 2 %}{% include "_schritte.html" %}
 <div class="seitenkopf">
@@ -9,18 +10,38 @@
     <p class="untertitel">Zielsystem: <strong>{{ ziel_anzeige[ziel] }}</strong> · <a href="{{ basis }}/rezepte">ändern</a></p>
   </div>
 </div>
-<form class="suche" role="search" action="{{ basis }}/rezepte" method="get"
-      hx-get="{{ basis }}/rezepte" hx-target="#rezeptliste" hx-trigger="input changed delay:300ms from:#suchfeld, change from:#kategorie, submit"
-      hx-push-url="true">
+
+<form class="rezept-filter" role="search" action="{{ basis }}/rezepte" method="get" id="rezept-filter">
   <input type="hidden" name="ziel" value="{{ ziel.value }}">
-  <label class="sr-only" for="suchfeld">Suche</label>
-  <input id="suchfeld" type="search" name="q" value="{{ q }}" placeholder="Suchen, z. B. Drucker, Netzwerk, Update …" autocomplete="off">
-  <label class="sr-only" for="kategorie">Kategorie</label>
-  <select id="kategorie" name="kategorie">
-    <option value="">Alle Kategorien</option>
-    {% for k in kategorien %}<option value="{{ k }}" {% if k == kategorie %}selected{% endif %}>{{ k }}</option>{% endfor %}
-  </select>
+  <label class="sr-only" for="suchfeld">Rezept suchen</label>
+  <input id="suchfeld" type="search" name="q" value="{{ q }}" placeholder="Rezept suchen … (z. B. drucker, langsam, löschen)" autocomplete="off" spellcheck="false">
   <noscript><button type="submit" class="knopf">Suchen</button></noscript>
+  <div class="katalog-chips" role="group" aria-label="Kategorien">
+    {% for k in kategorien %}<button type="button" class="chip" data-kategorie="{{ k }}" aria-pressed="{{ 'true' if k == kategorie else 'false' }}">{{ k }}</button>{% endfor %}
+  </div>
+  <p class="rezept-anzahl" id="rezept-anzahl" aria-live="polite"></p>
 </form>
-<div id="rezeptliste">{% include "_rezeptliste.html" %}</div>
+
+{% if zuletzt %}
+<section class="rezept-gruppe" id="zuletzt-benutzt" aria-labelledby="zuletzt-titel">
+  <h2 class="rezept-gruppe-titel" id="zuletzt-titel">Zuletzt benutzt</h2>
+  <ul class="rezept-karten">{% for k in zuletzt %}{% include "_rezeptkarte.html" %}{% endfor %}</ul>
+</section>
+{% endif %}
+
+<div id="rezeptliste">
+  {% for gruppe, karten in gruppen.items() %}
+  <section class="rezept-gruppe" data-gruppe="{{ gruppe }}" aria-labelledby="gruppe-{{ loop.index }}">
+    <h2 class="rezept-gruppe-titel" id="gruppe-{{ loop.index }}">{{ i.kategorie_icon(gruppe) }}{{ gruppe }}</h2>
+    <ul class="rezept-karten">{% for k in karten %}{% include "_rezeptkarte.html" %}{% endfor %}</ul>
+  </section>
+  {% endfor %}
+  {% if nicht_verfuegbar %}
+  <section class="rezept-gruppe rezept-gruppe-aus" id="nicht-verfuegbar" aria-labelledby="gruppe-aus">
+    <h2 class="rezept-gruppe-titel" id="gruppe-aus">Nicht für {{ ziel_kurz }} verfügbar</h2>
+    <ul class="rezept-karten">{% for k in nicht_verfuegbar %}{% include "_rezeptkarte.html" %}{% endfor %}</ul>
+  </section>
+  {% endif %}
+  <p class="leer" id="rezept-leer"{% if gruppen or nicht_verfuegbar %} hidden{% endif %}>Kein passendes Rezept gefunden. Versuch einen allgemeineren Begriff wie „drucker“ oder „netzwerk“.</p>
+</div>
 {% endblock %}

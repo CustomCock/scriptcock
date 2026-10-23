@@ -2,6 +2,26 @@
 
 ## Fehlerbehebung Runde 1
 
+### 8. Rezept-Übersicht als Karten-Raster
+
+- **Vorher:** schlichte Kartenliste mit Kategorie-Dropdown, Serversuche ohne Umlaut-Toleranz;
+  Rezepte für andere Zielsysteme fehlten ganz, ohne Hinweis.
+- **Lösung:**
+  - Karten gruppiert nach Kategorie mit Zwischenüberschriften; die Gruppen fließen als Spalten,
+    damit Kategorien mit ein bis drei Rezepten keinen Leerraum hinterlassen.
+  - Pro Karte: Kategorie-Icon (eigene Inline-SVGs), Titel, Beschreibung (zwei Zeilen),
+    Zielsysteme als Badges (nicht verfügbare durchgestrichen), Risiko als Farbpunkt mit Text
+    („nur lesen“, „ändert etwas“, „kritisch“), Anzahl der Schritte, „braucht Admin/sudo“.
+  - Live-Suche mit derselben Normalisierung wie der Software-Katalog (Umlaute, Satzzeichen)
+    und Kategorie-Chips mit dem eindeutigen aktiven Zustand aus Punkt 4; ohne JavaScript filtert
+    weiter der Server (`?q=`).
+  - Nicht verfügbare Rezepte stehen unten, abgeschwächt, mit „Nicht für macOS verfügbar“.
+  - „Zuletzt benutzt“: die letzten vier Rezepte, aus denen der Benutzer Scripte erzeugt hat.
+  - Kategorie „Windows Update“ in „Updates“ aufgegangen.
+- **Tests:** Server-Rendering (Gruppen, Badges, Risiko, Schritte, Rechte, Sortierung, Zuletzt
+  benutzt), Playwright (Live-Suche inkl. Umlaute, Chips, Leer-Hinweis, sichtbarer Tastaturfokus).
+- Screenshots: `docs/screenshots/rezepte-{360,768,1280,1920}.png`.
+
 ### 6. + 7. Software-Katalog unter der Vorschau, eine Komponente, auch in Blockly
 
 (Ein gemeinsamer Commit: Beide Punkte beruhen auf demselben Umbau der Katalog-Komponente.)

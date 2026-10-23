@@ -171,7 +171,54 @@
     if (liste.querySelector("li.schritt")) { setTimeout(aendern, 0); }
   }
 
-  document.addEventListener("DOMContentLoaded", function () { hervorheben(document); baukasten(); });
+  // --- Rezept-Übersicht: Live-Suche (umlauttolerant wie der Software-Katalog) + Kategorie-Chips ---
+  function rezeptFilter() {
+    var form = document.getElementById("rezept-filter");
+    var S = window.OkmKatalogSuche;
+    if (!form || !S) { return; }
+    var feld = document.getElementById("suchfeld");
+    var anzahl = document.getElementById("rezept-anzahl");
+    var leer = document.getElementById("rezept-leer");
+    var zuletzt = document.getElementById("zuletzt-benutzt");
+    var chips = form.querySelectorAll("[data-kategorie]");
+    var karten = [].slice.call(document.querySelectorAll("#rezeptliste .rezept-karte")).map(function (k) {
+      return { el: k, text: S.normalisiere(k.dataset.suche), kategorie: k.dataset.kategorie };
+    });
+    function filtern() {
+      var woerter = feld.value.trim().split(/\s+/).map(S.normalisiere).filter(Boolean);
+      var kategorien = [].slice.call(chips).filter(function (c) { return c.getAttribute("aria-pressed") === "true"; })
+        .map(function (c) { return c.dataset.kategorie; });
+      var sichtbar = 0;
+      karten.forEach(function (k) {
+        var ok = woerter.every(function (w) { return k.text.indexOf(w) >= 0; }) &&
+          (!kategorien.length || kategorien.indexOf(k.kategorie) >= 0);
+        k.el.hidden = !ok;
+        if (ok && !k.el.classList.contains("nicht-verfuegbar")) { sichtbar += 1; }
+      });
+      document.querySelectorAll("#rezeptliste .rezept-gruppe").forEach(function (g) {
+        g.hidden = !g.querySelector(".rezept-karte:not([hidden])");
+      });
+      var gefiltert = woerter.length > 0 || kategorien.length > 0;
+      if (zuletzt) { zuletzt.hidden = gefiltert; }
+      anzahl.textContent = gefiltert ? (sichtbar === 1 ? "1 passendes Rezept" : sichtbar + " passende Rezepte") : "";
+      leer.hidden = !!document.querySelector("#rezeptliste .rezept-karte:not([hidden])");
+    }
+    var zeit = null;
+    feld.addEventListener("input", function () { clearTimeout(zeit); zeit = setTimeout(filtern, 100); });
+    form.addEventListener("submit", function (ev) { ev.preventDefault(); filtern(); });
+    chips.forEach(function (c) {
+      c.addEventListener("click", function () {
+        c.setAttribute("aria-pressed", String(c.getAttribute("aria-pressed") !== "true"));
+        filtern();
+      });
+    });
+    feld.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape" && feld.value) { feld.value = ""; filtern(); }
+    });
+    filtern();
+  }
+
+  document.addEventListener("DOMContentLoaded", function () { hervorheben(document); baukasten(); rezeptFilter(); });
   document.addEventListener("htmx:afterSwap", function (ev) {
     hervorheben(ev.target);
     // Nur zum Ergebnis von „Erzeugen“ scrollen – nicht bei jeder Live-Vorschau im Baukasten.
