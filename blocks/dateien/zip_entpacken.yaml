@@ -1,0 +1,34 @@
+id: zip_entpacken
+version: 1
+name: ZIP-Archiv entpacken
+kategorie: Dateien
+beschreibung: Entpackt ein ZIP-Archiv in einen Ordner (wird bei Bedarf angelegt). Vorhandene Dateien werden überschrieben.
+hilfe: |
+  Linux: braucht das Programm unzip (Debian/Ubuntu: apt install unzip).
+  Windows-CMD: nutzt tar.exe (ab Windows 10 1803 vorhanden).
+risiko: gelb
+fortschritt: "{{ zip }} wird nach {{ ziel }} entpackt"
+tipp: Gibt es die ZIP-Datei, und ist sie vollständig heruntergeladen?
+parameter:
+  - id: zip
+    label: ZIP-Datei
+    typ: pfad
+    beispiel: C:\Downloads\Treiber.zip
+  - id: ziel
+    label: Zielordner
+    typ: pfad
+    beispiel: C:\Treiber
+ziele:
+  powershell: |
+    Expand-Archive -LiteralPath {{ zip }} -DestinationPath {{ ziel }} -Force{{ whatif }}
+  cmd: |
+    if not exist {{ ziel }} mkdir {{ ziel }}
+    tar -xf {{ zip }} -C {{ ziel }}
+  bash: |
+    mkdir -p -- {{ ziel }}
+    unzip -o -q {{ zip }} -d {{ ziel }}
+    printf 'Entpackt nach: %s\n' {{ ziel }}
+  zsh: |
+    mkdir -p {{ ziel }}
+    ditto -x -k {{ zip }} {{ ziel }}
+    printf 'Entpackt nach: %s\n' {{ ziel }}

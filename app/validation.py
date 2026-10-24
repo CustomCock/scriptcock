@@ -467,6 +467,31 @@ def _registry_pfad(text: str, p: ParameterDef) -> str:
     return pfad
 
 
+_DATEINAME = re.compile(r"^\w[\w .\-()+]{0,254}$")
+# Unter Windows reservierte Gerätenamen – auch mit Endung (nul.txt) nicht anlegbar
+_RESERVIERT = re.compile(r"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$", re.I)
+
+
+def _dateiname(text: str, p: ParameterDef) -> str:
+    if not _DATEINAME.match(text) or text.endswith((".", " ")):
+        raise ValidierungsFehler(
+            "Bitte nur einen Namen ohne Ordner angeben – erlaubt sind Buchstaben, Ziffern, Leerzeichen "
+            "und _ . - ( ) +, nicht am Ende ein Punkt, z. B. Bericht 2026.docx"
+        )
+    if _RESERVIERT.match(text):
+        raise ValidierungsFehler(f"„{text}“ ist unter Windows ein reservierter Name.")
+    return text
+
+
+def _rechnername(text: str, p: ParameterDef) -> str:
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{0,14}", text) or text.isdigit() or text.endswith("-"):
+        raise ValidierungsFehler(
+            "Bitte einen Rechnernamen mit 1–15 Zeichen angeben (Buchstaben, Ziffern, Bindestrich; "
+            "nicht nur Ziffern, ohne Punkt), z. B. PC-EMPFANG-01"
+        )
+    return text.upper()
+
+
 def registry_reg_form(pfad: str) -> str:
     """``HKLM:\\SOFTWARE\\x`` → ``HKLM\\SOFTWARE\\x`` (Schreibweise von reg.exe)."""
     return pfad.replace(":\\", "\\", 1)
@@ -485,6 +510,7 @@ LISTEN_MIT_LEERZEICHEN = frozenset(
         ParamTyp.UNC_PFAD,
         ParamTyp.PROZESSNAME,
         ParamTyp.REGISTRY_PFAD,
+        ParamTyp.DATEINAME,
     }
 )
 MAX_LISTE = 20
@@ -591,6 +617,8 @@ _TEXT_PRUEFER: dict[ParamTyp, Any] = {
     ParamTyp.MAC: _mac,
     ParamTyp.DOMAIN: _domain,
     ParamTyp.REGISTRY_PFAD: _registry_pfad,
+    ParamTyp.DATEINAME: _dateiname,
+    ParamTyp.RECHNERNAME: _rechnername,
 }
 
 

@@ -1,0 +1,32 @@
+id: umbenennen
+version: 1
+name: Datei/Ordner umbenennen
+kategorie: Dateien
+beschreibung: Gibt einer Datei oder einem Ordner einen neuen Namen im selben Ordner. Gibt es den neuen Namen schon, passiert nichts.
+risiko: gelb
+fortschritt: "{{ pfad }} wird in {{ neuer_name }} umbenannt"
+tipp: Gibt es die Datei, und ist der neue Name im Ordner noch frei?
+parameter:
+  - id: pfad
+    label: Datei oder Ordner
+    typ: pfad
+    beispiel: C:\Daten\Bericht alt.docx
+  - id: neuer_name
+    label: Neuer Name (ohne Ordner)
+    typ: dateiname
+    beispiel: Bericht 2026.docx
+ziele:
+  powershell: |
+    Rename-Item -LiteralPath {{ pfad }} -NewName {{ neuer_name }}{{ whatif }}
+  cmd: |
+    ren {{ pfad }} {{ neuer_name }}
+  bash: &umbenennen_sh |
+    okm_ordner=$(dirname -- {{ pfad }})
+    okm_ziel=$okm_ordner/{{ neuer_name }}
+    if [ -e "$okm_ziel" ]; then
+      okm_fehler "Den Namen gibt es dort schon: $okm_ziel"
+      false
+    fi
+    mv -- {{ pfad }} "$okm_ziel"
+    printf 'Neuer Name: %s\n' "$okm_ziel"
+  zsh: *umbenennen_sh

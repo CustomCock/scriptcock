@@ -1,0 +1,38 @@
+id: rechner_umbenennen
+version: 1
+name: Rechner umbenennen
+kategorie: System
+beschreibung: Gibt dem Rechner einen neuen Namen. Unter Windows wirkt der Name erst nach einem Neustart.
+hilfe: |
+  Windows: Bei Rechnern in einer Domäne braucht die Umbenennung ein Domänen-Konto mit Rechten – dann lieber über die IT.
+  Linux: setzt den Hostnamen per hostnamectl; einen Eintrag in /etc/hosts bitte selbst prüfen.
+  macOS: setzt ComputerName, LocalHostName und HostName.
+risiko: gelb
+fortschritt: "Rechner wird in {{ neuer_name }} umbenannt"
+tipp: Ist der Rechner Mitglied einer Domäne? Dann muss die IT ihn umbenennen.
+rechte:
+  powershell: admin
+  cmd: admin
+  bash: root
+  zsh: root
+parameter:
+  - id: neuer_name
+    label: Neuer Rechnername
+    typ: rechnername
+    beispiel: PC-EMPFANG-01
+ziele:
+  powershell: |
+    Rename-Computer -NewName {{ neuer_name }} -Force{{ whatif }}
+    Write-Host 'Der neue Name gilt nach dem nächsten Neustart.' -ForegroundColor Yellow
+  cmd: |
+    set OKM_NEUER_NAME={{ neuer_name }}
+    powershell -NoProfile -Command "Rename-Computer -NewName $env:OKM_NEUER_NAME.Trim([char]34) -Force"
+    if errorlevel 1 (cmd /c exit 1) else (echo Der neue Name gilt nach dem nächsten Neustart.)
+  bash: |
+    {{ sudo }}hostnamectl set-hostname {{ neuer_name }}
+    printf 'Neuer Hostname: %s\n' "$(hostname)"
+  zsh: |
+    {{ sudo }}scutil --set ComputerName {{ neuer_name }}
+    {{ sudo }}scutil --set LocalHostName {{ neuer_name }}
+    {{ sudo }}scutil --set HostName {{ neuer_name }}
+    printf 'Neuer Name: %s\n' "$(scutil --get ComputerName)"

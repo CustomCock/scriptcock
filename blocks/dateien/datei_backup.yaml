@@ -1,0 +1,61 @@
+id: datei_backup
+version: 1
+name: Sicherungskopie mit Zeitstempel
+kategorie: Dateien
+beschreibung: Legt eine Kopie einer Datei oder eines Ordners mit Datum und Uhrzeit im Namen an, z. B. hosts_20261024-153000 – vor Änderungen an Konfigurationsdateien.
+hilfe: |
+  Ohne Zielordner landet die Kopie neben dem Original. Windows-CMD legt die Kopie immer neben dem Original ab.
+risiko: gelb
+fortschritt: "Sicherungskopie von {{ pfad }} wird angelegt"
+tipp: Gibt es die Datei, und ist im Zielordner genug Platz?
+parameter:
+  - id: pfad
+    label: Datei oder Ordner
+    typ: pfad
+    beispiel: C:\Windows\System32\drivers\etc\hosts
+  - id: ziel
+    label: Zielordner (optional)
+    typ: pfad
+    pflicht: false
+ziele:
+  powershell: |
+    $okmEintrag = Get-Item -LiteralPath {{ pfad }} -Force
+    $okmStempel = Get-Date -Format 'yyyyMMdd-HHmmss'
+    if ($okmEintrag.PSIsContainer) { $okmName = $okmEintrag.Name + '_' + $okmStempel } else { $okmName = $okmEintrag.BaseName + '_' + $okmStempel + $okmEintrag.Extension }
+    {% if ziel %}
+    $okmOrdner = {{ ziel }}
+    {% else %}
+    $okmOrdner = Split-Path -Path $okmEintrag.FullName -Parent
+    {% endif %}
+    $okmKopie = Join-Path -Path $okmOrdner -ChildPath $okmName
+    Copy-Item -LiteralPath {{ pfad }} -Destination $okmKopie -Recurse -Force{{ whatif }}
+    Write-Host ('Sicherung: ' + $okmKopie)
+  cmd: |
+    for %%I in ({{ pfad }}) do for /f %%t in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss"') do (
+      echo Sicherung: %%~dpnI_%%t%%~xI
+      if exist "%%~fI\*" (
+        robocopy "%%~fI" "%%~dpnI_%%t%%~xI" /E /R:1 /W:1 /NP /NFL /NDL
+        if errorlevel 8 (cmd /c exit 1) else (cmd /c exit 0)
+      ) else (
+        copy /Y "%%~fI" "%%~dpnI_%%t%%~xI"
+      )
+    )
+  bash: &backup_sh |
+    okm_stempel=$(date +%Y%m%d-%H%M%S)
+    okm_name=$(basename -- {{ pfad }})
+    if [ -d {{ pfad }} ]; then
+      okm_neu=${okm_name}_$okm_stempel
+    else
+      case "$okm_name" in
+        ?*.*) okm_neu=${okm_name%.*}_$okm_stempel.${okm_name##*.} ;;
+        *) okm_neu=${okm_name}_$okm_stempel ;;
+      esac
+    fi
+    {% if ziel %}
+    okm_ordner={{ ziel }}
+    {% else %}
+    okm_ordner=$(dirname -- {{ pfad }})
+    {% endif %}
+    cp -a -- {{ pfad }} "$okm_ordner/$okm_neu"
+    printf 'Sicherung: %s\n' "$okm_ordner/$okm_neu"
+  zsh: *backup_sh

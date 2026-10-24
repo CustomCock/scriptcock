@@ -78,6 +78,8 @@ class ParamTyp(StrEnum):
     MAC = "mac"  # → AA:BB:CC:DD:EE:FF
     DOMAIN = "domain"  # DNS-Domain mit mindestens einem Punkt, klein geschrieben
     REGISTRY_PFAD = "registry_pfad"  # → HKLM:\\SOFTWARE\\… (abgeleitet: <id>_reg ohne Doppelpunkt)
+    DATEINAME = "dateiname"  # ein Datei-/Ordnername ohne Pfad (kein . / .., keine reservierten Namen)
+    RECHNERNAME = "rechnername"  # NetBIOS-tauglich: 1–15 Zeichen, Buchstaben/Ziffern/-, → GROSS
     LISTE = "liste"  # mehrere Werte vom Typ ``listen_typ``
 
 

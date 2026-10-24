@@ -1,0 +1,33 @@
+id: zeit_sync
+version: 1
+name: Uhrzeit synchronisieren
+kategorie: System
+beschreibung: Gleicht die Uhrzeit sofort mit dem Zeitserver ab (bei falscher Uhrzeit scheitern Anmeldungen und Zertifikate).
+risiko: gelb
+fortschritt: Uhrzeit wird mit dem Zeitserver abgeglichen
+tipp: Ist der Zeitserver erreichbar (Firewall, UDP-Port 123)? In Domänen gibt der Domänencontroller die Zeit vor.
+rechte:
+  powershell: admin
+  cmd: admin
+  bash: root
+  zsh: root
+ziele:
+  powershell: |
+    Start-Service -Name w32time -ErrorAction SilentlyContinue
+    w32tm /resync /force
+    w32tm /query /status
+  cmd: |
+    net start w32time >nul 2>&1
+    w32tm /resync /force
+    if errorlevel 1 (cmd /c exit 1) else (w32tm /query /status)
+  bash: |
+    if command -v chronyc >/dev/null 2>&1; then
+      {{ sudo }}chronyc makestep
+    else
+      {{ sudo }}timedatectl set-ntp true
+      {{ sudo }}systemctl restart systemd-timesyncd
+    fi
+    timedatectl status
+  zsh: |
+    {{ sudo }}sntp -sS time.apple.com
+    date

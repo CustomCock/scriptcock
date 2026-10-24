@@ -1,0 +1,57 @@
+id: existiert_pruefen
+version: 1
+name: Prüfen, ob Datei/Ordner existiert
+kategorie: Dateien
+beschreibung: Prüft, ob es eine Datei oder einen Ordner gibt. Das Ergebnis kann ein späterer „Wenn“-Block verwenden.
+risiko: gruen
+fortschritt: "Gibt es {{ pfad }}?"
+tipp: Stimmt der Pfad (Laufwerk, Schreibweise)?
+parameter:
+  - id: pfad
+    label: Datei oder Ordner
+    typ: pfad
+    beispiel: C:\Programme\Firma\app.exe
+  - id: abbrechen
+    label: Script abbrechen, wenn es fehlt
+    typ: ja_nein
+    pflicht: false
+    standard: false
+rueckgabe:
+  - id: vorhanden
+    typ: ja_nein
+    beschreibung: Datei oder Ordner ist vorhanden
+ziele:
+  powershell: |
+    {{ rueckgabe_vorhanden }} = Test-Path -LiteralPath {{ pfad }}
+    if ({{ rueckgabe_vorhanden }}) {
+        Write-Host 'Vorhanden.'
+    } else {
+    {% if abbrechen %}
+        throw 'Nicht vorhanden.'
+    {% else %}
+        Write-Host 'Nicht vorhanden.' -ForegroundColor Yellow
+    {% endif %}
+    }
+  cmd: |
+    if exist {{ pfad }} (
+      echo Vorhanden.
+      set {{ rueckgabe_vorhanden }}=1
+    ) else (
+      echo Nicht vorhanden.
+      set {{ rueckgabe_vorhanden }}=0
+    {% if abbrechen %}
+      cmd /c exit 1
+    {% endif %}
+    )
+  bash: &existiert_sh |
+    if [ -e {{ pfad }} ]; then
+      {{ rueckgabe_vorhanden }}=1
+      printf '%s\n' 'Vorhanden.'
+    else
+      {{ rueckgabe_vorhanden }}=0
+      printf '%s\n' 'Nicht vorhanden.'
+    {% if abbrechen %}
+      false
+    {% endif %}
+    fi
+  zsh: *existiert_sh

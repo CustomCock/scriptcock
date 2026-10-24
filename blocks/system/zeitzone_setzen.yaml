@@ -1,0 +1,71 @@
+id: zeitzone_setzen
+version: 1
+name: Zeitzone setzen
+kategorie: System
+beschreibung: Stellt die Zeitzone des Rechners ein (Sommer-/Winterzeit wird automatisch berücksichtigt).
+risiko: gelb
+fortschritt: Zeitzone wird gesetzt
+rechte:
+  powershell: admin
+  cmd: admin
+  bash: root
+  zsh: root
+parameter:
+  - id: zeitzone
+    label: Zeitzone
+    typ: auswahl
+    standard: berlin
+    optionen:
+      - wert: berlin
+        label: Mitteleuropa (Berlin)
+      - wert: london
+        label: Großbritannien (London)
+      - wert: utc
+        label: UTC
+      - wert: new_york
+        label: USA Ostküste (New York)
+ziele:
+  powershell: |
+    {% if zeitzone.wert == 'berlin' %}
+    Set-TimeZone -Id 'W. Europe Standard Time'{{ whatif }}
+    {% elif zeitzone.wert == 'london' %}
+    Set-TimeZone -Id 'GMT Standard Time'{{ whatif }}
+    {% elif zeitzone.wert == 'utc' %}
+    Set-TimeZone -Id 'UTC'{{ whatif }}
+    {% else %}
+    Set-TimeZone -Id 'Eastern Standard Time'{{ whatif }}
+    {% endif %}
+    Get-TimeZone | Format-List Id, DisplayName
+  cmd: |
+    {% if zeitzone.wert == 'berlin' %}
+    tzutil /s "W. Europe Standard Time"
+    {% elif zeitzone.wert == 'london' %}
+    tzutil /s "GMT Standard Time"
+    {% elif zeitzone.wert == 'utc' %}
+    tzutil /s "UTC"
+    {% else %}
+    tzutil /s "Eastern Standard Time"
+    {% endif %}
+    tzutil /g
+  bash: |
+    {% if zeitzone.wert == 'berlin' %}
+    {{ sudo }}timedatectl set-timezone Europe/Berlin
+    {% elif zeitzone.wert == 'london' %}
+    {{ sudo }}timedatectl set-timezone Europe/London
+    {% elif zeitzone.wert == 'utc' %}
+    {{ sudo }}timedatectl set-timezone UTC
+    {% else %}
+    {{ sudo }}timedatectl set-timezone America/New_York
+    {% endif %}
+    timedatectl status
+  zsh: |
+    {% if zeitzone.wert == 'berlin' %}
+    {{ sudo }}systemsetup -settimezone Europe/Berlin
+    {% elif zeitzone.wert == 'london' %}
+    {{ sudo }}systemsetup -settimezone Europe/London
+    {% elif zeitzone.wert == 'utc' %}
+    {{ sudo }}systemsetup -settimezone UTC
+    {% else %}
+    {{ sudo }}systemsetup -settimezone America/New_York
+    {% endif %}
+    {{ sudo }}systemsetup -gettimezone

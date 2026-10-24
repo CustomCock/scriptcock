@@ -1,0 +1,56 @@
+id: verschieben
+version: 1
+name: Datei/Ordner verschieben
+kategorie: Dateien
+beschreibung: Verschiebt eine Datei oder einen Ordner in einen anderen Ordner. Vorhandenes wird nur mit „Überschreiben“ ersetzt.
+hilfe: |
+  Der Name bleibt gleich; Ziel ist der Ordner, in den verschoben wird.
+  Windows-CMD: Ordner lassen sich nur innerhalb desselben Laufwerks verschieben.
+risiko: gelb
+fortschritt: "{{ quelle }} wird nach {{ ziel }} verschoben"
+tipp: Gibt es die Quelle und den Zielordner? Liegt am Ziel schon etwas mit gleichem Namen, „Überschreiben“ aktivieren.
+parameter:
+  - id: quelle
+    label: Datei oder Ordner
+    typ: pfad
+    beispiel: C:\Daten\bericht.docx
+  - id: ziel
+    label: Zielordner
+    typ: pfad
+    beispiel: D:\Archiv
+  - id: ueberschreiben
+    label: Vorhandenes am Ziel überschreiben
+    typ: ja_nein
+    pflicht: false
+    standard: false
+ziele:
+  powershell: |
+    $okmZiel = Join-Path -Path {{ ziel }} -ChildPath (Split-Path -Path {{ quelle }} -Leaf)
+    {% if not ueberschreiben %}
+    if (Test-Path -LiteralPath $okmZiel) { throw ('Am Ziel gibt es bereits: ' + $okmZiel) }
+    {% endif %}
+    Move-Item -LiteralPath {{ quelle }} -Destination $okmZiel{% if ueberschreiben %} -Force{% endif %}{{ whatif }}
+  cmd: |
+    for %%I in ({{ quelle }}) do (
+    {% if ueberschreiben %}
+      move /Y {{ quelle }} {{ ziel }}
+    {% else %}
+      if exist {{ ziel }}\%%~nxI (
+        echo Am Ziel gibt es bereits: %%~nxI
+        cmd /c exit 1
+      ) else (
+        move {{ quelle }} {{ ziel }}
+      )
+    {% endif %}
+    )
+  bash: &verschieben_sh |
+    okm_ziel={{ ziel }}/$(basename -- {{ quelle }})
+    {% if not ueberschreiben %}
+    if [ -e "$okm_ziel" ]; then
+      okm_fehler "Am Ziel gibt es bereits: $okm_ziel"
+      false
+    fi
+    {% endif %}
+    mv -f -- {{ quelle }} "$okm_ziel"
+    printf 'Verschoben nach: %s\n' "$okm_ziel"
+  zsh: *verschieben_sh

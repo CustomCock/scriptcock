@@ -39,6 +39,14 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 | alle | powershell | Native Programme, die Fehler über stderr melden, aber Exit-Code 0 liefern, werden nicht als Fehler erkannt. |
 | `ping` | cmd | `ping.exe` meldet „Zielhost nicht erreichbar“ (Antwort eines Routers) mit Exit-Code 0. PowerShell prüft daher zusätzlich auf `TTL=`; CMD wertet nur den Exit-Code aus. Die Laufzeit (`ms`) gibt es unter CMD nicht (Ausgabe sprachabhängig). |
 | `dienst_status` | cmd | `laeuft` sucht `RUNNING` in der Ausgabe von `sc query` – prüfen, ob das auf deutschem Windows englisch bleibt. |
+| `verschieben` | cmd | `move` verschiebt Ordner nur innerhalb desselben Laufwerks. |
+| `loeschen`, `alte_dateien_loeschen` | cmd | Schutzliste in CMD nur Laufwerkswurzel, `%SystemRoot%`, `%ProgramFiles%`, `%USERPROFILE%` (PowerShell und bash/zsh schützen mehr). `del` meldet manche Fehler nicht über den Errorlevel. |
+| `alte_dateien_loeschen` | cmd | `forfiles` liefert keine Anzahl (keine Rückgabe `anzahl` unter CMD). |
+| `datei_backup` | cmd | Zeitstempel über einen kurzen PowerShell-Aufruf; Zielordner-Option gibt es unter CMD nicht. |
+| `rechner_umbenennen` | powershell/cmd | In einer Domäne braucht `Rename-Computer` Domänen-Anmeldedaten – dann schlägt der Schritt mit Meldung fehl. |
+| `zeit_sync` | bash | Nutzt `chronyc makestep`, sonst `timedatectl set-ntp` + Neustart von `systemd-timesyncd`; andere NTP-Dienste (ntpd) nicht abgedeckt. |
+| `zeit_sync`, `zeitzone_setzen`, `rechner_umbenennen` | zsh | `sntp`, `systemsetup`, `scutil` nur mit Attrappen getestet. |
+| alle Datei-Bausteine aus Paket 1 | powershell/cmd | Unter Linux nur Syntax/Lint geprüft (Windows-Pfade), auf Win 11 ausführen. |
 | alle | powershell/cmd | Ausführen-Checkliste (`docs/test-vms.md`, Abschnitt 4): alle Windows-Zellen (Doppelklick/„Mit PowerShell ausführen“, UAC angefordert/abgelehnt, Konsole UTF-8, Fenster bleibt offen) sind noch **nicht** auf Win 11 geprüft. |
 | alle | bash/zsh | Checkliste bisher nur im Linux-Container mit Attrappen (`ping`, `sudo`); auf Debian 12 und echtem macOS (Terminal.app, echtes sudo) wiederholen. |
 

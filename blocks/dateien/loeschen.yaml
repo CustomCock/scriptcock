@@ -1,0 +1,74 @@
+id: loeschen
+version: 1
+name: Datei/Ordner löschen
+kategorie: Dateien
+beschreibung: Löscht eine Datei oder einen Ordner samt Inhalt endgültig (nicht in den Papierkorb). Zeigt vorher, was gelöscht wird.
+hilfe: |
+  Geschützt sind Laufwerke/Wurzel (C:\, /), Systemordner (Windows, Programme, /etc, /usr …) und das Benutzerverzeichnis selbst.
+risiko: rot
+fortschritt: "{{ pfad }} wird gelöscht"
+tipp: Gibt es den Pfad, und ist keine Datei darin geöffnet?
+parameter:
+  - id: pfad
+    label: Datei oder Ordner
+    typ: pfad
+    beispiel: C:\Temp\Altlasten
+ziele:
+  powershell: |
+    if (-not (Test-Path -LiteralPath {{ pfad }})) { throw 'Das gibt es nicht.' }
+    $okmEintrag = Get-Item -LiteralPath {{ pfad }} -Force
+    $okmVoll = $okmEintrag.FullName.TrimEnd('\')
+    $okmGeschuetzt = @($env:SystemRoot, $env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:ProgramData, $env:USERPROFILE, (Join-Path $env:SystemDrive 'Users'))
+    if ($okmVoll -match '^[A-Za-z]:$' -or $okmGeschuetzt -contains $okmVoll) { throw ('Dieser Ordner ist geschützt: ' + $okmVoll) }
+    if ($okmEintrag.PSIsContainer) {
+        $okmAnzahl = @(Get-ChildItem -LiteralPath {{ pfad }} -Recurse -Force -File -ErrorAction SilentlyContinue).Count
+        Write-Host ('Wird gelöscht: Ordner ' + $okmVoll + ' mit ' + $okmAnzahl + ' Dateien')
+    } else {
+        Write-Host ('Wird gelöscht: Datei ' + $okmVoll + ' (' + [math]::Round($okmEintrag.Length / 1KB, 1) + ' KB)')
+    }
+    Remove-Item -LiteralPath {{ pfad }} -Recurse -Force{{ whatif }}
+  cmd: |
+    for %%I in ({{ pfad }}) do (
+      if "%%~pnxI"=="\" (
+        echo Ein ganzes Laufwerk kann nicht gelöscht werden.
+        cmd /c exit 1
+      ) else if /i "%%~fI"=="%SystemRoot%" (
+        echo Dieser Ordner ist geschützt.
+        cmd /c exit 1
+      ) else if /i "%%~fI"=="%ProgramFiles%" (
+        echo Dieser Ordner ist geschützt.
+        cmd /c exit 1
+      ) else if /i "%%~fI"=="%USERPROFILE%" (
+        echo Dieser Ordner ist geschützt.
+        cmd /c exit 1
+      ) else if exist "%%~fI\*" (
+        echo Wird gelöscht: Ordner %%~fI
+        rmdir /s /q {{ pfad }}
+      ) else if exist {{ pfad }} (
+        echo Wird gelöscht: Datei %%~fI
+        del /f /q {{ pfad }}
+      ) else (
+        echo Das gibt es nicht: %%~fI
+        cmd /c exit 1
+      )
+    )
+  bash: &loeschen_sh |
+    if [ ! -e {{ pfad }} ]; then
+      okm_fehler 'Das gibt es nicht.'
+      false
+    fi
+    okm_voll=$(realpath -- {{ pfad }})
+    case "$okm_voll" in
+      /|/bin|/boot|/dev|/etc|/home|/lib|/lib64|/opt|/proc|/root|/sbin|/srv|/sys|/tmp|/usr|/var|/Users|/System|/Library|/Applications|"$HOME")
+        okm_fehler "Dieser Ordner ist geschützt: $okm_voll"
+        false
+        ;;
+    esac
+    if [ -d "$okm_voll" ]; then
+      okm_anzahl=$(find "$okm_voll" -type f 2>/dev/null | grep -c . || true)
+      printf 'Wird gelöscht: Ordner %s mit %s Dateien\n' "$okm_voll" "$okm_anzahl"
+    else
+      printf 'Wird gelöscht: Datei %s\n' "$okm_voll"
+    fi
+    rm -rf -- "$okm_voll"
+  zsh: *loeschen_sh

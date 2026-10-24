@@ -2,6 +2,23 @@
 
 ## Backlog P1
 
+### Paket 1: Datei- und System-Bausteine
+
+- **Neu (10 Bausteine):** `verschieben` (Vorhandenes nur mit „Überschreiben“), `umbenennen`,
+  `loeschen` (rot, zeigt vorher Datei bzw. Ordner mit Anzahl), `alte_dateien_loeschen` (rot, Tage +
+  optionales Muster, Vorschau mit Anzahl und Beispielen, Rückgabe `anzahl`), `existiert_pruefen`
+  (Rückgabe `vorhanden`, optional Abbruch), `zip_entpacken`, `datei_backup` (Kopie mit Zeitstempel),
+  `rechner_umbenennen`, `zeit_sync`, `zeitzone_setzen` (Auswahl, je Ziel die richtige Zonen-ID).
+- **Schutz beim Löschen:** Laufwerkswurzel bzw. `/`, Systemordner (Windows, Programme, `/etc`,
+  `/usr`, `/System` …) und das Benutzerverzeichnis selbst werden abgelehnt – auf jedem Ziel im
+  Template geprüft.
+- **Neue Typen:** `dateiname` (kein `.`/`..` – sonst würde `mv a ordner/..` eine Ebene höher
+  verschieben; keine Windows-Gerätenamen) und `rechnername` (NetBIOS: 1–15 Zeichen).
+- Tests: `tests/test_paket1.py` – Ausführung in bash und zsh (Systembefehle als protokollierende
+  Attrappen). Die Schutz-Tests ersetzen `rm`/`find` durch Attrappen, damit ein Fehler im Baustein
+  nie echte Systemordner löscht; per Gegenprobe geprüft, dass sie einen fehlenden Schutz erkennen.
+  PowerShell/CMD: Syntax/Lint wie bei allen Bausteinen.
+
 ### Neue Parametertypen
 
 - `tage` (1–3650), `dauer_sek` (1–86400) – Ganzzahlen mit Standardbereich, per `min`/`max` enger.
