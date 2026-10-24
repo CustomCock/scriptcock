@@ -13,7 +13,7 @@ import pytest
 from app.escaping import Ziel
 from app.registry import Registry, lade_registry
 from tests.conftest import erzeuge
-from tests.test_ausfuehrung import SH_ZIELE, ausfuehren
+from tests.test_ausfuehrung import SH_ZIELE, _shell, ausfuehren
 
 
 def _attrappe(ordner: Path, name: str, code: int, ausgabe: str = "") -> None:
@@ -195,6 +195,7 @@ def test_cmd_pause_und_nopause(registry: Registry) -> None:
 
 @pytest.mark.parametrize(("shell", "ziel"), SH_ZIELE)
 def test_pause_nur_im_terminal(registry: Registry, tmp_path: Path, shell: str, ziel: Ziel) -> None:
+    shell = _shell(shell)  # fehlt die Shell: überspringen statt FileNotFoundError
     s = erzeuge(registry, ziel, [("meldung", {"text": "x", "pause": False})])
     datei = tmp_path / "s.sh"
     datei.write_bytes(s.inhalt)

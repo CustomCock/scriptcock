@@ -1,5 +1,16 @@
 # Changelog
 
+## Backlog P1
+
+### Kleine Fehler
+
+- `test_pause_nur_im_terminal[zsh]` schlug ohne installiertes zsh mit `FileNotFoundError` fehl.
+  **Ursache:** Der Test rief die Shell direkt über ihren Namen auf statt über `_shell()`, das
+  fehlende Werkzeuge überspringt. **Lösung:** `_shell()` nutzen (ohne zsh im `PATH` geprüft:
+  alle Shell-Tests werden übersprungen, keiner schlägt fehl).
+- `docs/offene-punkte.md` gegen den Code abgeglichen: Blockly hat seit Fix 7 einen Katalog,
+  Mini-Migration erwähnt, Abschnitt „Script-Editor“ ergänzt; alle Block-IDs der Prüfliste existieren.
+
 ## Fehlerbehebung Runde 1
 
 ### 10. + 11. CLAUDE.md und Ausführen-Checkliste

@@ -44,7 +44,8 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 
 - **Port erreichbar prüfen** und **Drucker per IP** gibt es für CMD nicht (kein Bordmittel ohne PowerShell).
 - **Netzlaufwerk** gibt es für Linux nicht (abhängig von Desktop/fstab/cifs-utils).
-- Die macOS-Blöcke sind ohne Mac-Testgerät nur per `zsh -n` geprüft.
+- Die macOS-Blöcke sind ohne Mac-Testgerät nur per `zsh -n` und mit zsh unter Linux geprüft
+  (macOS-Befehle wie `launchctl`, `sysadminctl` nur als Attrappen).
 - BitLocker-Wiederherstellungsschlüssel, Passwort-Generator, Office-Schnellreparatur, ESET-Status
   u. a.: siehe [vorlagen-status.md](vorlagen-status.md) („Bewusst nicht umgesetzt“).
 - Der Neustart mit Vorwarnung fehlt für macOS (kein Countdown mit Meldung per Bordmittel).
@@ -68,7 +69,8 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 - Die Spec verweist bei fehlendem Homebrew auf eine Vorlage „Homebrew installieren“ – die gibt
   es noch nicht (der Installer lädt ein Script aus dem Internet und ist interaktiv). Bis dahin
   meldet der Baustein „bitte an die IT wenden“.
-- Im **Blockly-Modus** gibt es kein Katalog-Panel; dort die ID über die Seite „Software“ kopieren.
+- Im **Blockly-Modus** setzt „＋“ die ID in den ausgewählten Paket-Block, sonst entsteht ein neuer
+  Block am Ende des Scripts. Mehrfachauswahl („Ausgewählte installieren“) gibt es dort nicht.
 - Die Auswahlliste „Paketmanager“ zeigt unter Linux/macOS alle Werte. Ein unpassender Wert
   (z. B. `brew_cask` unter Linux) erzeugt eine klare Fehlermeldung im Script statt eines
   falschen Befehls; unter Windows wird das Feld ausgeblendet (immer winget).
@@ -85,7 +87,20 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 - Titel/Beschreibung in der Bibliothek sind reine Metadaten; der Kopfkommentar des Scripts
   behält den Titel von der Erzeugung.
 - Es gibt keine Datenbank-Migrationen (Alembic). Neue Tabellen legt die App selbst an; neue
-  Spalten in bestehenden Tabellen bräuchten künftig eine Migration.
+  Spalten ergänzt eine Mini-Migration per `ALTER TABLE` (`Datenbank._migrieren`, bisher nur
+  `editor_text`/`manuell_bearbeitet`). Für Umbenennungen/Typänderungen braucht es Alembic.
+
+## Script-Editor
+
+- „Syntax prüfen“ nutzt auf dem Server dieselben Werkzeuge wie die Tests. Fehlen `shellcheck`,
+  `zsh`, `pwsh` oder das Modul PSScriptAnalyzer, meldet die Prüfung das – für vollständige
+  Prüfungen auf dem Server installieren.
+- Für CMD gibt es keinen echten Parser, nur die Baukasten-Regeln.
+- „Script erzeugen“ im Listen-/Blockly-Modus speichert die **generierte** Fassung; ein bearbeiteter
+  Text landet erst mit „In Bibliothek speichern“ in der Datenbank (der Download-Knopf im Ergebnis
+  liefert vorher schon den bearbeiteten Text).
+- Listen-Modus: Wer den Titel tippt und sofort „Erzeugen“ klickt, löst beim Verlassen des Feldes
+  noch eine Live-Vorschau aus, die das Ergebnis wieder leert.
 
 ## Blockly & Ablauf-Bausteine
 
