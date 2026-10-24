@@ -10,7 +10,7 @@ from __future__ import annotations
 import ipaddress
 import re
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
@@ -32,7 +32,15 @@ from app.ir import (
     WennFehler,
     Wiederhole,
 )
-from app.models.block import BlockDef, ParameterDef, ParamTyp, Risiko, RueckgabeDef, RueckgabeTyp
+from app.models.block import (
+    ZAHLENTYPEN,
+    BlockDef,
+    ParameterDef,
+    ParamTyp,
+    Risiko,
+    RueckgabeDef,
+    RueckgabeTyp,
+)
 from app.models.request import (
     AbbrechenEingabe,
     BestaetigungEingabe,
@@ -124,6 +132,18 @@ def _text_frei(text: str, p: ParameterDef) -> str:
                 "Leerzeichen und . , : ; ! ? - _ ( ) / + # ' @ = *"
             )
     return text
+
+
+def _ganzzahl(roh: Any, p: ParameterDef) -> int:
+    """zahl/tage/dauer_sek: Standardbereich des Typs, im YAML per min/max enger."""
+    untere, obere = ZAHLENTYPEN[p.typ.value]
+    grenzen = p.model_copy(
+        update={
+            "min": p.min if p.min is not None else untere,
+            "max": p.max if p.max is not None else obere,
+        }
+    )
+    return _zahl(roh, grenzen)
 
 
 def _zahl(roh: Any, p: ParameterDef) -> int:
@@ -315,6 +335,199 @@ def verweis_teile(wert: str) -> tuple[int, str]:
     return int(nr), rid
 
 
+_DATUM_ISO = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})$")
+_DATUM_DE = re.compile(r"^(\d{1,2})\.(\d{1,2})\.(\d{4})$")
+
+
+def _datum(text: str, p: ParameterDef) -> str:
+    if m := _DATUM_ISO.match(text):
+        j, mo, t = (int(x) for x in m.groups())
+    elif m := _DATUM_DE.match(text):
+        t, mo, j = (int(x) for x in m.groups())
+    else:
+        raise ValidierungsFehler("Bitte ein Datum wie 24.12.2026 oder 2026-12-24 angeben.")
+    try:
+        d = date(j, mo, t)
+    except ValueError:
+        raise ValidierungsFehler("Dieses Datum gibt es nicht (z. B. 30. Februar).") from None
+    if not 1970 <= d.year <= 2100:
+        raise ValidierungsFehler("Bitte ein Datum zwischen 1970 und 2100 angeben.")
+    return d.isoformat()
+
+
+def _uhrzeit(text: str, p: ParameterDef) -> str:
+    m = re.fullmatch(r"(\d{1,2}):(\d{2})", text)
+    if not m or int(m[1]) > 23 or int(m[2]) > 59:
+        raise ValidierungsFehler("Bitte eine Uhrzeit wie 08:30 angeben (00:00 bis 23:59).")
+    return f"{int(m[1]):02d}:{m[2]}"
+
+
+_GRUPPE = re.compile(r"^\w[\w .\-]{0,63}$")
+
+
+def _gruppenname(text: str, p: ParameterDef) -> str:
+    _kein_minus(text)
+    if not _GRUPPE.match(text):
+        raise ValidierungsFehler(
+            "Das ist kein gültiger Gruppenname. Erlaubt sind Buchstaben (auch Umlaute), Ziffern, "
+            "Leerzeichen und _ . - (höchstens 64 Zeichen), z. B. Domänen-Benutzer"
+        )
+    return text
+
+
+_MUSTER = re.compile(r"^[\w.\-*? ]{1,100}$")
+
+
+def _dateimuster(text: str, p: ParameterDef) -> str:
+    _kein_minus(text)
+    if not _MUSTER.match(text):
+        raise ValidierungsFehler(
+            "Bitte nur einen Dateinamen bzw. ein Muster ohne Ordner angeben – erlaubt sind Buchstaben, "
+            "Ziffern, Leerzeichen, _ . - sowie * und ?, z. B. *.log"
+        )
+    if not re.search(r"[^*?.]", text):
+        raise ValidierungsFehler(
+            "Das Muster passt auf alle Dateien – bitte genauer angeben, z. B. *.log oder backup_*.zip"
+        )
+    return text
+
+
+def _cidr(text: str, p: ParameterDef) -> str:
+    fehler = ValidierungsFehler("Bitte ein Netz wie 192.168.1.0/24 angeben (Präfix 8 bis 32).")
+    if not re.fullmatch(r"[0-9.]+/[0-9]{1,2}", text):
+        raise fehler
+    try:
+        netz = ipaddress.IPv4Network(text, strict=False)
+    except ValueError:
+        raise fehler from None
+    if not 8 <= netz.prefixlen <= 32:
+        raise fehler
+    if str(netz) != text:
+        raise ValidierungsFehler(
+            f"Das ist eine Adresse im Netz, nicht das Netz selbst – gemeint ist wohl {netz}."
+        )
+    return text
+
+
+_MAC = re.compile(
+    r"^(?:[0-9A-Fa-f]{2}([:-])(?:[0-9A-Fa-f]{2}\1){4}[0-9A-Fa-f]{2}"
+    r"|[0-9A-Fa-f]{4}\.[0-9A-Fa-f]{4}\.[0-9A-Fa-f]{4}|[0-9A-Fa-f]{12})$"
+)
+
+
+def _mac(text: str, p: ParameterDef) -> str:
+    if not _MAC.match(text):
+        raise ValidierungsFehler("Das ist keine gültige MAC-Adresse, Beispiel: 00:1A:2B:3C:4D:5E")
+    hexa = re.sub(r"[:.\-]", "", text).upper()
+    return ":".join(hexa[i : i + 2] for i in range(0, 12, 2))
+
+
+def _domain(text: str, p: ParameterDef) -> str:
+    name = text.rstrip(".").lower()
+    teile = name.split(".")
+    if (
+        len(teile) < 2
+        or len(name) > 253
+        or not all(_HOST_LABEL.match(t) for t in teile)
+        or not re.search("[a-z]", teile[-1])
+    ):
+        raise ValidierungsFehler("Das ist keine gültige Domain, Beispiel: okm.local oder example.de")
+    return name
+
+
+_HIVES = {
+    "HKLM": "HKLM",
+    "HKEY_LOCAL_MACHINE": "HKLM",
+    "HKCU": "HKCU",
+    "HKEY_CURRENT_USER": "HKCU",
+    "HKCR": "HKCR",
+    "HKEY_CLASSES_ROOT": "HKCR",
+    "HKU": "HKU",
+    "HKEY_USERS": "HKU",
+    "HKCC": "HKCC",
+    "HKEY_CURRENT_CONFIG": "HKCC",
+}
+_REG_TEIL = re.compile(r"^[\w .\-(){}+]{1,255}$")
+
+
+def _registry_pfad(text: str, p: ParameterDef) -> str:
+    fehler = ValidierungsFehler(
+        "Bitte einen Registry-Schlüssel wie HKLM:\\SOFTWARE\\Firma angeben (HKLM, HKCU, HKCR, HKU oder "
+        "HKCC; erlaubt sind Buchstaben, Ziffern, Leerzeichen und _ . - ( ) { } +)."
+    )
+    m = re.fullmatch(r"([A-Za-z_]+):?\\(.+)", text)
+    if not m or m[1].upper() not in _HIVES:
+        raise fehler
+    teile = m[2].rstrip("\\").split("\\")
+    if not all(_REG_TEIL.match(t) for t in teile):
+        raise fehler
+    pfad = _HIVES[m[1].upper()] + ":\\" + "\\".join(teile)
+    if len(pfad) > 512:
+        raise ValidierungsFehler("Der Registry-Pfad ist zu lang (höchstens 512 Zeichen).")
+    return pfad
+
+
+def registry_reg_form(pfad: str) -> str:
+    """``HKLM:\\SOFTWARE\\x`` → ``HKLM\\SOFTWARE\\x`` (Schreibweise von reg.exe)."""
+    return pfad.replace(":\\", "\\", 1)
+
+
+# Typen, deren Werte Leerzeichen enthalten dürfen – Listen davon trennt nur , oder ;
+LISTEN_MIT_LEERZEICHEN = frozenset(
+    {
+        ParamTyp.TEXT_KURZ,
+        ParamTyp.TEXT,
+        ParamTyp.GRUPPENNAME,
+        ParamTyp.DATEIMUSTER,
+        ParamTyp.PFAD,
+        ParamTyp.PFAD_WINDOWS,
+        ParamTyp.PFAD_UNIX,
+        ParamTyp.UNC_PFAD,
+        ParamTyp.PROZESSNAME,
+        ParamTyp.REGISTRY_PFAD,
+    }
+)
+MAX_LISTE = 20
+
+
+def _liste(roh: Any, p: ParameterDef) -> list[str | int]:
+    if p.listen_typ is None:
+        raise ValidierungsFehler("Für diese Liste ist kein Eintragstyp festgelegt.")
+    if isinstance(roh, list):
+        teile: list[Any] = roh
+    else:
+        trenner = r"[,;]" if p.listen_typ in LISTEN_MIT_LEERZEICHEN else r"[,;\s]"
+        teile = [t.strip() for t in re.split(trenner, _text(roh))]
+    teile = [t for t in teile if not (t is None or (isinstance(t, str) and not t.strip()))]
+    if not teile:
+        raise ValidierungsFehler("Dieses Feld muss ausgefüllt werden.")
+    eintrag = p.model_copy(
+        update={
+            "typ": p.listen_typ,
+            "listen_typ": None,
+            "min_anzahl": None,
+            "max_anzahl": None,
+            "pflicht": True,
+            "standard": None,
+        }
+    )
+    werte: list[str | int] = []
+    for i, roh_eintrag in enumerate(teile, 1):
+        try:
+            wert = validiere_wert(eintrag, roh_eintrag).wert
+        except ValidierungsFehler as e:
+            raise ValidierungsFehler(f"Eintrag {i} („{roh_eintrag}“): {e}") from None
+        if isinstance(wert, str | int) and not isinstance(wert, bool) and wert not in werte:
+            werte.append(wert)
+    hoechstens = p.max_anzahl or MAX_LISTE
+    mindestens = p.min_anzahl or 1
+    if len(werte) > hoechstens:
+        raise ValidierungsFehler(f"Bitte höchstens {hoechstens} Einträge angeben.")
+    if len(werte) < mindestens:
+        raise ValidierungsFehler(f"Bitte mindestens {mindestens} verschiedene Einträge angeben.")
+    return werte
+
+
 def _auswahl(text: str, p: ParameterDef) -> str:
     erlaubt = [o.wert for o in p.optionen]
     if text not in erlaubt:
@@ -370,6 +583,14 @@ _TEXT_PRUEFER: dict[ParamTyp, Any] = {
     ParamTyp.SHA256: _sha256,
     ParamTyp.AUSWAHL: _auswahl,
     ParamTyp.VARIABLE: _variable,
+    ParamTyp.DATUM: _datum,
+    ParamTyp.UHRZEIT: _uhrzeit,
+    ParamTyp.GRUPPENNAME: _gruppenname,
+    ParamTyp.DATEIMUSTER: _dateimuster,
+    ParamTyp.CIDR: _cidr,
+    ParamTyp.MAC: _mac,
+    ParamTyp.DOMAIN: _domain,
+    ParamTyp.REGISTRY_PFAD: _registry_pfad,
 }
 
 
@@ -389,9 +610,11 @@ def validiere_wert(p: ParameterDef, roh: Any) -> ParamValue:
     if leer and p.typ is ParamTyp.JA_NEIN and p.standard is not None:
         roh = p.standard
 
-    wert: str | int | bool
-    if p.typ is ParamTyp.ZAHL:
-        wert = _zahl(roh, p)
+    wert: str | int | bool | list[str | int]
+    if p.typ is ParamTyp.LISTE:
+        return ParamValue(typ=p.typ, wert=_liste(roh, p), listen_typ=p.listen_typ)
+    if p.typ.value in ZAHLENTYPEN:
+        wert = _ganzzahl(roh, p)
     elif p.typ is ParamTyp.PORT:
         wert = _port(roh, p)
     elif p.typ is ParamTyp.JA_NEIN:
@@ -405,6 +628,13 @@ def validiere_wert(p: ParameterDef, roh: Any) -> ParamValue:
 def pruefe_wert_fuer_ziel(wert: ParamValue, ziel: Ziel) -> None:
     """Zielabhängige Zusatzprüfungen (z. B. Windows-Pfad nicht unter Linux)."""
     if wert.wert is None:
+        return
+    if isinstance(wert.wert, list):
+        for i, eintrag in enumerate(wert.wert, 1):
+            try:
+                pruefe_wert_fuer_ziel(ParamValue(typ=wert.listen_typ or ParamTyp.TEXT, wert=eintrag), ziel)
+            except ValidierungsFehler as e:
+                raise ValidierungsFehler(f"Eintrag {i}: {e}") from None
         return
     windows = ziel in (Ziel.POWERSHELL, Ziel.CMD)
     if wert.typ is ParamTyp.PFAD and isinstance(wert.wert, str):

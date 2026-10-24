@@ -245,11 +245,13 @@ class Wiederherstellung:
     hinweise: list[str]
 
 
-def _als_text(wert: str | int | bool | None) -> str | None:
+def _als_text(wert: str | int | bool | list[str | int] | None) -> str | None:
     if wert is None:
         return None
     if isinstance(wert, bool):
         return "true" if wert else "false"
+    if isinstance(wert, list):
+        return ", ".join(str(w) for w in wert)
     return str(wert)
 
 

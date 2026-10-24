@@ -44,7 +44,7 @@ from app.models.block import (
     RueckgabeTyp,
 )
 from app.registry import Registry
-from app.validation import ValidierungsFehler, pruefe_wert_fuer_ziel, verweis_teile
+from app.validation import ValidierungsFehler, pruefe_wert_fuer_ziel, registry_reg_form, verweis_teile
 
 
 class GenerierungsFehler(ValueError):
@@ -296,6 +296,8 @@ class Generator(ABC):
                 pruefe_wert_fuer_ziel(wert, self.ziel)
                 if p.typ is ParamTyp.VARIABLE and isinstance(wert.wert, str):
                     kontext[p.id] = escaping.variable_lesen(self.ziel, *verweis_teile(wert.wert))
+                elif isinstance(wert.wert, list):
+                    kontext[p.id] = escaping.liste(self.ziel, wert.wert)
                 elif isinstance(wert.wert, bool):
                     kontext[p.id] = escaping.wahrheitswert(self.ziel, wert.wert)
                 elif isinstance(wert.wert, int):
@@ -308,6 +310,8 @@ class Generator(ABC):
             quelle = schritt.parameter.get(pid)
             if quelle is None or not isinstance(quelle.wert, str):
                 kontext[name] = escaping.leer()
+            elif name.endswith("_reg"):
+                kontext[name] = escaping.literal(self.ziel, registry_reg_form(quelle.wert))
             else:
                 kontext[name] = escaping.literal(self.ziel, unc_zu_smb_url(quelle.wert))
         for r in block.rueckgaben(self.ziel):
@@ -342,10 +346,7 @@ class Generator(ABC):
         vorlage = self.registry.fortschritt.get(block.id)
         if vorlage is None:
             return block.name
-        werte = {
-            p.id: ("" if (v := schritt.parameter.get(p.id)) is None or v.wert is None else str(v.wert))
-            for p in block.parameter
-        }
+        werte = {p.id: als_text(schritt.parameter.get(p.id)) for p in block.parameter}
         for p in block.parameter:
             if p.typ is ParamTyp.VARIABLE and werte[p.id]:
                 nr, rid = verweis_teile(werte[p.id])
@@ -498,6 +499,16 @@ class Generator(ABC):
     @abstractmethod
     def rueckgabe_normalisieren(self, name: Escaped, r: RueckgabeDef) -> list[str]:
         """Zahl → nur Ziffern (sonst unbekannt), ja/nein → fester Wahrheitswert."""
+
+
+def als_text(v: object) -> str:
+    """Wert für Fortschrittstexte (Listen mit Komma)."""
+    wert = getattr(v, "wert", None)
+    if wert is None:
+        return ""
+    if isinstance(wert, list):
+        return ", ".join(str(w) for w in wert)
+    return str(wert)
 
 
 def sekunden_text(n: int) -> str:

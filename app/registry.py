@@ -281,7 +281,7 @@ def _pruefe_block(block: BlockDef, reg: Registry, fehler: list[str]) -> None:
 
 
 def _typ_kompatibel(feld: ParameterDef, param: ParameterDef) -> bool:
-    if feld.typ != param.typ:
+    if feld.typ != param.typ or feld.listen_typ != param.listen_typ:
         return False
     if param.optionen:
         return {o.wert for o in feld.optionen} <= {o.wert for o in param.optionen}

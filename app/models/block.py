@@ -68,6 +68,27 @@ class ParamTyp(StrEnum):
     AUSWAHL = "auswahl"
     JA_NEIN = "ja_nein"
     VARIABLE = "variable"  # Rückgabewert eines vorherigen Schritts, Wert "<schritt>.<rueckgabe_id>"
+    TAGE = "tage"  # ganze Tage, Standard 1–3650
+    DAUER_SEK = "dauer_sek"  # Sekunden, Standard 1–86400
+    DATUM = "datum"  # → JJJJ-MM-TT (auch TT.MM.JJJJ als Eingabe)
+    UHRZEIT = "uhrzeit"  # → HH:MM (24 h)
+    GRUPPENNAME = "gruppenname"  # lokale/AD-Gruppe, auch mit Leerzeichen und Umlauten
+    DATEIMUSTER = "dateimuster"  # Dateiname mit * und ?, ohne Pfad
+    CIDR = "cidr"  # IPv4-Netz, z. B. 192.168.1.0/24 (Präfix 8–32)
+    MAC = "mac"  # → AA:BB:CC:DD:EE:FF
+    DOMAIN = "domain"  # DNS-Domain mit mindestens einem Punkt, klein geschrieben
+    REGISTRY_PFAD = "registry_pfad"  # → HKLM:\\SOFTWARE\\… (abgeleitet: <id>_reg ohne Doppelpunkt)
+    LISTE = "liste"  # mehrere Werte vom Typ ``listen_typ``
+
+
+# Typen mit ganzen Zahlen und ihr Standardbereich (min/max im YAML engen ihn ein)
+ZAHLENTYPEN: dict[str, tuple[int | None, int | None]] = {
+    "zahl": (None, None),
+    "tage": (1, 3650),
+    "dauer_sek": (1, 86_400),
+}
+# Als Listeneintrag nicht erlaubt
+NICHT_IN_LISTEN = frozenset({"liste", "variable", "ja_nein"})
 
 
 class RueckgabeTyp(StrEnum):
@@ -115,6 +136,10 @@ class ParameterDef(BaseModel):
     optionen: list[Option] = Field(default_factory=list)
     # Nur bei typ: variable – welcher Rückgabetyp erwartet wird
     variable_typ: RueckgabeTyp | None = None
+    # Nur bei typ: liste – Typ der Einträge und erlaubte Anzahl
+    listen_typ: ParamTyp | None = None
+    min_anzahl: int | None = Field(default=None, ge=1)
+    max_anzahl: int | None = Field(default=None, ge=1, le=100)
 
     @field_validator("id")
     @classmethod
@@ -123,14 +148,33 @@ class ParameterDef(BaseModel):
             raise ValueError(f"'{v}' ist ein reservierter Name und kann nicht als Parameter-ID dienen")
         return v
 
+    @property
+    def eintrag_typ(self) -> ParamTyp:
+        """Typ eines einzelnen Werts (bei Listen der Typ der Einträge)."""
+        return self.listen_typ if self.typ is ParamTyp.LISTE and self.listen_typ else self.typ
+
     @model_validator(mode="after")
     def _typ_passend(self) -> ParameterDef:
-        if self.typ is ParamTyp.AUSWAHL and not self.optionen:
+        if (self.typ is ParamTyp.LISTE) != (self.listen_typ is not None):
+            raise ValueError("'listen_typ' gehört genau zum Typ 'liste'")
+        if self.listen_typ is not None and self.listen_typ.value in NICHT_IN_LISTEN:
+            raise ValueError(f"listen_typ '{self.listen_typ.value}' ist nicht erlaubt")
+        if (self.min_anzahl is not None or self.max_anzahl is not None) and self.typ is not ParamTyp.LISTE:
+            raise ValueError("'min_anzahl'/'max_anzahl' gibt es nur beim Typ 'liste'")
+        if self.min_anzahl is not None and self.max_anzahl is not None and self.min_anzahl > self.max_anzahl:
+            raise ValueError("'min_anzahl' ist größer als 'max_anzahl'")
+        typ = self.eintrag_typ
+        if typ is ParamTyp.AUSWAHL and not self.optionen:
             raise ValueError("Typ 'auswahl' braucht eine Liste 'optionen'")
-        if self.typ is not ParamTyp.AUSWAHL and self.optionen:
+        if typ is not ParamTyp.AUSWAHL and self.optionen:
             raise ValueError("'optionen' ist nur beim Typ 'auswahl' erlaubt")
-        if (self.min is not None or self.max is not None) and self.typ is not ParamTyp.ZAHL:
-            raise ValueError("'min'/'max' sind nur beim Typ 'zahl' erlaubt")
+        if (self.min is not None or self.max is not None) and typ.value not in ZAHLENTYPEN:
+            raise ValueError("'min'/'max' sind nur bei 'zahl', 'tage' und 'dauer_sek' erlaubt")
+        untere, obere = ZAHLENTYPEN.get(typ.value, (None, None))
+        if self.min is not None and untere is not None and self.min < untere:
+            raise ValueError(f"'min' darf bei '{typ.value}' nicht kleiner als {untere} sein")
+        if self.max is not None and obere is not None and self.max > obere:
+            raise ValueError(f"'max' darf bei '{typ.value}' nicht größer als {obere} sein")
         if self.min is not None and self.max is not None and self.min > self.max:
             raise ValueError("'min' ist größer als 'max'")
         if (self.typ is ParamTyp.VARIABLE) != (self.variable_typ is not None):
@@ -240,6 +284,8 @@ class BlockDef(BaseModel):
         """Zusätzliche Template-Variablen, die aus Parametern berechnet werden.
 
         ``<id>_smb``: ein ``unc_pfad`` als ``smb://``-URL (für macOS).
+        ``<id>_reg``: ein ``registry_pfad`` in reg.exe-Schreibweise (``HKLM\\SOFTWARE\\…``).
         Rückgabe: Variablenname -> Parameter-ID.
         """
-        return {f"{p.id}_smb": p.id for p in self.parameter if p.typ is ParamTyp.UNC_PFAD}
+        endung = {ParamTyp.UNC_PFAD: "_smb", ParamTyp.REGISTRY_PFAD: "_reg"}
+        return {f"{p.id}{endung[p.typ]}": p.id for p in self.parameter if p.typ in endung}

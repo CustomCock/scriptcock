@@ -29,7 +29,8 @@ class ParamValue(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
     typ: ParamTyp
-    wert: str | int | bool | None
+    wert: str | int | bool | list[str | int] | None
+    listen_typ: ParamTyp | None = None  # nur bei typ "liste": Typ der Einträge
 
 
 class BlockSchritt(BaseModel):

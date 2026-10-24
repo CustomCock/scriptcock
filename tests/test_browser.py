@@ -33,12 +33,15 @@ def server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
     from app.config import Einstellungen
     from app.db import Datenbank
     from app.main import create_app
-    from app.registry import lade_registry
 
     db = Path(tmp_path_factory.mktemp("browser")) / "b.db"
+    from tests.test_parametertypen import LISTE_BLOCK
+    from tests.test_rueckgabe import mit_bloecken
+
+    # Zusätzlich ein Test-Baustein mit Listen-Parameter (noch kein echter Baustein hat einen)
     app = create_app(
         Einstellungen(AUTH_DISABLED=True, DEV_ADMIN=False, APP_SECRET_KEY="x" * 32),
-        lade_registry(),
+        mit_bloecken(LISTE_BLOCK),
         Datenbank(f"sqlite:///{db}"),
     )
     with socket.socket() as s:
@@ -730,4 +733,34 @@ def test_blockly_wenn_mit_rueckgabewert(server: str, browser) -> None:
     assert wieder[2]["wert"] == "1.ms" and wieder[2]["zahl"] == 100 and wieder[2]["vergleich"] == "groesser"
     assert wieder[2]["dann"] == [{"art": "warten", "sekunden": 2}]
     assert wieder[2]["sonst"] == [{"art": "bestaetigung", "meldung": "Weiter?"}]
+    assert js_fehler == []
+
+
+def test_tagfeld_fuer_listen(server: str, browser) -> None:
+    """Backlog P1: Parametertyp „liste“ als Tag-Feld; das Textfeld bleibt Quelle fürs Formular."""
+    seite = browser.new_page(viewport={"width": 1280, "height": 1000})
+    js_fehler: list[str] = []
+    seite.on("pageerror", lambda e: js_fehler.append(str(e)))
+    seite.goto(f"{server}/baukasten?ziel=bash")
+    seite.click("[data-hinzufuegen=test_liste]")
+    eingabe = seite.locator("#schrittliste .tagfeld-eingabe").first
+    eingabe.wait_for()
+    eingabe.click()
+    seite.keyboard.type("Domänen-Benutzer, Remote Desktop Users")
+    seite.keyboard.press("Enter")
+    tags = seite.locator("#schrittliste .tag-text").all_inner_texts()
+    assert tags == ["Domänen-Benutzer", "Remote Desktop Users"]
+    quelle = seite.locator("#schrittliste input.tagfeld-quelle").first
+    assert quelle.input_value() == "Domänen-Benutzer, Remote Desktop Users"
+    warte_editor(seite, "okm_gruppen=('Domänen-Benutzer' 'Remote Desktop Users')", 8000)
+    # Entfernen per × und per Rücktaste
+    seite.click("#schrittliste .tag-weg[aria-label='Domänen-Benutzer entfernen']")
+    assert seite.locator("#schrittliste .tag-text").all_inner_texts() == ["Remote Desktop Users"]
+    eingabe.click()
+    seite.keyboard.press("Backspace")
+    assert seite.locator("#schrittliste .tag-text").count() == 0
+    assert quelle.input_value() == ""
+    # Label zeigt auf das sichtbare Feld
+    feld_id = eingabe.get_attribute("id")
+    assert seite.locator(f"label[for='{feld_id}']").count() == 1
     assert js_fehler == []

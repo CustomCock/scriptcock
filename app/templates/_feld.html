@@ -12,11 +12,22 @@
     <select id="f-{{ dom }}" name="{{ name }}">
       {% for o in f.optionen %}<option value="{{ o.wert }}" {% if o.wert == aktuell %}selected{% endif %}>{{ o.label }}</option>{% endfor %}
     </select>
-  {% elif f.typ in (ParamTyp.ZAHL, ParamTyp.PORT) %}
+  {% elif f.typ == ParamTyp.PORT or f.typ.value in ZAHLENTYPEN %}
+    {% set bereich = ZAHLENTYPEN.get(f.typ.value, (1, 65535)) %}
+    {% set unten = f.min if f.min is not none else bereich[0] %}{% set oben = f.max if f.max is not none else bereich[1] %}
     <input id="f-{{ dom }}" name="{{ name }}" type="number" inputmode="numeric"
-      {% if f.min is not none %}min="{{ f.min }}"{% endif %} {% if f.max is not none %}max="{{ f.max }}"{% endif %}
-      {% if f.typ == ParamTyp.PORT %}min="1" max="65535"{% endif %}
+      {% if unten is not none %}min="{{ unten }}"{% endif %} {% if oben is not none %}max="{{ oben }}"{% endif %}
       value="{{ aktuell if aktuell is not none else '' }}" placeholder="{{ f.beispiel if f.beispiel is not none else '' }}"
+      {% if f.pflicht %}required{% endif %} {{ pruefen|safe }} aria-describedby="status-{{ dom }} hilfe-{{ dom }}">
+  {% elif f.typ in (ParamTyp.DATUM, ParamTyp.UHRZEIT) %}
+    <input id="f-{{ dom }}" name="{{ name }}" type="{{ 'date' if f.typ == ParamTyp.DATUM else 'time' }}"
+      value="{{ aktuell if aktuell is not none else '' }}"
+      {% if f.pflicht %}required{% endif %} {{ pruefen|safe }} aria-describedby="status-{{ dom }} hilfe-{{ dom }}">
+  {% elif f.typ == ParamTyp.LISTE %}
+    {% set liste_text = (aktuell | join(", ")) if aktuell is iterable and aktuell is not string else (aktuell if aktuell is not none else '') %}
+    <input id="f-{{ dom }}" name="{{ name }}" type="text" autocomplete="off" spellcheck="false" data-typ="liste"
+      data-listen-typ="{{ f.listen_typ.value }}" data-mit-leerzeichen="{{ 'ja' if f.listen_typ in LISTEN_MIT_LEERZEICHEN else 'nein' }}" value="{{ liste_text }}"
+      placeholder="mehrere mit Komma trennen{{ ', z. B. ' ~ (f.beispiel | join(', ') if f.beispiel is iterable and f.beispiel is not string else f.beispiel) if f.beispiel is not none else '' }}"
       {% if f.pflicht %}required{% endif %} {{ pruefen|safe }} aria-describedby="status-{{ dom }} hilfe-{{ dom }}">
   {% else %}
     <input id="f-{{ dom }}" name="{{ name }}" type="text" autocomplete="off" spellcheck="false" data-typ="{{ f.typ.value }}"

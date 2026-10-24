@@ -145,6 +145,18 @@ Weitere Regeln, die beim Start geprüft werden:
 | `sha256` | 64 Hex-Zeichen (wird kleingeschrieben) | `e3b0c442…b855` |
 | `auswahl` | einer der Werte aus `optionen` | siehe unten |
 | `ja_nein` | Ja/Nein, im Template als Bedingung | `true` |
+| `tage` | ganze Tage 1–3650 (mit `min`/`max` enger) | `30` |
+| `dauer_sek` | Sekunden 1–86400 (mit `min`/`max` enger) | `90` |
+| `datum` | wird zu `JJJJ-MM-TT` (Eingabe auch `TT.MM.JJJJ`), 1970–2100 | `2026-12-24` |
+| `uhrzeit` | wird zu `HH:MM` (24 h) | `08:30` |
+| `gruppenname` | Buchstaben (auch Umlaute), Ziffern, Leerzeichen, `_ . -` (max. 64) | `Domänen-Benutzer` |
+| `dateimuster` | Dateiname mit `*`/`?`, **ohne** Ordner; nicht nur Platzhalter (`*`, `*.*`) | `*.log` |
+| `cidr` | IPv4-Netz, Präfix 8–32, muss die Netzadresse sein | `192.168.1.0/24` |
+| `mac` | wird zu `AA:BB:CC:DD:EE:FF` (Eingabe auch mit `-`, `.` oder ohne Trenner) | `00:1A:2B:3C:4D:5E` |
+| `domain` | DNS-Domain mit mindestens einem Punkt, wird kleingeschrieben | `okm.local` |
+| `registry_pfad` | wird zu `HKLM:\…` (HKLM, HKCU, HKCR, HKU, HKCC; Langform erlaubt) | `HKLM:\SOFTWARE\Firma` |
+| `liste` | mehrere Werte vom Typ `listen_typ`, siehe unten | `80, 443` |
+| `variable` | Rückgabewert eines Schritts davor, siehe Abschnitt 6 | `3.frei_prozent` |
 
 Kein Wert darf mit `-` beginnen, Zeilenumbrüche und Steuerzeichen sind nie erlaubt.
 
@@ -172,7 +184,28 @@ Kein Wert darf mit `-` beginnen, Zeilenumbrüche und Steuerzeichen sind nie erla
 ```
 
 Für `unc_pfad`-Parameter gibt es zusätzlich `{{ <id>_smb }}` – die Freigabe als
-`smb://server/freigabe`-Adresse (für macOS).
+`smb://server/freigabe`-Adresse (für macOS). Für `registry_pfad` gibt es `{{ <id>_reg }}` in der
+Schreibweise von `reg.exe` (`HKLM\SOFTWARE\Firma`, ohne Doppelpunkt).
+
+### Listen (`typ: liste`)
+
+```yaml
+  - id: ports
+    label: Ports
+    typ: liste
+    listen_typ: port        # jeder Einfachtyp außer ja_nein, variable, liste
+    min_anzahl: 1           # optional (Standard 1)
+    max_anzahl: 10          # optional (Standard 20, höchstens 100)
+    beispiel: [80, 443]
+```
+
+- Eingabe getrennt mit `,` oder `;` – bei Typen ohne Leerzeichen (z. B. `port`, `ipv4`) auch mit
+  Leerzeichen. Jeder Eintrag wird einzeln geprüft („Eintrag 2 („http“): …“), doppelte fallen weg.
+- Im Template ist `{{ ports }}` ein fertiger Ausdruck:
+  PowerShell `@(80, 443)` → `foreach ($okmPort in {{ ports }}) { … }`,
+  bash/zsh `80 443` bzw. `'a' 'b'` → `okm_ports=({{ ports }})` und `"${okm_ports[@]}"`,
+  CMD `80 443` bzw. `"a" "b"` → `for %%p in ({{ ports }}) do …` (`%%~p` entfernt die Quotes).
+- In der Oberfläche erscheint ein Tag-Feld (Enter oder Komma fügt hinzu, × bzw. Rücktaste entfernt).
 
 Parameter, die das Template eines Ziels gar nicht verwendet, werden für dieses Ziel in der
 UI ausgeblendet und sind dort keine Pflicht.

@@ -133,16 +133,22 @@
       if (p.typ === "ja_nein") {
         return new Blockly.FieldCheckbox(p.standard ? "TRUE" : "FALSE");
       }
-      if (p.typ === "zahl" || p.typ === "port") {
-        var start = p.standard !== null ? p.standard : (p.beispiel !== null ? p.beispiel : (p.min !== null ? p.min : 1));
-        var min = p.typ === "port" ? 1 : p.min;
-        var max = p.typ === "port" ? 65535 : p.max;
+      if (p.typ === "port" || daten.zahlentypen[p.typ]) {
+        var bereich = daten.zahlentypen[p.typ] || [1, 65535];
+        var min = p.min !== null ? p.min : bereich[0];
+        var max = p.max !== null ? p.max : bereich[1];
+        var start = p.standard !== null ? p.standard : (p.beispiel !== null ? p.beispiel : (min !== null ? min : 1));
         return new Blockly.FieldNumber(Number(start), min === null ? undefined : min, max === null ? undefined : max, 1);
       }
       if (p.typ === "auswahl") {
         var feld = new Blockly.FieldDropdown(p.optionen.map(function (o) { return [o.label, o.wert]; }));
         if (p.standard !== null) { feld.setValue(String(p.standard)); }
         return feld;
+      }
+      if (p.typ === "liste") {
+        // Mehrere Werte mit Komma getrennt; das Backend prüft jeden Eintrag einzeln
+        var vorgabe = p.standard !== null ? p.standard : "";
+        return new Blockly.FieldTextInput(Array.isArray(vorgabe) ? vorgabe.join(", ") : String(vorgabe));
       }
       return new Blockly.FieldTextInput(p.standard !== null ? String(p.standard) : "");
     }
@@ -376,7 +382,7 @@
         if (k.parameter[p.id] === undefined) { return; }
         var wert = k.parameter[p.id];
         if (p.typ === "ja_nein") { wert = wert === "true" ? "TRUE" : "FALSE"; }
-        else if (p.typ === "zahl" || p.typ === "port") { wert = Number(wert); }
+        else if (p.typ === "port" || daten.zahlentypen[p.typ]) { wert = Number(wert); }
         else if (p.typ === "variable") { wert = verweisLaden(wert); }
         felder[p.id] = wert;
       });

@@ -2,6 +2,26 @@
 
 ## Backlog P1
 
+### Neue Parametertypen
+
+- `tage` (1–3650), `dauer_sek` (1–86400) – Ganzzahlen mit Standardbereich, per `min`/`max` enger.
+- `datum` (→ `JJJJ-MM-TT`, auch `TT.MM.JJJJ`, echte Kalenderprüfung), `uhrzeit` (→ `HH:MM`).
+- `gruppenname` (Umlaute und Leerzeichen, z. B. „Domänen-Benutzer“; kein `\`, `,`, `%`).
+- `dateimuster` (`*.log`, ohne Ordner; reine Platzhalter wie `*` oder `*.*` werden abgelehnt).
+- `cidr` (Präfix 8–32, Hostadresse statt Netz → Hinweis „gemeint ist wohl …“), `mac` (→ `AA:BB:…`),
+  `domain` (mindestens ein Punkt, kleingeschrieben).
+- `registry_pfad` (→ `HKLM:\…`, Langform `HKEY_LOCAL_MACHINE` erlaubt) mit abgeleitetem
+  `{{ <id>_reg }}` für `reg.exe` (`HKLM\…`).
+- `liste` + `listen_typ` (+ `min_anzahl`/`max_anzahl`): jeder Eintrag einzeln geprüft, doppelte fallen
+  weg, zielabhängige Prüfungen je Eintrag. Escaping je Ziel als Array/Wortliste
+  (`escaping.liste`); Fortschrittstexte und „Erneut öffnen“ zeigen die Werte mit Komma.
+- Oberfläche: Zahlenfelder mit Bereich, `type="date"`/`type="time"`, Tag-Feld für Listen (das
+  Textfeld bleibt Quelle für Formular, htmx und Live-Prüfung); Blockly bekommt die Zahlenbereiche
+  aus dem Backend und für Listen ein Textfeld mit Komma.
+- Tests: `tests/test_validation.py` (je Typ gültige/ungültige Werte), `tests/test_parametertypen.py`
+  (Listen, Schema, Escaping, Ausführung in bash/zsh/pwsh, CMD-Schreibweise, Formularfelder),
+  Browser-Test für das Tag-Feld. Golden-Files unverändert.
+
 ### Blockly: Wenn … dann … sonst, Abbrechen, Warten, Bestätigung, Notiz
 
 - **Neue IR-Knoten** (IR-Version 3): `wenn` (Vergleich auf einen Rückgabewert: = ≠ < > ≤ ≥ bei

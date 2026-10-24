@@ -17,6 +17,7 @@ from app.auth import aktueller_benutzer
 from app.escaping import Ziel
 from app.generators.base import ZIEL_ANZEIGE, GeneratedScript
 from app.ir import ScriptIR
+from app.models.block import ZAHLENTYPEN
 from app.registry import Registry
 from app.routes.pages import HLJS_SPRACHE, _render, _sitzung
 from app.service import Benutzer, Ergebnis, rechte_hinweis
@@ -91,6 +92,7 @@ async def blockly_seite(
         "katalog": katalog(reg),
         "max_wiederholungen": MAX_WIEDERHOLUNGEN,
         "max_warten": MAX_WARTEN,
+        "zahlentypen": ZAHLENTYPEN,
         "max_tiefe": MAX_TIEFE,
         "vorbelegung": vorbelegung,
     }

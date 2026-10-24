@@ -60,7 +60,10 @@ UI-Formular / JSON ──► ScriptRequest ──► validation.py ──► Scr
 - **Nie** Benutzereingaben roh in Code. Templates bekommen nur `Escaped`; Platzhalter stehen
   **nie** in Quotes (`-Name {{ dienst }}`, nicht `'{{ dienst }}'`) – die Registry prüft das.
 - Neue Parametertypen: Whitelist in `validation.py` + Tests in `tests/test_validation.py`.
-  Werte dürfen nicht mit `-` beginnen (Option-Injection).
+  Werte dürfen nicht mit `-` beginnen (Option-Injection). Ganzzahl-Typen mit Standardbereich in
+  `ZAHLENTYPEN` (models/block.py); `liste` + `listen_typ` → `ParamValue.wert` ist eine Liste,
+  `escaping.liste()` rendert sie je Ziel (PS `@(…)`, sh `'a' 'b'`, CMD `"a" "b"`). Typen, deren
+  Werte Leerzeichen enthalten dürfen, stehen in `LISTEN_MIT_LEERZEICHEN` (Trennung nur mit , ;).
 - Neue Blöcke: nur YAML (`docs/neuen-block-anlegen.md`). Jeder Pflichtparameter braucht `beispiel`/`standard`.
 - **Rechte** pro Ziel im Block: `rechte: {powershell: admin, bash: root, zsh: nie_root, …}` mit
   `admin` (nur Windows), `root` (nur bash/zsh), `benutzer` (Standard), `nie_root`. Das alte

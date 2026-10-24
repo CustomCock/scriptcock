@@ -219,7 +219,90 @@
     filtern();
   }
 
-  document.addEventListener("DOMContentLoaded", function () { hervorheben(document); baukasten(); rezeptFilter(); });
+  // --- Tag-Feld für Listen (Parametertyp "liste") ------------------------------------
+  /* Das ursprüngliche Textfeld bleibt Quelle für Formular, htmx und Live-Prüfung (Werte mit ", "
+     getrennt); das Tag-Feld schreibt nur hinein. Ohne JavaScript bleibt das Textfeld nutzbar. */
+  function tagfeld(quelle) {
+    if (quelle.dataset.tagfeld) { return; }
+    quelle.dataset.tagfeld = "1";
+    var mitLeerzeichen = quelle.dataset.mitLeerzeichen === "ja";
+    var trenner = mitLeerzeichen ? /[,;]/ : /[,;\s]/;
+    var rahmen = document.createElement("div");
+    rahmen.className = "tagfeld";
+    var liste = document.createElement("ul");
+    liste.className = "tagfeld-liste";
+    var eingabe = document.createElement("input");
+    eingabe.type = "text";
+    eingabe.className = "tagfeld-eingabe";
+    eingabe.autocomplete = "off";
+    eingabe.spellcheck = false;
+    eingabe.placeholder = quelle.placeholder;
+    // Label und Beschreibung zeigen auf das sichtbare Eingabefeld
+    eingabe.id = quelle.id;
+    quelle.id = quelle.id + "-wert";
+    eingabe.setAttribute("aria-describedby", quelle.getAttribute("aria-describedby") || "");
+    quelle.classList.add("tagfeld-quelle");
+    quelle.tabIndex = -1;
+    quelle.setAttribute("aria-hidden", "true");
+    quelle.parentNode.insertBefore(rahmen, quelle);
+    rahmen.appendChild(liste);
+    rahmen.appendChild(eingabe);
+
+    function werte() {
+      return Array.prototype.map.call(liste.querySelectorAll(".tag-text"), function (s) { return s.textContent; });
+    }
+    function speichern() {
+      quelle.value = werte().join(", ");
+      quelle.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    function tag(text) {
+      text = text.trim();
+      if (!text || werte().indexOf(text) >= 0) { return; }
+      var li = document.createElement("li");
+      li.className = "tag";
+      var s = document.createElement("span");
+      s.className = "tag-text";
+      s.textContent = text;
+      var weg = document.createElement("button");
+      weg.type = "button";
+      weg.className = "tag-weg";
+      weg.textContent = "×";
+      weg.setAttribute("aria-label", text + " entfernen");
+      weg.addEventListener("click", function () { li.remove(); speichern(); eingabe.focus(); });
+      li.appendChild(s);
+      li.appendChild(weg);
+      liste.appendChild(li);
+    }
+    function uebernehmen() {
+      var teile = eingabe.value.split(trenner);
+      if (teile.length === 1 && !teile[0].trim()) { return; }
+      teile.forEach(tag);
+      eingabe.value = "";
+      speichern();
+    }
+    quelle.value.split(trenner).forEach(tag);
+    eingabe.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter" || ev.key === "," || ev.key === ";" || (!mitLeerzeichen && ev.key === " ")) {
+        ev.preventDefault();
+        uebernehmen();
+      } else if (ev.key === "Backspace" && !eingabe.value && liste.lastElementChild) {
+        liste.lastElementChild.remove();
+        speichern();
+      }
+    });
+    eingabe.addEventListener("paste", function () { window.setTimeout(uebernehmen, 0); });
+    eingabe.addEventListener("blur", uebernehmen);
+    rahmen.addEventListener("click", function (ev) { if (ev.target === rahmen || ev.target === liste) { eingabe.focus(); } });
+  }
+  function tagfelder(wurzel) {
+    if (!wurzel.querySelectorAll) { return; }
+    wurzel.querySelectorAll("input[data-typ=liste]").forEach(tagfeld);
+  }
+  document.addEventListener("htmx:load", function (ev) { tagfelder(ev.target); });
+
+  document.addEventListener("DOMContentLoaded", function () {
+    hervorheben(document); baukasten(); rezeptFilter(); tagfelder(document);
+  });
   document.addEventListener("htmx:afterSwap", function (ev) {
     hervorheben(ev.target);
     // Nur zum Ergebnis von „Erzeugen“ scrollen – nicht bei jeder Live-Vorschau im Baukasten.

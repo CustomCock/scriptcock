@@ -581,3 +581,19 @@ a.rezept-link:focus-visible { outline: 2px solid var(--sand); outline-offset: 2p
 .cm-s-okm .editor-fehlerzeile { background: var(--fehlerzeile); }
 .script-editor .CodeMirror-dialog { background: var(--flaeche-2); color: var(--text); border-color: var(--rand); }
 .script-editor .CodeMirror-dialog input { color: var(--text); font-family: var(--mono); }
+
+/* --- Tag-Feld für Listen (static/js/app.js) ------------------------------------------------- */
+.tagfeld { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; padding: .3rem .4rem; min-height: 2.4rem;
+  background: var(--eingabe); border: 1px solid var(--rand-stark); border-radius: var(--radius-klein); cursor: text; }
+.tagfeld:focus-within { border-color: var(--sand); }
+.tagfeld-liste { display: contents; list-style: none; margin: 0; padding: 0; }
+.tag { display: inline-flex; align-items: center; gap: .2rem; padding: .1rem .2rem .1rem .55rem; border-radius: 999px;
+  background: var(--flaeche-3); border: 1px solid var(--rand-stark); font-size: .85rem; max-width: 100%; }
+.tag-text { overflow-wrap: anywhere; }
+.tag-weg { font: inherit; line-height: 1; background: none; border: 0; color: var(--text-leise); cursor: pointer;
+  padding: .1rem .3rem; border-radius: 999px; }
+.tag-weg:hover { color: var(--text); background: var(--rot-dunkel); }
+.tagfeld-eingabe { flex: 1 1 8rem; min-width: 6rem; border: 0 !important; background: transparent !important;
+  padding: .2rem !important; outline: none; box-shadow: none !important; }
+.tagfeld-quelle { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.feld { position: relative; }

@@ -130,6 +130,20 @@ def wahrheitswert(ziel: Ziel, wert: bool) -> Escaped:
     return Escaped(code, wert, wahr=wert)
 
 
+def liste(ziel: Ziel, werte: list[str | int]) -> Escaped:
+    """Mehrere Werte, jeder einzeln escaped.
+
+    PowerShell: ``@('a', 'b')`` · bash/zsh: ``'a' 'b'`` (für ``arr=({{ x }})``) ·
+    CMD: ``"a" "b"`` (für ``for %%x in ({{ x }}) do …``). Zahlen ohne Quotes.
+    """
+    teile = [
+        zahl(w) if isinstance(w, int) and not isinstance(w, bool) else literal(ziel, str(w)) for w in werte
+    ]
+    if ziel is Ziel.POWERSHELL:
+        return Escaped("@(" + ", ".join(teile) + ")", list(werte))
+    return Escaped(" ".join(teile), list(werte))
+
+
 def leer() -> Escaped:
     """Platzhalter für einen nicht ausgefüllten optionalen Parameter."""
     return Escaped("", None, wahr=False)

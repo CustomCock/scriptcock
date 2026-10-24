@@ -13,7 +13,7 @@ from app.auth import aktueller_benutzer
 from app.db import GespeichertesRezept, GespeichertesScript
 from app.escaping import Ziel
 from app.generators.base import ZIEL_ANZEIGE
-from app.models.block import ParamTyp, Risiko
+from app.models.block import ZAHLENTYPEN, ParamTyp, Risiko
 from app.models.recipe import RezeptDef
 from app.registry import Registry
 from app.service import (
@@ -26,7 +26,7 @@ from app.service import (
     rezept_felder,
     rezept_zu_request,
 )
-from app.validation import FehlerSammlung
+from app.validation import LISTEN_MIT_LEERZEICHEN, FehlerSammlung
 
 router = APIRouter()
 
@@ -49,6 +49,8 @@ def _render(request: Request, vorlage: str, benutzer: Benutzer | None = None, **
             "benutzer": benutzer,
             "ziel_anzeige": ZIEL_ANZEIGE,
             "ParamTyp": ParamTyp,
+            "ZAHLENTYPEN": ZAHLENTYPEN,
+            "LISTEN_MIT_LEERZEICHEN": LISTEN_MIT_LEERZEICHEN,
             "Risiko": Risiko,
             **kontext,
         },
