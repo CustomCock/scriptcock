@@ -34,7 +34,7 @@ UI-Formular / JSON ──► ScriptRequest ──► validation.py ──► Scr
 |---|---|
 | `app/escaping.py` | **Sicherheitskritisch.** Literal pro Zielsprache, `Escaped`-Markertyp, echo-/Kommentar-Escaping |
 | `app/validation.py` | Parametertypen (Whitelist) → `ParamValue`; ganzer Request → `ScriptIR` |
-| `app/ir.py` | Zielunabhängige IR. Schritte = Baum über Diskriminator `art`: `block`, `wenn_fehler`, `wiederhole`, `wenn`, `abbrechen`, `warten`, `bestaetigung`, `kommentar` |
+| `app/ir.py` | Zielunabhängige IR. Schritte = Baum über Diskriminator `art`: `block`, `wenn_fehler`, `wiederhole`, `fuer_jeden`, `wenn`, `abbrechen`, `warten`, `bestaetigung`, `kommentar` |
 | `app/codeenv.py` | Jinja-Umgebung für Code: `finalize` lässt **nur** `Escaped` durch |
 | `app/registry.py` | Lädt/prüft `blocks/**/*.yaml` und `recipes/*.yaml` beim Start, bricht bei Fehlern ab |
 | `app/generators/base.py` | Fester Script-Aufbau (Kopf → Präambel → Schritte → Abschluss), Dry-Run-Logik |
@@ -120,6 +120,11 @@ sonst wird `tests/test_browser.py` übersprungen.
 - `wenn`: Vergleich auf einen Rückgabewert (`"<schritt>.<id>"`); unbekannter Wert → alle
   Vergleiche falsch außer `unbekannt`. `abbrechen` (Status `beendet`, Exit-Code 0–99) ist in
   „Versuche“ verboten (bash-Subshell); `bestaetigung` nutzt den Mechanismus der roten Abfrage.
+- `fuer_jeden`: Werteliste (max. 50, Text mit , ;). Im Rumpf bekommt ein Parameter mit
+  `{"schleifenwert": true}` (Blockly: Textfeld `{wert}`) den Wert der **innersten** Schleife; jeder Wert
+  wird gegen den Typ jedes Feldes geprüft (`ParamValue.schleife`, `wert` = Liste je Durchlauf). Der
+  Generator rollt den Rumpf pro Wert aus (`emit_fuer_jeden`, keine Laufzeitschleife, kein CMD-`for`);
+  Schrittnummern/Rückgabewerte wie bei „Wiederhole“.
 - Blockly: `VerweisFeld` speichert `Block-ID|wert` (stabil beim Umsortieren), `serialisieren()`
   macht daraus `"<schritt>.<wert>"`; beim Laden bekommen Bausteine die IDs `okm-s<n>`.
 

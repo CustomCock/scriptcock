@@ -2,6 +2,20 @@
 
 ## Backlog P1
 
+### Blockly: „Für jeden Wert“
+
+- Neuer Ablauf-Baustein **„Für jeden Wert aus …“** (IR-Knoten `fuer_jeden`, IR-Version 4): führt die
+  Schritte darin einmal pro Wert einer Liste aus (höchstens 50, mit Komma getrennt). In einem Textfeld
+  im Rumpf steht `{wert}` für den aktuellen Wert (API: `{"schleifenwert": true}`).
+- **Sicherheit:** Jeder Wert wird für jedes Feld, das ihn benutzt, gegen dessen Parametertyp geprüft
+  und normalisiert (z. B. MAC-Schreibweise) – Fehler nennen „Wert 2 („…“) aus der Liste passt nicht“.
+  Der Generator rollt den Rumpf pro Wert mit den geprüften Literalen aus: keine Laufzeitvariablen mit
+  Benutzerwerten und unter CMD keine Schritte in `for`-Blöcken.
+- Verschachtelung, „Versuche“, „Wenn“ und Rückgabewerte funktionieren im Rumpf wie bei „Wiederhole“.
+  Bibliothek „Erneut öffnen“ stellt Schleife und `{wert}` in Blockly wieder her.
+- Tests: `tests/test_fuer_jeden.py` (Validierung, Ausführung in bash/zsh/pwsh mit Sonderzeichen in
+  Pfaden, verschachtelt mit „Wenn“, CMD-Lint, Rückweg IR → Request), Browser-Test für Blockly.
+
 ### Rezepte
 
 - Sechs neue Rezepte: **Standardsoftware installieren**, **Neuer Arbeitsplatz einrichten** (Rechnername,

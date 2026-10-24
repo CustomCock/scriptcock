@@ -23,8 +23,10 @@ from app.ir import (
     Abbrechen,
     Bestaetigung,
     BlockSchritt,
+    FuerJeden,
     Knoten,
     Kommentar,
+    ParamValue,
     ScriptIR,
     Vergleich,
     Warten,
@@ -144,6 +146,7 @@ class Generator(ABC):
         self._nr = 0  # laufende Schrittnummer (Pre-Order über Blöcke)
         self._id = 0  # eindeutige Nummer je Kontrollknoten (Labels, Variablen)
         self._versuche: list[int] = []  # offene "Versuche"-Blöcke (innerster zuletzt)
+        self._durchlauf: list[int] = []  # Durchlauf-Index offener „Für jeden Wert“ (innerster zuletzt)
         self._defs = defs  # Block-Definitionen in Schrittnummer-Reihenfolge (für Verweise)
         # Ohne Verzweigung (Kommentar, Warten …) bleibt es bei „X von Y Schritten“.
         self.mit_kontrolle = ir.hat_verzweigung()
@@ -189,6 +192,7 @@ class Generator(ABC):
         return methode(knoten)
 
     def emit_block(self, schritt: BlockSchritt) -> list[str]:
+        schritt = self.schleifenwert_einsetzen(schritt)
         self._nr += 1
         block = self.registry.bloecke[schritt.block_id]
         dry = self._ir.optionen.dry_run
@@ -226,6 +230,46 @@ class Generator(ABC):
         self._id += 1
         nr = self._id
         return self.wiederhole(nr, knoten.anzahl, self.emit_liste(knoten.rumpf))
+
+    def emit_fuer_jeden(self, knoten: FuerJeden) -> list[str]:
+        """Rollt den Rumpf einmal pro Wert aus: jeder Durchlauf bekommt die geprüften Literale.
+
+        Keine Laufzeitschleife – so gibt es keine Laufzeitvariablen mit Benutzerwerten (und unter CMD
+        keine Schritte in ``for``-Blöcken). Schrittnummern sind wie bei „Wiederhole“ in jedem Durchlauf
+        dieselben; Rückgabewerte eines Durchlaufs überschreiben die des vorherigen.
+        """
+        self._id += 1
+        nr = self._id
+        start = self._nr
+        anzahl = len(knoten.werte)
+        kopf = f"===== Für jeden Wert ({anzahl}) (Block {nr}): {', '.join(knoten.werte)} ====="
+        zeilen = [self.kommentar(escaping.kommentar_text(self.ziel, kopf))]
+        for i, wert in enumerate(knoten.werte):
+            self._nr = start
+            self._durchlauf.append(i)
+            rumpf = self.emit_liste(knoten.rumpf)
+            self._durchlauf.pop()
+            zeilen += [*self.ausgabe_zeilen(f"--- Wert {i + 1} von {anzahl}: {wert} ---"), *rumpf]
+        return [*zeilen, ""]
+
+    def schleifenwert_einsetzen(self, schritt: BlockSchritt) -> BlockSchritt:
+        """Parameter mit ``schleife`` → geprüfter Wert des aktuellen Durchlaufs (innerste Schleife)."""
+        if not any(v.schleife for v in schritt.parameter.values()):
+            return schritt
+        if not self._durchlauf:
+            raise GenerierungsFehler("Wert aus der Liste außerhalb von „Für jeden Wert“.")
+        i = self._durchlauf[-1]
+        parameter: dict[str, ParamValue] = {}
+        for pid, v in schritt.parameter.items():
+            if v.schleife and isinstance(v.wert, list):
+                parameter[pid] = ParamValue(typ=v.typ, wert=v.wert[i])
+            else:
+                parameter[pid] = v
+        return schritt.model_copy(update={"parameter": parameter})
+
+    def ausgabe_zeilen(self, text: str) -> list[str]:
+        """Meldung des Generators auf Konsole (und ins Protokoll, wo das nicht automatisch passiert)."""
+        return [self.echo(text)]
 
     def emit_wenn(self, knoten: Wenn) -> list[str]:
         self._id += 1
@@ -390,6 +434,9 @@ class Generator(ABC):
                     liste(kn.sonst, einzug + 3)
                 elif isinstance(kn, Wiederhole):
                     zeilen.append(" " * einzug + f"Wiederhole {kn.anzahl}-mal:")
+                    liste(kn.rumpf, einzug + 3)
+                elif isinstance(kn, FuerJeden):
+                    zeilen.append(" " * einzug + f"Für jeden Wert ({k(', '.join(kn.werte))}):")
                     liste(kn.rumpf, einzug + 3)
                 elif isinstance(kn, Wenn):
                     zeilen.append(" " * einzug + f"Wenn {k(bedingung_text(kn))}:")

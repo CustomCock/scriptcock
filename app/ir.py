@@ -5,7 +5,8 @@ nur geprüfte, typisierte Werte. Generatoren arbeiten nur auf der IR.
 
 Die Schritte bilden einen Baum über das Diskriminator-Feld ``art``:
 ``block`` (ein Baustein), ``wenn_fehler`` (Versuche … / Wenn das fehlschlägt …),
-``wiederhole`` (N-mal), ``wenn`` (Bedingung auf einen Rückgabewert) sowie die Blätter
+``wiederhole`` (N-mal), ``fuer_jeden`` (einmal pro Wert einer Liste), ``wenn`` (Bedingung auf
+einen Rückgabewert) sowie die Blätter
 ``abbrechen``, ``warten``, ``bestaetigung`` und ``kommentar``. Weitere Kontrollstrukturen kommen
 als neue Knotentypen in die Union ``Knoten``.
 """
@@ -21,7 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.block import ParamTyp
 
-IR_VERSION = 3  # 2: wenn_fehler/wiederhole, 3: wenn/abbrechen/warten/bestaetigung/kommentar
+IR_VERSION = 4  # 2: wenn_fehler/wiederhole, 3: wenn/abbrechen/warten/bestaetigung/kommentar, 4: fuer_jeden
 
 
 class ParamValue(BaseModel):
@@ -31,6 +32,9 @@ class ParamValue(BaseModel):
     typ: ParamTyp
     wert: str | int | bool | list[str | int] | None
     listen_typ: ParamTyp | None = None  # nur bei typ "liste": Typ der Einträge
+    # Aktueller Wert der innersten „Für jeden Wert“-Schleife: ``wert`` = die für diesen Parameter
+    # geprüften Werte, einer pro Durchlauf.
+    schleife: bool = False
 
 
 class BlockSchritt(BaseModel):
@@ -59,6 +63,19 @@ class Wiederhole(BaseModel):
     model_config = ConfigDict(extra="forbid")
     art: Literal["wiederhole"] = "wiederhole"
     anzahl: int
+    rumpf: list[Knoten]
+
+
+class FuerJeden(BaseModel):
+    """Führt ``rumpf`` einmal pro Eintrag von ``werte`` aus (Werte, wie eingegeben).
+
+    Parameter im Rumpf mit ``ParamValue.schleife`` bekommen den Wert des jeweiligen Durchlaufs –
+    für jeden Parameter einzeln gegen dessen Typ geprüft.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    art: Literal["fuer_jeden"] = "fuer_jeden"
+    werte: list[str]
     rumpf: list[Knoten]
 
 
@@ -151,10 +168,19 @@ class Kommentar(BaseModel):
 
 
 Knoten = Annotated[
-    BlockSchritt | WennFehler | Wiederhole | Wenn | Abbrechen | Warten | Bestaetigung | Kommentar,
+    BlockSchritt | WennFehler | Wiederhole | FuerJeden | Wenn | Abbrechen | Warten | Bestaetigung | Kommentar,
     Field(discriminator="art"),
 ]
-KONTROLL_ARTEN = ("wenn_fehler", "wiederhole", "wenn", "abbrechen", "warten", "bestaetigung", "kommentar")
+KONTROLL_ARTEN = (
+    "wenn_fehler",
+    "wiederhole",
+    "fuer_jeden",
+    "wenn",
+    "abbrechen",
+    "warten",
+    "bestaetigung",
+    "kommentar",
+)
 
 
 class ScriptMeta(BaseModel):
@@ -189,7 +215,7 @@ class ScriptIR(BaseModel):
         return _hat_kontrolle(self.schritte)
 
     def hat_verzweigung(self) -> bool:
-        """Versuche/Wiederhole/Wenn: nicht jeder Schritt läuft genau einmal (keine feste Gesamtzahl)."""
+        """Versuche/Wiederhole/Für jeden/Wenn: nicht jeder Schritt läuft genau einmal (keine Gesamtzahl)."""
         return _hat_verzweigung(self.schritte)
 
 
@@ -200,7 +226,7 @@ def bloecke_in(knoten: list[Knoten]) -> Iterator[BlockSchritt]:
         elif isinstance(k, WennFehler):
             yield from bloecke_in(k.versuche)
             yield from bloecke_in(k.sonst)
-        elif isinstance(k, Wiederhole):
+        elif isinstance(k, Wiederhole | FuerJeden):
             yield from bloecke_in(k.rumpf)
         elif isinstance(k, Wenn):
             yield from bloecke_in(k.dann)
@@ -214,7 +240,7 @@ def alle_knoten(knoten: list[Knoten]) -> Iterator[Knoten]:
         if isinstance(k, WennFehler):
             yield from alle_knoten(k.versuche)
             yield from alle_knoten(k.sonst)
-        elif isinstance(k, Wiederhole):
+        elif isinstance(k, Wiederhole | FuerJeden):
             yield from alle_knoten(k.rumpf)
         elif isinstance(k, Wenn):
             yield from alle_knoten(k.dann)
@@ -226,10 +252,11 @@ def _hat_kontrolle(knoten: list[Knoten]) -> bool:
 
 
 def _hat_verzweigung(knoten: list[Knoten]) -> bool:
-    return any(isinstance(k, WennFehler | Wiederhole | Wenn) for k in knoten)
+    return any(isinstance(k, WennFehler | Wiederhole | FuerJeden | Wenn) for k in knoten)
 
 
 WennFehler.model_rebuild()
 Wiederhole.model_rebuild()
+FuerJeden.model_rebuild()
 Wenn.model_rebuild()
 ScriptIR.model_rebuild()

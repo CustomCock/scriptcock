@@ -20,6 +20,7 @@ from app.ir import (
     Abbrechen,
     Bestaetigung,
     BlockSchritt,
+    FuerJeden,
     Knoten,
     Kommentar,
     Optionen,
@@ -45,6 +46,7 @@ from app.models.request import (
     AbbrechenEingabe,
     BestaetigungEingabe,
     EingabeKnoten,
+    FuerJedenEingabe,
     KommentarEingabe,
     SchrittEingabe,
     ScriptRequest,
@@ -751,6 +753,10 @@ MAX_WIEDERHOLUNGEN = 50
 _ANZAHL = ParameterDef(
     id="anzahl", label="Anzahl Wiederholungen", typ=ParamTyp.ZAHL, min=1, max=MAX_WIEDERHOLUNGEN
 )
+MAX_SCHLEIFENWERTE = 50
+SCHLEIFENWERT = "schleifenwert"  # Parameterwert {"schleifenwert": true} = aktueller Wert der Schleife
+# Typen, die den Schleifenwert nicht aufnehmen können (Listen, Verweise, Haken)
+_OHNE_SCHLEIFENWERT = frozenset({ParamTyp.LISTE, ParamTyp.VARIABLE, ParamTyp.JA_NEIN, ParamTyp.AUSWAHL})
 MAX_WARTEN = 3600
 _SEKUNDEN = ParameterDef(id="sekunden", label="Sekunden", typ=ParamTyp.ZAHL, min=1, max=MAX_WARTEN)
 _CODE = ParameterDef(id="code", label="Exit-Code", typ=ParamTyp.ZAHL, min=0, max=99)
@@ -781,6 +787,8 @@ class _BaumPruefer:
         self.versuche: list[int] = []
         self.anzahl_versuche = 0
         self.bekannt: dict[int, tuple[BlockDef, tuple[int, ...]]] = {}
+        # Werte der offenen „Für jeden Wert“-Schleifen (innerste zuletzt)
+        self.schleifen: list[list[str]] = []
 
     def liste(self, eingaben: list[EingabeKnoten], tiefe: int) -> list[Knoten]:
         ergebnis: list[Knoten] = []
@@ -810,6 +818,8 @@ class _BaumPruefer:
             return WennFehler(versuche=versuche, sonst=sonst)
         if isinstance(eingabe, WennEingabe):
             return self.wenn(i, eingabe, tiefe)
+        if isinstance(eingabe, FuerJedenEingabe):
+            return self.fuer_jeden(i, eingabe, tiefe)
         # WiederholeEingabe
         anzahl = 1
         try:
@@ -820,6 +830,37 @@ class _BaumPruefer:
         if not eingabe.rumpf:
             self.fehler.append(Feldfehler(i, None, "„Wiederhole“ braucht mindestens einen Schritt."))
         return Wiederhole(anzahl=anzahl, rumpf=self.liste(eingabe.rumpf, tiefe + 1))
+
+    def fuer_jeden(self, i: int, eingabe: FuerJedenEingabe, tiefe: int) -> FuerJeden:
+        werte: list[str] = []
+        try:
+            werte = schleifenwerte(eingabe.werte)
+        except ValidierungsFehler as e:
+            self.fehler.append(Feldfehler(i, "werte", f"Werte: {e}"))
+        if not eingabe.rumpf:
+            self.fehler.append(Feldfehler(i, None, "„Für jeden Wert“ braucht mindestens einen Schritt."))
+        self.schleifen.append(werte)
+        rumpf = self.liste(eingabe.rumpf, tiefe + 1)
+        self.schleifen.pop()
+        return FuerJeden(werte=werte or ["?"], rumpf=rumpf)
+
+    def schleifenwert(self, p: ParameterDef) -> ParamValue:
+        """Parameter bekommt den Wert der innersten Schleife – jeder Wert wird gegen ``p`` geprüft."""
+        if not self.schleifen:
+            raise ValidierungsFehler("„Wert aus der Liste“ geht nur innerhalb von „Für jeden Wert“.")
+        if p.typ in _OHNE_SCHLEIFENWERT:
+            raise ValidierungsFehler("Dieses Feld kann keinen Wert aus der Liste übernehmen.")
+        geprueft: list[str | int] = []
+        for n, roh in enumerate(self.schleifen[-1], 1):
+            try:
+                wert = validiere_wert(p, roh)
+                pruefe_wert_fuer_ziel(wert, self.ziel)
+            except ValidierungsFehler as e:
+                raise ValidierungsFehler(f"Wert {n} („{roh}“) aus der Liste passt nicht: {e}") from None
+            if not isinstance(wert.wert, str | int) or isinstance(wert.wert, bool):
+                raise ValidierungsFehler(f"Wert {n} („{roh}“) aus der Liste fehlt.")
+            geprueft.append(wert.wert)
+        return ParamValue(typ=p.typ, wert=geprueft, schleife=True)
 
     def _wert(self, i: int, p: ParameterDef, roh: Any) -> Any:
         try:
@@ -923,7 +964,11 @@ class _BaumPruefer:
                 # Für dieses Zielsystem nicht verwendet – daher auch keine Pflicht.
                 continue
             try:
-                wert = validiere_wert(p, eingabe.parameter.get(p.id))
+                roh = eingabe.parameter.get(p.id)
+                if ist_schleifenwert(roh):
+                    werte[p.id] = self.schleifenwert(p)
+                    continue
+                wert = validiere_wert(p, roh)
                 pruefe_wert_fuer_ziel(wert, self.ziel)
                 if p.typ is ParamTyp.VARIABLE and isinstance(wert.wert, str):
                     self.verweis_pruefen(nr, wert.wert, p.variable_typ)
@@ -966,6 +1011,39 @@ class _BaumPruefer:
                 "davon nicht verfügbar."
             )
         return r
+
+
+def ist_schleifenwert(roh: Any) -> bool:
+    return isinstance(roh, dict) and roh.get(SCHLEIFENWERT) is True and len(roh) == 1
+
+
+def schleifenwerte(roh: Any) -> list[str]:
+    """Werte für „Für jeden Wert“: Liste oder Text mit , bzw. ; getrennt (Leerzeichen bleiben)."""
+    if isinstance(roh, str):
+        teile: list[Any] = re.split(r"[,;]", roh)
+    elif isinstance(roh, list):
+        teile = roh
+    else:
+        raise ValidierungsFehler("Bitte mindestens einen Wert angeben (mehrere mit Komma trennen).")
+    werte: list[str] = []
+    for n, teil in enumerate(teile, 1):
+        if isinstance(teil, bool) or not isinstance(teil, str | int):
+            raise ValidierungsFehler(f"Wert {n} ist kein Text.")
+        text = str(teil).strip()
+        if not text:
+            continue
+        try:
+            pruefe_zeichen(text)
+        except (ValidierungsFehler, UnsicherError) as e:
+            raise ValidierungsFehler(f"Wert {n} („{text}“): {e}") from None
+        if len(text) > 260:
+            raise ValidierungsFehler(f"Wert {n} ist zu lang (höchstens 260 Zeichen).")
+        werte.append(text)
+    if not werte:
+        raise ValidierungsFehler("Bitte mindestens einen Wert angeben (mehrere mit Komma trennen).")
+    if len(werte) > MAX_SCHLEIFENWERTE:
+        raise ValidierungsFehler(f"Höchstens {MAX_SCHLEIFENWERTE} Werte.")
+    return werte
 
 
 def validiere_request(
@@ -1067,11 +1145,19 @@ def _knoten_zu_eingabe(k: Knoten) -> EingabeKnoten:
             versuche=[_knoten_zu_eingabe(x) for x in k.versuche],
             sonst=[_knoten_zu_eingabe(x) for x in k.sonst],
         )
+    if isinstance(k, FuerJeden):
+        return FuerJedenEingabe(
+            art="fuer_jeden", werte=k.werte, rumpf=[_knoten_zu_eingabe(x) for x in k.rumpf]
+        )
     if isinstance(k, Wiederhole):
         return WiederholeEingabe(
             art="wiederhole", anzahl=k.anzahl, rumpf=[_knoten_zu_eingabe(x) for x in k.rumpf]
         )
     return SchrittEingabe(
         block_id=k.block_id,
-        parameter={n: v.wert for n, v in k.parameter.items() if v.wert is not None},
+        parameter={
+            n: {SCHLEIFENWERT: True} if v.schleife else v.wert
+            for n, v in k.parameter.items()
+            if v.wert is not None
+        },
     )

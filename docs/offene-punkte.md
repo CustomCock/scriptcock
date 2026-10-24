@@ -156,6 +156,10 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 - CMD: Innerhalb von „Versuche“ wird ein roter Abbruch wie überall über `:okm_abbruch` beendet;
   die Ausgabe eines fehlgeschlagenen Schritts erscheint (wie generell in CMD) erst nach dem Schritt.
 - Ablauf-Bausteine gibt es nur im Blockly-Modus (nicht im Listen-Modus und nicht in Rezepten).
+- „Für jeden Wert“: In Blockly lässt sich `{wert}` nur in Textfeldern eintragen – nicht in Zahlen-,
+  Auswahl- oder Ja/Nein-Feldern (die API nimmt den Schleifenwert auch für Zahlenfelder an). Der Rumpf
+  wird pro Wert ausgerollt: 50 Werte × viele Schritte ergeben lange Scripte. Nur der Wert der innersten
+  Schleife ist erreichbar.
 
 ## Phasen
 

@@ -159,6 +159,9 @@ class CmdGenerator(Generator):
             "",
         ]
 
+    def ausgabe_zeilen(self, text: str) -> list[str]:
+        return _echo_beides(text)
+
     @staticmethod
     def _beides(text: str) -> list[str]:
         # Text mit %VARIABLEN% (vom Generator, keine Benutzerwerte) auf Konsole und ins Log

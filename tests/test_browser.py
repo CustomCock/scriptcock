@@ -187,6 +187,51 @@ def test_blockly_im_browser(server: str, browser) -> None:
     assert js_fehler == []
 
 
+def test_blockly_fuer_jeden(server: str, browser) -> None:
+    """„Für jeden Wert“: Laden mit {wert} im Textfeld, Serialisieren → ausgerollte Vorschau."""
+    import json
+    import urllib.request
+
+    seite = browser.new_page(viewport={"width": 1280, "height": 1100})
+    js_fehler: list[str] = []
+    seite.on("pageerror", lambda e: js_fehler.append(str(e)))
+    seite.goto(f"{server}/blockly?ziel=bash")
+    seite.locator(".blocklyDraggable", has_text="Script").first.wait_for()
+    cookies = "; ".join(f"{c['name']}={c['value']}" for c in seite.context.cookies())
+    anfrage = urllib.request.Request(
+        f"{server}/api/v1/skripte",
+        data=json.dumps(
+            {
+                "ziel": "bash",
+                "titel": "Schleife",
+                "quelle": "blockly",
+                "schritte": [
+                    {
+                        "art": "fuer_jeden",
+                        "werte": "PC-01, PC-02",
+                        "rumpf": [
+                            {
+                                "art": "block",
+                                "block_id": "meldung",
+                                "parameter": {"text": {"schleifenwert": True}, "pause": "false"},
+                            }
+                        ],
+                    }
+                ],
+            }
+        ).encode(),
+        headers={"Content-Type": "application/json", "X-Okm-Request": "1", "Cookie": cookies},
+    )
+    sid = json.loads(urllib.request.urlopen(anfrage).read())["id"]
+    seite.goto(f"{server}/blockly?aus={sid}")
+    warte_editor(seite, "Wert 2 von 2: PC-02", 5000)
+    text = seite.evaluate("() => window.OkmEditor.wert()")
+    assert "printf '%s\\n' 'PC-01'" in text and "printf '%s\\n' 'PC-02'" in text
+    assert seite.locator(".blocklyText", has_text="Für jeden Wert aus").count() == 1
+    assert seite.locator(".blocklyText", has_text="{wert}").count() >= 1
+    assert js_fehler == []
+
+
 def test_software_katalog_im_browser(server: str, browser) -> None:
     """Suche, Kopieren (Clipboard-API und Fallback), „＋“, Mehrfachauswahl, Feld befüllen, Zielwechsel."""
     kontext = browser.new_context(viewport={"width": 1400, "height": 950})

@@ -21,7 +21,7 @@ from app.models.block import ZAHLENTYPEN
 from app.registry import Registry
 from app.routes.pages import HLJS_SPRACHE, _render, _sitzung
 from app.service import Benutzer, Ergebnis, rechte_hinweis
-from app.validation import MAX_TIEFE, MAX_WARTEN, MAX_WIEDERHOLUNGEN, FehlerSammlung
+from app.validation import MAX_SCHLEIFENWERTE, MAX_TIEFE, MAX_WARTEN, MAX_WIEDERHOLUNGEN, FehlerSammlung
 
 router = APIRouter()
 
@@ -91,6 +91,7 @@ async def blockly_seite(
         "sprachen": {zz.value: HLJS_SPRACHE[zz] for zz in Ziel},
         "katalog": katalog(reg),
         "max_wiederholungen": MAX_WIEDERHOLUNGEN,
+        "max_schleifenwerte": MAX_SCHLEIFENWERTE,
         "max_warten": MAX_WARTEN,
         "zahlentypen": ZAHLENTYPEN,
         "max_tiefe": MAX_TIEFE,

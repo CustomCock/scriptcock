@@ -47,7 +47,7 @@
     // --- Schritte in Vorordnung (gleiche Reihenfolge wie Validierung und Generator) -----
     var KINDER = {
       ablauf_start: ["SCHRITTE"], ablauf_wenn_fehler: ["VERSUCHE", "SONST"],
-      ablauf_wiederhole: ["RUMPF"], ablauf_wenn: ["DANN", "SONST"]
+      ablauf_wiederhole: ["RUMPF"], ablauf_fuer_jeden: ["RUMPF"], ablauf_wenn: ["DANN", "SONST"]
     };
     function durchlaufe(block, besuch) {
       for (var b = block; b; b = b.getNextBlock()) {
@@ -214,6 +214,21 @@
         this.setTooltip("Führt die Schritte darin mehrmals hintereinander aus (höchstens " + daten.max_wiederholungen + "-mal).");
       }
     };
+    // „Für jeden Wert“: im Rumpf steht {wert} in einem Textfeld für den aktuellen Wert
+    var SCHLEIFENWERT = "{wert}";
+    Blockly.Blocks.ablauf_fuer_jeden = {
+      init: function () {
+        this.appendDummyInput().appendField("Für jeden Wert aus")
+          .appendField(new Blockly.FieldTextInput("PC-01, PC-02"), "WERTE");
+        this.appendStatementInput("RUMPF").setCheck("schritt");
+        this.setPreviousStatement(true, "schritt");
+        this.setNextStatement(true, "schritt");
+        this.setColour(FARBE_ABLAUF);
+        this.setTooltip("Führt die Schritte darin einmal pro Wert aus (Werte mit Komma trennen, höchstens " +
+          daten.max_schleifenwerte + "). In einem Textfeld darin steht " + SCHLEIFENWERT +
+          " für den aktuellen Wert – er wird für jedes Feld einzeln geprüft.");
+      }
+    };
     Blockly.Blocks.ablauf_wenn = {
       init: function () {
         var block = this;
@@ -293,7 +308,8 @@
           kind: "category", name: "Ablauf", colour: FARBE_ABLAUF,
           contents: [
             { kind: "block", type: "ablauf_wenn" }, { kind: "block", type: "ablauf_wenn_fehler" },
-            { kind: "block", type: "ablauf_wiederhole" }, { kind: "block", type: "ablauf_warten" },
+            { kind: "block", type: "ablauf_wiederhole" }, { kind: "block", type: "ablauf_fuer_jeden" },
+            { kind: "block", type: "ablauf_warten" },
             { kind: "block", type: "ablauf_bestaetigung" }, { kind: "block", type: "ablauf_abbrechen" },
             { kind: "block", type: "ablauf_kommentar" }
           ]
@@ -369,6 +385,11 @@
         var s = kette(k.sonst); if (s) { z.inputs.SONST = { block: s }; }
         return z;
       }
+      if (k.art === "fuer_jeden") {
+        z = { type: "ablauf_fuer_jeden", fields: { WERTE: k.werte }, inputs: {} };
+        var fr = kette(k.rumpf); if (fr) { z.inputs.RUMPF = { block: fr }; }
+        return z;
+      }
       if (k.art === "wiederhole") {
         z = { type: "ablauf_wiederhole", fields: { ANZAHL: k.anzahl }, inputs: {} };
         var r = kette(k.rumpf); if (r) { z.inputs.RUMPF = { block: r }; }
@@ -382,6 +403,7 @@
         if (k.parameter[p.id] === undefined) { return; }
         var wert = k.parameter[p.id];
         if (p.typ === "ja_nein") { wert = wert === "true" ? "TRUE" : "FALSE"; }
+        else if (wert === SCHLEIFENWERT) { /* bleibt Text */ }
         else if (p.typ === "port" || daten.zahlentypen[p.typ]) { wert = Number(wert); }
         else if (p.typ === "variable") { wert = verweisLaden(wert); }
         felder[p.id] = wert;
@@ -436,6 +458,9 @@
         if (b.type === "ablauf_wiederhole") {
           return { art: "wiederhole", anzahl: b.getFieldValue("ANZAHL"), rumpf: liste(b.getInputTargetBlock("RUMPF")) };
         }
+        if (b.type === "ablauf_fuer_jeden") {
+          return { art: "fuer_jeden", werte: b.getFieldValue("WERTE"), rumpf: liste(b.getInputTargetBlock("RUMPF")) };
+        }
         if (b.type === "ablauf_wenn") {
           var vergleich = b.getFieldValue("VERGLEICH");
           return {
@@ -455,6 +480,7 @@
           var wert = b.getFieldValue(p.id);
           if (p.typ === "ja_nein") { wert = wert === "TRUE" ? "true" : "false"; }
           else if (p.typ === "variable") { wert = verweisText(wert); }
+          else if (wert === SCHLEIFENWERT) { wert = { schleifenwert: true }; }  // Backend prüft, ob in Schleife
           else if (wert !== null && wert !== undefined) { wert = String(wert); }
           parameter[p.id] = wert;
         });

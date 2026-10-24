@@ -15,7 +15,18 @@ from sqlalchemy.orm import Session
 from app.db import Bewertung, GespeichertesScript
 from app.escaping import UnsicherError, Ziel, pruefe_zeichen
 from app.export import exportiere
-from app.ir import Abbrechen, Bestaetigung, Knoten, Kommentar, ScriptIR, Warten, Wenn, WennFehler, Wiederhole
+from app.ir import (
+    Abbrechen,
+    Bestaetigung,
+    FuerJeden,
+    Knoten,
+    Kommentar,
+    ScriptIR,
+    Warten,
+    Wenn,
+    WennFehler,
+    Wiederhole,
+)
 from app.registry import Registry
 from app.service import Benutzer
 from app.validation import FehlerSammlung, Feldfehler, ValidierungsFehler
@@ -324,6 +335,10 @@ def blockversionen(registry: Registry, eintrag: GespeichertesScript) -> list[dic
     return ergebnis
 
 
+# So steht „aktueller Wert der Schleife“ in Blockly-Textfeldern (static/js/blockly-modus.js)
+SCHLEIFENWERT_BLOCKLY = "{wert}"
+
+
 def baum_wiederherstellen(
     registry: Registry, eintrag: GespeichertesScript
 ) -> tuple[ScriptIR, list[Any], list[str]]:
@@ -352,6 +367,8 @@ def baum_wiederherstellen(
             return {"art": "wenn_fehler", "versuche": liste(k.versuche), "sonst": liste(k.sonst)}
         if isinstance(k, Wiederhole):
             return {"art": "wiederhole", "anzahl": k.anzahl, "rumpf": liste(k.rumpf)}
+        if isinstance(k, FuerJeden):
+            return {"art": "fuer_jeden", "werte": ", ".join(k.werte), "rumpf": liste(k.rumpf)}
         block = registry.bloecke.get(k.block_id)
         if block is None:
             hinweise.append(f"Den Baustein „{k.block_id}“ gibt es nicht mehr – er wurde weggelassen.")
@@ -362,7 +379,7 @@ def baum_wiederherstellen(
                 f"{block.version}). Bitte Werte und Vorschau prüfen."
             )
         werte = {
-            pid: text
+            pid: SCHLEIFENWERT_BLOCKLY if pv.schleife else text
             for pid, pv in k.parameter.items()
             if block.param(pid) is not None and (text := _als_text(pv.wert)) is not None
         }

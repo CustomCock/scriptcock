@@ -30,6 +30,16 @@ class WiederholeEingabe(BaseModel):
     rumpf: list[EingabeKnoten] = Field(max_length=100)
 
 
+class FuerJedenEingabe(BaseModel):
+    """Werte als Liste oder Text (getrennt mit , oder ;). Im Rumpf steht der aktuelle Wert als
+    Parameterwert ``{"schleifenwert": true}``."""
+
+    model_config = ConfigDict(extra="forbid")
+    art: Literal["fuer_jeden"]
+    werte: Any = None
+    rumpf: list[EingabeKnoten] = Field(max_length=100)
+
+
 class WennEingabe(BaseModel):
     model_config = ConfigDict(extra="forbid")
     art: Literal["wenn"]
@@ -76,6 +86,7 @@ EingabeKnoten = Annotated[
     Annotated[SchrittEingabe, Tag("block")]
     | Annotated[WennFehlerEingabe, Tag("wenn_fehler")]
     | Annotated[WiederholeEingabe, Tag("wiederhole")]
+    | Annotated[FuerJedenEingabe, Tag("fuer_jeden")]
     | Annotated[WennEingabe, Tag("wenn")]
     | Annotated[AbbrechenEingabe, Tag("abbrechen")]
     | Annotated[WartenEingabe, Tag("warten")]
@@ -98,5 +109,6 @@ class ScriptRequest(BaseModel):
 
 WennFehlerEingabe.model_rebuild()
 WiederholeEingabe.model_rebuild()
+FuerJedenEingabe.model_rebuild()
 WennEingabe.model_rebuild()
 ScriptRequest.model_rebuild()
