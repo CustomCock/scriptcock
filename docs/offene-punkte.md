@@ -37,6 +37,8 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 | `neustart_countdown` | bash | `shutdown -r +N` – Meldung erscheint nur in Terminal-Sitzungen (wall). |
 | alle | cmd | Ausgaben eines Schritts erscheinen erst nach seinem Ende (Umleitung in eine Temp-Datei, weil CMD kein `tee` hat). Interaktive Blöcke (`interaktiv: true`) laufen ohne Umleitung und werden daher nicht vollständig protokolliert. |
 | alle | powershell | Native Programme, die Fehler über stderr melden, aber Exit-Code 0 liefern, werden nicht als Fehler erkannt. |
+| `ping` | cmd | `ping.exe` meldet „Zielhost nicht erreichbar“ (Antwort eines Routers) mit Exit-Code 0. PowerShell prüft daher zusätzlich auf `TTL=`; CMD wertet nur den Exit-Code aus. Die Laufzeit (`ms`) gibt es unter CMD nicht (Ausgabe sprachabhängig). |
+| `dienst_status` | cmd | `laeuft` sucht `RUNNING` in der Ausgabe von `sc query` – prüfen, ob das auf deutschem Windows englisch bleibt. |
 | alle | powershell/cmd | Ausführen-Checkliste (`docs/test-vms.md`, Abschnitt 4): alle Windows-Zellen (Doppelklick/„Mit PowerShell ausführen“, UAC angefordert/abgelehnt, Konsole UTF-8, Fenster bleibt offen) sind noch **nicht** auf Win 11 geprüft. |
 | alle | bash/zsh | Checkliste bisher nur im Linux-Container mit Attrappen (`ping`, `sudo`); auf Debian 12 und echtem macOS (Terminal.app, echtes sudo) wiederholen. |
 
@@ -101,6 +103,14 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
   liefert vorher schon den bearbeiteten Text).
 - Listen-Modus: Wer den Titel tippt und sofort „Erzeugen“ klickt, löst beim Verlassen des Feldes
   noch eine Live-Vorschau aus, die das Ergebnis wieder leert.
+
+## Rückgabewerte & Variablen
+
+- Der Parametertyp `variable` ist in Validierung und Generator fertig, aber noch **kein Baustein
+  nutzt ihn** und es gibt noch keine Eingabe dafür in Listen-Modus und Blockly (kommt mit „Wenn …
+  dann … sonst“). Bis dahin zeigt die Oberfläche ein Textfeld (`3.frei_prozent`).
+- Rückgaben in Schleifen: Es gilt der Wert des letzten Durchlaufs.
+- Rückgaben im Dry-Run bleiben „unbekannt“ (die Befehle laufen nicht).
 
 ## Blockly & Ablauf-Bausteine
 

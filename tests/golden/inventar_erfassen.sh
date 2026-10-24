@@ -109,6 +109,9 @@ okm_info '=============================================='
 
 okm_info 'Rechte: ohne erhöhte Rechte'
 
+# Rückgabewerte der Schritte (Namen vergibt der Baukasten; leer = unbekannt)
+okm_s3_stunden=''
+
 # --------------------------------------------------------------------
 # Schritt 1/4: Seriennummer und Modell (Risiko: gruen)
 # --------------------------------------------------------------------
@@ -147,6 +150,8 @@ OKM_SCHRITT='3/4 (Letzter Neustart und ausstehender Neustart)'
 OKM_TIPP=''
 okm_info '[3/4] Startzeit und ausstehende Neustarts werden geprüft ...'
 printf 'Letzter Start: %s (%s)\n' "$(uptime -s)" "$(uptime -p)"
+okm_sekunden=$(cut -d' ' -f1 /proc/uptime)
+okm_s3_stunden=$(( ${okm_sekunden%.*} / 3600 ))
 if [ -f /var/run/reboot-required ]; then
   printf '%s\n' 'Neustart ausstehend: JA'
   cat /var/run/reboot-required.pkgs 2>/dev/null || true
@@ -155,6 +160,7 @@ elif command -v needs-restarting >/dev/null 2>&1; then
 else
   printf '%s\n' 'Neustart ausstehend: nein'
 fi
+[[ $okm_s3_stunden =~ ^-?[0-9]+$ ]] || okm_s3_stunden=''
 OKM_OK=$((OKM_OK + 1))
 okm_ok
 

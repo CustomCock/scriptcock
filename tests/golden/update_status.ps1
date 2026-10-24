@@ -89,6 +89,10 @@ Write-OkmInfo '=============================================='
 
 Write-OkmInfo 'Rechte: ohne erhöhte Rechte'
 
+# Rückgabewerte der Schritte (Namen vergibt der Baukasten; $null = unbekannt)
+$script:OkmS1_ausstehend = $null
+$script:OkmS2_stunden = $null
+
 # --------------------------------------------------------------------
 # Schritt 1/2: Update-Status anzeigen (Risiko: gruen)
 # --------------------------------------------------------------------
@@ -102,6 +106,7 @@ try {
         Write-Host 'Suche ausstehende Updates …'
         $okmSuche = (New-Object -ComObject Microsoft.Update.Session).CreateUpdateSearcher()
         $okmOffen = $okmSuche.Search("IsInstalled=0 and IsHidden=0").Updates
+        $script:OkmS1_ausstehend = $okmOffen.Count
         if ($okmOffen.Count -eq 0) {
             Write-Host 'Keine ausstehenden Updates.' -ForegroundColor Green
         } else {
@@ -110,6 +115,7 @@ try {
         }
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
+    if ("$($script:OkmS1_ausstehend)" -match '^-?[0-9]+$') { $script:OkmS1_ausstehend = [long]"$($script:OkmS1_ausstehend)" } else { $script:OkmS1_ausstehend = $null }
     $OkmErfolgreich++
     Write-OkmOk
 } catch {
@@ -128,6 +134,7 @@ try {
     . {
         $okmStart = (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime
         $okmLaufzeit = (Get-Date) - $okmStart
+        $script:OkmS2_stunden = [math]::Floor($okmLaufzeit.TotalHours)
         Write-Host ('Letzter Start: ' + $okmStart.ToString('dd.MM.yyyy HH:mm') + ' (vor ' + $okmLaufzeit.Days + ' Tagen)')
         $okmGruende = @()
         if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') { $okmGruende += 'Windows-Komponenten' }
@@ -140,6 +147,7 @@ try {
         }
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
+    if ("$($script:OkmS2_stunden)" -match '^-?[0-9]+$') { $script:OkmS2_stunden = [long]"$($script:OkmS2_stunden)" } else { $script:OkmS2_stunden = $null }
     $OkmErfolgreich++
     Write-OkmOk
 } catch {

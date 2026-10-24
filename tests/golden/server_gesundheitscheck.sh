@@ -110,6 +110,9 @@ okm_info '=============================================='
 
 okm_info 'Rechte: ohne erhöhte Rechte'
 
+# Rückgabewerte der Schritte (Namen vergibt der Baukasten; leer = unbekannt)
+okm_s5_ausstehend=''
+
 # --------------------------------------------------------------------
 # Schritt 1/5: Linux: Server-Gesundheitscheck (Risiko: gruen)
 # --------------------------------------------------------------------
@@ -190,12 +193,21 @@ OKM_SCHRITT='5/5 (Update-Status anzeigen)'
 OKM_TIPP=''
 okm_info '[5/5] Update-Status wird ermittelt ...'
 if command -v apt >/dev/null 2>&1; then
-  apt list --upgradable 2>/dev/null
+  okm_liste=$(apt list --upgradable 2>/dev/null)
+  printf '%s\n' "$okm_liste"
+  okm_s5_ausstehend=$(printf '%s\n' "$okm_liste" | grep -c 'upgradable from' || true)
 elif command -v dnf >/dev/null 2>&1; then
-  dnf -q check-update || [ $? -eq 100 ]
+  okm_rc=0
+  okm_liste=$(dnf -q check-update) || okm_rc=$?
+  printf '%s\n' "$okm_liste"
+  # Exit-Code 100 = Updates verfügbar
+  [ "$okm_rc" -eq 0 ] || [ "$okm_rc" -eq 100 ]
+  okm_s5_ausstehend=$(printf '%s\n' "$okm_liste" | grep -c '^[^[:space:]]\+\.[^[:space:]]\+[[:space:]]' || true)
 else
   printf '%s\n' 'Kein unterstützter Paketmanager (apt, dnf) gefunden.'
+  okm_s5_ausstehend=''
 fi
+[[ $okm_s5_ausstehend =~ ^-?[0-9]+$ ]] || okm_s5_ausstehend=''
 OKM_OK=$((OKM_OK + 1))
 okm_ok
 

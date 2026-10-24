@@ -108,6 +108,9 @@ okm_info '=============================================='
 
 okm_info 'Rechte: ohne erhöhte Rechte'
 
+# Rückgabewerte der Schritte (Namen vergibt der Baukasten; leer = unbekannt)
+okm_s3_stunden=''
+
 # --------------------------------------------------------------------
 # Schritt 1/4: Seriennummer und Modell (Risiko: gruen)
 # --------------------------------------------------------------------
@@ -146,6 +149,10 @@ OKM_TIPP=''
 okm_info '[3/4] Startzeit und ausstehende Neustarts werden geprüft ...'
 printf 'Letzter Start: %s\n' "$(sysctl -n kern.boottime)"
 uptime
+# "{ sec = 1729760000, usec = 0 } …" – erste Zahl nach "=" sind die Sekunden seit 1970
+okm_start=$(sysctl -n kern.boottime | sed -E 's/^[^=]*= ([0-9]+).*/\1/')
+okm_s3_stunden=$(( ($(date +%s) - okm_start) / 3600 ))
+[[ $okm_s3_stunden =~ ^-?[0-9]+$ ]] || okm_s3_stunden=''
 OKM_OK=$((OKM_OK + 1))
 okm_ok
 

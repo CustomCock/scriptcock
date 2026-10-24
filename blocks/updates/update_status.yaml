@@ -1,5 +1,5 @@
 id: update_status
-version: 1
+version: 2
 name: Update-Status anzeigen
 kategorie: Updates
 beschreibung: Zeigt die zuletzt installierten Updates und welche Updates noch ausstehen.
@@ -8,6 +8,10 @@ hilfe: |
   Linux: Paketquellen werden nicht aktualisiert – die Liste bezieht sich auf den letzten Abgleich.
 risiko: gruen
 fortschritt: Update-Status wird ermittelt
+rueckgabe:
+  - id: ausstehend
+    typ: zahl
+    beschreibung: Anzahl ausstehender Updates
 ziele:
   powershell: |
     Write-Host 'Zuletzt installierte Updates:'
@@ -15,6 +19,7 @@ ziele:
     Write-Host 'Suche ausstehende Updates …'
     $okmSuche = (New-Object -ComObject Microsoft.Update.Session).CreateUpdateSearcher()
     $okmOffen = $okmSuche.Search("IsInstalled=0 and IsHidden=0").Updates
+    {{ rueckgabe_ausstehend }} = $okmOffen.Count
     if ($okmOffen.Count -eq 0) {
         Write-Host 'Keine ausstehenden Updates.' -ForegroundColor Green
     } else {
@@ -23,11 +28,21 @@ ziele:
     }
   bash: |
     if command -v apt >/dev/null 2>&1; then
-      apt list --upgradable 2>/dev/null
+      okm_liste=$(apt list --upgradable 2>/dev/null)
+      printf '%s\n' "$okm_liste"
+      {{ rueckgabe_ausstehend }}=$(printf '%s\n' "$okm_liste" | grep -c 'upgradable from' || true)
     elif command -v dnf >/dev/null 2>&1; then
-      dnf -q check-update || [ $? -eq 100 ]
+      okm_rc=0
+      okm_liste=$(dnf -q check-update) || okm_rc=$?
+      printf '%s\n' "$okm_liste"
+      # Exit-Code 100 = Updates verfügbar
+      [ "$okm_rc" -eq 0 ] || [ "$okm_rc" -eq 100 ]
+      {{ rueckgabe_ausstehend }}=$(printf '%s\n' "$okm_liste" | grep -c '^[^[:space:]]\+\.[^[:space:]]\+[[:space:]]' || true)
     else
       printf '%s\n' 'Kein unterstützter Paketmanager (apt, dnf) gefunden.'
+      {{ rueckgabe_ausstehend }}=''
     fi
   zsh: |
-    softwareupdate --list 2>&1 || true
+    okm_liste=$(softwareupdate --list 2>&1 || true)
+    printf '%s\n' "$okm_liste"
+    {{ rueckgabe_ausstehend }}=$(printf '%s\n' "$okm_liste" | grep -c '^\* Label:' || true)

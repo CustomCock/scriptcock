@@ -134,6 +134,11 @@ okm_info '=============================================='
 
 okm_info 'Rechte: ohne erhöhte Rechte'
 
+# Rückgabewerte der Schritte (Namen vergibt der Baukasten; leer = unbekannt)
+okm_s3_erreichbar=''
+okm_s3_ms=''
+okm_s7_laeuft=''
+
 # --------------------------------------------------------------------
 # Schritt 1/8: Meldung/Pause für den Benutzer (Risiko: gruen)
 # --------------------------------------------------------------------
@@ -181,7 +186,19 @@ unsetopt ERR_EXIT
     OKM_SCHRITT='3/8 (Ping auf Ziel)'
     OKM_TIPP='Ist das Gerät eingeschaltet und im selben Netz? Manche Geräte und Firewalls antworten grundsätzlich nicht auf Ping.'
     okm_info '[3/8] Ping auf 10.0.0.1 (4x) ...'
-    ping -c 4 '10.0.0.1'
+    okm_rc=0
+    okm_ausgabe=$(ping -c 4 '10.0.0.1' 2>&1) || okm_rc=$?
+    printf '%s\n' "$okm_ausgabe"
+    if [ "$okm_rc" -eq 0 ]; then
+      okm_s3_erreichbar=1
+      # "rtt min/avg/max/mdev = 11.1/12.6/…" (Linux) bzw. "round-trip min/avg/…" (macOS)
+      okm_s3_ms=$(printf '%s\n' "$okm_ausgabe" | awk -F/ '/min\/avg/ { printf "%.0f", $5 }')
+    else
+      okm_s3_erreichbar=0
+      false
+    fi
+    case "$okm_s3_erreichbar" in 1|true|ja) okm_s3_erreichbar=1 ;; '') ;; *) okm_s3_erreichbar=0 ;; esac
+    [[ $okm_s3_ms =~ ^-?[0-9]+$ ]] || okm_s3_ms=''
     okm_geschafft
     okm_ok
 
@@ -281,11 +298,14 @@ for ((okm_durchlauf_4 = 1; okm_durchlauf_4 <= 3; okm_durchlauf_4++)); do
     OKM_TIPP=''
     okm_info '[7/8] Status von Dienst Spooler wird abgefragt ...'
     okm_label='Spooler'
+    okm_s7_laeuft=0
     if okm_launchd="$(launchctl print "system/$okm_label" 2>/dev/null)"; then
       printf '%s\n' "$okm_launchd" | grep -E '^\s*(state|pid|path) =' || true
+      case "$okm_launchd" in *'state = running'*) okm_s7_laeuft=1 ;; esac
     else
       okm_warn 'Diesen Dienst gibt es nicht (oder er ist nur für den angemeldeten Benutzer geladen).'
     fi
+    case "$okm_s7_laeuft" in 1|true|ja) okm_s7_laeuft=1 ;; '') ;; *) okm_s7_laeuft=0 ;; esac
     okm_geschafft
     okm_ok
 

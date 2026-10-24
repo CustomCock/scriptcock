@@ -107,6 +107,10 @@ okm_info '=============================================='
 
 okm_info 'Rechte: ohne erhöhte Rechte'
 
+# Rückgabewerte der Schritte (Namen vergibt der Baukasten; leer = unbekannt)
+okm_s1_ausstehend=''
+okm_s2_stunden=''
+
 # --------------------------------------------------------------------
 # Schritt 1/2: Update-Status anzeigen (Risiko: gruen)
 # --------------------------------------------------------------------
@@ -115,12 +119,21 @@ OKM_SCHRITT='1/2 (Update-Status anzeigen)'
 OKM_TIPP=''
 okm_info '[1/2] Update-Status wird ermittelt ...'
 if command -v apt >/dev/null 2>&1; then
-  apt list --upgradable 2>/dev/null
+  okm_liste=$(apt list --upgradable 2>/dev/null)
+  printf '%s\n' "$okm_liste"
+  okm_s1_ausstehend=$(printf '%s\n' "$okm_liste" | grep -c 'upgradable from' || true)
 elif command -v dnf >/dev/null 2>&1; then
-  dnf -q check-update || [ $? -eq 100 ]
+  okm_rc=0
+  okm_liste=$(dnf -q check-update) || okm_rc=$?
+  printf '%s\n' "$okm_liste"
+  # Exit-Code 100 = Updates verfügbar
+  [ "$okm_rc" -eq 0 ] || [ "$okm_rc" -eq 100 ]
+  okm_s1_ausstehend=$(printf '%s\n' "$okm_liste" | grep -c '^[^[:space:]]\+\.[^[:space:]]\+[[:space:]]' || true)
 else
   printf '%s\n' 'Kein unterstützter Paketmanager (apt, dnf) gefunden.'
+  okm_s1_ausstehend=''
 fi
+[[ $okm_s1_ausstehend =~ ^-?[0-9]+$ ]] || okm_s1_ausstehend=''
 OKM_OK=$((OKM_OK + 1))
 okm_ok
 
@@ -132,6 +145,8 @@ OKM_SCHRITT='2/2 (Letzter Neustart und ausstehender Neustart)'
 OKM_TIPP=''
 okm_info '[2/2] Startzeit und ausstehende Neustarts werden geprüft ...'
 printf 'Letzter Start: %s (%s)\n' "$(uptime -s)" "$(uptime -p)"
+okm_sekunden=$(cut -d' ' -f1 /proc/uptime)
+okm_s2_stunden=$(( ${okm_sekunden%.*} / 3600 ))
 if [ -f /var/run/reboot-required ]; then
   printf '%s\n' 'Neustart ausstehend: JA'
   cat /var/run/reboot-required.pkgs 2>/dev/null || true
@@ -140,6 +155,7 @@ elif command -v needs-restarting >/dev/null 2>&1; then
 else
   printf '%s\n' 'Neustart ausstehend: nein'
 fi
+[[ $okm_s2_stunden =~ ^-?[0-9]+$ ]] || okm_s2_stunden=''
 OKM_OK=$((OKM_OK + 1))
 okm_ok
 

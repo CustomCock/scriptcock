@@ -89,6 +89,14 @@ erneut durch dieselbe Validierung.
 - **Protokoll** jedes Laufs (`%TEMP%` bzw. `/tmp`), Pfad wird am Ende ausgegeben.
 - **SHA-256** jedes erzeugten Scripts wird gespeichert und angezeigt.
 
+### Rückgabewerte
+
+Werte, die Blöcke zur Laufzeit ermitteln (z. B. freier Speicher), sind keine Benutzereingaben, landen
+aber in Variablen, die spätere Schritte lesen. Deshalb: Variablennamen vergibt nur der Generator
+(Schrittnummer + Bezeichner aus dem Block-YAML), es gibt nur die Typen `zahl` und `ja_nein`, und nach
+jedem Schritt wird normalisiert (Zahl → nur Ziffern/Minus, sonst leer; ja/nein → fester Wert). Auch
+`%VAR%` in CMD kann damit keine Sonderzeichen wie `&` oder `|` einschleusen.
+
 ## 6. Webanwendung
 
 - Login per OIDC (Keycloak), optional auf eine Gruppe beschränkt. `AUTH_DISABLED=true`

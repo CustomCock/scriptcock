@@ -203,7 +203,54 @@ Was das Script daraus macht:
   Erklärung ab.
 - Kopfkommentar: `Benötigte Rechte:  Administrator (Schritt 2, 4)` bzw. `sudo (…)` bzw. `keine`.
 
-## 6. Dry-Run (Simulation)
+## 6. Rückgabewerte (`rueckgabe`)
+
+Ein Block kann Werte liefern, die spätere Schritte verwenden (z. B. „Wenn freier Speicher < 10 % …“):
+
+```yaml
+rueckgabe:
+  - id: frei_prozent
+    typ: zahl                  # nur zahl oder ja_nein
+    beschreibung: "Freier Speicher des Systemlaufwerks in Prozent"
+    ziele: [powershell, bash, zsh]   # optional; fehlt es, gilt die Rückgabe für alle Ziele
+ziele:
+  powershell: |
+    {{ rueckgabe_frei_prozent }} = [math]::Floor(100 * $okmSystem.Free / $okmGesamt)
+  bash: |
+    {{ rueckgabe_frei_prozent }}=$(df -P / | awk 'NR == 2 { sub(/%/, "", $5); print 100 - $5 }')
+```
+
+- `{{ rueckgabe_<id> }}` wird zum Variablennamen, den **nur der Generator** vergibt:
+  `$script:OkmS3_frei_prozent` (PowerShell), `okm_s3_frei_prozent` (bash/zsh),
+  `OKM_S3_FREI_PROZENT` (CMD, Zuweisung mit `set {{ rueckgabe_x }}=1` – ohne Quotes).
+- Jede Rückgabe muss im Template jedes ihrer Ziele gesetzt werden (die Registry prüft das). Lässt
+  sie sich für ein Ziel nicht sicher ermitteln, `ziele:` der Rückgabe einschränken.
+- Alle Rückgaben stehen vor dem ersten Schritt auf „unbekannt“ (`$null` bzw. leer). Nach einem
+  erfolgreichen Schritt normalisiert der Generator: `zahl` → nur Ziffern (sonst unbekannt),
+  `ja_nein` → PowerShell `$true`/`$false`, sonst `1`/`0` (`1`, `true`, `ja` gelten als ja; CMD nur `1`).
+- **CMD:** `set` setzt in `.cmd`-Dateien den Errorlevel auf 0 – Rückgabe zuerst setzen, danach
+  `cmd /c exit N`. Werte nicht im selben `( … )`-Block wieder lesen (`%VAR%` wird beim Einlesen
+  des Blocks ersetzt).
+- **bash/zsh:** Zuweisungen nicht in einer Pipe oder `( … )` machen (Subshell – der Wert ginge verloren).
+
+### Werte aus früheren Schritten verwenden (`typ: variable`)
+
+```yaml
+parameter:
+  - id: frei
+    label: Freier Speicher (aus einem früheren Schritt)
+    typ: variable
+    variable_typ: zahl           # zahl oder ja_nein
+```
+
+Der Wert im Request ist `"<schritt>.<rueckgabe_id>"`, z. B. `"3.frei_prozent"` (Schritt-Nummer wie in
+`[3/7]`). Geprüft wird: Der Schritt liegt davor, liefert den Wert für das Zielsystem, der Typ passt,
+und er steht nicht in einem „Versuche“-Block, der den aktuellen Schritt nicht umfasst (bash/zsh führen
+„Versuche“ in einer Subshell aus). Im Template wird `{{ frei }}` zum lesenden Ausdruck
+(`$script:OkmS3_frei_prozent`, `"$okm_s3_frei_prozent"`, `"%OKM_S3_FREI_PROZENT%"`) – wie ein
+Literal ohne eigene Quotes verwenden.
+
+## 7. Dry-Run (Simulation)
 
 Im Modus „Nur simulieren“ gilt pro Block:
 
@@ -214,7 +261,7 @@ Im Modus „Nur simulieren“ gilt pro Block:
    `-Force{{ whatif }}`).
 4. Sonst wird jede Zeile zu einer Ausgabe „[SIMULATION] würde ausführen: …“.
 
-## 7. Testen
+## 8. Testen
 
 ```bash
 pytest -q -rs
@@ -232,7 +279,7 @@ Bevor ein neuer Block produktiv geht, bitte auf den Test-VMs ausprobieren
 (`docs/test-vms.md`). Ist ein Befehl für ein System unsicher: das Ziel weglassen und in
 `docs/offene-punkte.md` eintragen.
 
-## 8. Rezepte
+## 9. Rezepte
 
 Rezepte (`recipes/*.yaml`) verketten Blöcke mit einem eigenen, einfachen Formular:
 

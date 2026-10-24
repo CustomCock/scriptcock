@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from app.escaping import Ziel, echo_cmd, kommentar_text
+from app.escaping import Escaped, Ziel, echo_cmd, kommentar_text
 from app.generators.base import EINZUG, LINIE, Generator, SchrittInfo
 from app.ir import ScriptIR
-from app.models.block import BlockDef
+from app.models.block import BlockDef, RueckgabeDef, RueckgabeTyp
 
 LOG = '"%OKM_LOG%"'
 TMP = '"%OKM_TMP%"'
@@ -120,6 +120,7 @@ class CmdGenerator(Generator):
         zeilen += ["(call )", *self._gruppe(info.koerper, b.interaktiv)]
         if info.pruefung:
             zeilen += ["rem Prüfung", "(call )", *self._gruppe(info.pruefung, b.interaktiv)]
+        zeilen += info.nachher
         zeilen += ["set /a OKM_OK+=1 >nul", *_echo_beides(EINZUG + "OK"), ""]
         return zeilen
 
@@ -232,3 +233,16 @@ class CmdGenerator(Generator):
             "",
             *rechte,
         ]
+
+    def rueckgaben_vorbelegen(self, rueckgaben: list[tuple[Escaped, RueckgabeDef]]) -> list[str]:
+        return [
+            "rem Rückgabewerte der Schritte (Namen vergibt der Baukasten; leer = unbekannt)",
+            *(f'set "{name}="' for name, _ in rueckgaben),
+            "",
+        ]
+
+    def rueckgabe_normalisieren(self, name: Escaped, r: RueckgabeDef) -> list[str]:
+        if r.typ is RueckgabeTyp.ZAHL:
+            # Bleibt nach Entfernen von Ziffern und "-" etwas übrig, ist es keine Zahl.
+            return [f'if defined {name} for /f "delims=-0123456789" %%z in ("%{name}%") do set "{name}="']
+        return [f'if defined {name} if not "%{name}%"=="1" set "{name}=0"']

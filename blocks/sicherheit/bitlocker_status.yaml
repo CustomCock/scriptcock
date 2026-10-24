@@ -1,5 +1,5 @@
 id: bitlocker_status
-version: 1
+version: 2
 name: BitLocker-Status
 kategorie: Sicherheit
 beschreibung: Zeigt für jedes Laufwerk, ob es mit BitLocker verschlüsselt ist. Wiederherstellungsschlüssel werden nicht angezeigt.
@@ -8,8 +8,15 @@ fortschritt: BitLocker-Status wird gelesen
 rechte:
   powershell: admin
   cmd: admin
+rueckgabe:
+  - id: verschluesselt
+    typ: ja_nein
+    beschreibung: Das Systemlaufwerk ist mit aktivem BitLocker-Schutz verschlüsselt
+    ziele: [powershell]
 ziele:
   powershell: |
     Get-BitLockerVolume | Format-Table MountPoint, VolumeStatus, ProtectionStatus, EncryptionPercentage, EncryptionMethod -AutoSize
+    $okmSystem = Get-BitLockerVolume -MountPoint $env:SystemDrive -ErrorAction SilentlyContinue
+    {{ rueckgabe_verschluesselt }} = ($null -ne $okmSystem) -and ("$($okmSystem.ProtectionStatus)" -eq 'On')
   cmd: |
     manage-bde -status

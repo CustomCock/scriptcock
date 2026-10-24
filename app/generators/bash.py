@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from app.escaping import Ziel, sh_literal
+from app.escaping import Escaped, Ziel, sh_literal
 from app.generators.base import EINZUG, LINIE, Generator, SchrittInfo, einruecken
 from app.ir import ScriptIR
-from app.models.block import BlockDef
+from app.models.block import BlockDef, RueckgabeDef, RueckgabeTyp
 
 NIE_ROOT_TEXT = "Dieses Script darf nicht als root (mit sudo) gestartet werden: "
 NIE_ROOT_HINWEIS = "Bitte ohne sudo starten – das Script fragt selbst, wenn es sudo braucht."
@@ -235,6 +235,18 @@ class ShGenerator(Generator):
     def fehler_ort(self) -> list[str]:
         raise NotImplementedError
 
+    def rueckgaben_vorbelegen(self, rueckgaben: list[tuple[Escaped, RueckgabeDef]]) -> list[str]:
+        return [
+            "# Rückgabewerte der Schritte (Namen vergibt der Baukasten; leer = unbekannt)",
+            *(f"{name}=''" for name, _ in rueckgaben),
+            "",
+        ]
+
+    def rueckgabe_normalisieren(self, name: Escaped, r: RueckgabeDef) -> list[str]:
+        if r.typ is RueckgabeTyp.ZAHL:
+            return [f"[[ ${name} =~ ^-?[0-9]+$ ]] || {name}=''"]
+        return [f"case \"${name}\" in 1|true|ja) {name}=1 ;; '') ;; *) {name}=0 ;; esac"]
+
     def sudo_helfer(self) -> list[str]:
         """``{{ sudo }}`` wird zu ``okm_sudo `` – als root direkt, sonst über sudo."""
         return [
@@ -274,6 +286,7 @@ class ShGenerator(Generator):
         zeilen += info.koerper
         if info.pruefung:
             zeilen += ["# Prüfung", *info.pruefung]
+        zeilen += info.nachher
         zeilen += ["okm_geschafft" if self.mit_kontrolle else "OKM_OK=$((OKM_OK + 1))", "okm_ok", ""]
         return zeilen
 

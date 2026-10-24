@@ -1,5 +1,5 @@
 id: dienst_status
-version: 2
+version: 3
 name: Dienst-Status prüfen
 kategorie: Dienste
 beschreibung: Zeigt, ob ein Systemdienst läuft.
@@ -13,9 +13,14 @@ parameter:
     label: Dienstname
     typ: dienstname
     beispiel: Spooler
+rueckgabe:
+  - id: laeuft
+    typ: ja_nein
+    beschreibung: Der Dienst läuft
 ziele:
   powershell: |
     $okmDienst = Get-Service -Name {{ dienst }} -ErrorAction SilentlyContinue
+    {{ rueckgabe_laeuft }} = ($null -ne $okmDienst) -and ($okmDienst.Status -eq 'Running')
     if (-not $okmDienst) {
         Write-OkmWarnung 'Diesen Dienst gibt es nicht.'
     } else {
@@ -26,22 +31,30 @@ ziele:
     sc query {{ dienst }}
     if errorlevel 1 (
       echo Hinweis: Diesen Dienst gibt es nicht oder er lässt sich nicht abfragen.
-      cmd /c exit 0
+      set {{ rueckgabe_laeuft }}=0
+    ) else (
+      set {{ rueckgabe_laeuft }}=0
+      rem Der Zustand RUNNING ist auch auf deutschem Windows englisch
+      sc query {{ dienst }} | find "RUNNING" >nul && set {{ rueckgabe_laeuft }}=1
     )
+    cmd /c exit 0
   bash: |
     # Exit-Codes von systemctl status: 0 läuft, 3 gestoppt, 4 unbekannt – Ergebnis, kein Fehler
     okm_rc=0
     systemctl --no-pager status {{ dienst }} || okm_rc=$?
+    {{ rueckgabe_laeuft }}=0
     case "$okm_rc" in
-      0) ;;
+      0) {{ rueckgabe_laeuft }}=1 ;;
       3) okm_warn 'Der Dienst ist vorhanden, läuft aber nicht.' ;;
       4) okm_warn 'Diesen Dienst gibt es nicht.' ;;
       *) okm_fehler "systemctl endete mit Exit-Code $okm_rc."; false ;;
     esac
   zsh: |
     okm_label={{ dienst }}
+    {{ rueckgabe_laeuft }}=0
     if okm_launchd="$(launchctl print "system/$okm_label" 2>/dev/null)"; then
       printf '%s\n' "$okm_launchd" | grep -E '^\s*(state|pid|path) =' || true
+      case "$okm_launchd" in *'state = running'*) {{ rueckgabe_laeuft }}=1 ;; esac
     else
       okm_warn 'Diesen Dienst gibt es nicht (oder er ist nur für den angemeldeten Benutzer geladen).'
     fi

@@ -93,6 +93,11 @@ Write-OkmInfo '=============================================='
 
 Write-OkmInfo 'Rechte: ohne erhöhte Rechte'
 
+# Rückgabewerte der Schritte (Namen vergibt der Baukasten; $null = unbekannt)
+$script:OkmS2_stunden = $null
+$script:OkmS3_frei_prozent = $null
+$script:OkmS6_ausstehend = $null
+
 # --------------------------------------------------------------------
 # Schritt 1/6: Systeminfo anzeigen (Risiko: gruen)
 # --------------------------------------------------------------------
@@ -136,6 +141,7 @@ try {
     . {
         $okmStart = (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime
         $okmLaufzeit = (Get-Date) - $okmStart
+        $script:OkmS2_stunden = [math]::Floor($okmLaufzeit.TotalHours)
         Write-Host ('Letzter Start: ' + $okmStart.ToString('dd.MM.yyyy HH:mm') + ' (vor ' + $okmLaufzeit.Days + ' Tagen)')
         $okmGruende = @()
         if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') { $okmGruende += 'Windows-Komponenten' }
@@ -148,6 +154,7 @@ try {
         }
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
+    if ("$($script:OkmS2_stunden)" -match '^-?[0-9]+$') { $script:OkmS2_stunden = [long]"$($script:OkmS2_stunden)" } else { $script:OkmS2_stunden = $null }
     $OkmErfolgreich++
     Write-OkmOk
 } catch {
@@ -167,8 +174,13 @@ try {
         Get-PSDrive -PSProvider FileSystem |
             Where-Object { $null -ne $_.Used } |
             Format-Table Name, Root, @{ Name = 'Belegt (GB)'; Expression = { [math]::Round($_.Used / 1GB, 1) } }, @{ Name = 'Frei (GB)'; Expression = { [math]::Round($_.Free / 1GB, 1) } } -AutoSize
+        $okmSystem = Get-PSDrive -Name $env:SystemDrive.Substring(0, 1) -ErrorAction SilentlyContinue
+        if ($okmSystem -and ($okmSystem.Used + $okmSystem.Free) -gt 0) {
+            $script:OkmS3_frei_prozent = [math]::Floor(100 * $okmSystem.Free / ($okmSystem.Used + $okmSystem.Free))
+        }
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
+    if ("$($script:OkmS3_frei_prozent)" -match '^-?[0-9]+$') { $script:OkmS3_frei_prozent = [long]"$($script:OkmS3_frei_prozent)" } else { $script:OkmS3_frei_prozent = $null }
     $OkmErfolgreich++
     Write-OkmOk
 } catch {
@@ -238,6 +250,7 @@ try {
         Write-Host 'Suche ausstehende Updates …'
         $okmSuche = (New-Object -ComObject Microsoft.Update.Session).CreateUpdateSearcher()
         $okmOffen = $okmSuche.Search("IsInstalled=0 and IsHidden=0").Updates
+        $script:OkmS6_ausstehend = $okmOffen.Count
         if ($okmOffen.Count -eq 0) {
             Write-Host 'Keine ausstehenden Updates.' -ForegroundColor Green
         } else {
@@ -246,6 +259,7 @@ try {
         }
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
+    if ("$($script:OkmS6_ausstehend)" -match '^-?[0-9]+$') { $script:OkmS6_ausstehend = [long]"$($script:OkmS6_ausstehend)" } else { $script:OkmS6_ausstehend = $null }
     $OkmErfolgreich++
     Write-OkmOk
 } catch {

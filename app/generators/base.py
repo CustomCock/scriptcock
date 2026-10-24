@@ -20,9 +20,9 @@ from app import escaping
 from app.escaping import Escaped, UnsicherError, Ziel
 from app.export import exportiere, text_fuer
 from app.ir import BlockSchritt, Knoten, ScriptIR, WennFehler, Wiederhole
-from app.models.block import WINDOWS, BlockDef, Recht, Risiko
+from app.models.block import RUECKGABE_PRAEFIX, WINDOWS, BlockDef, ParamTyp, Recht, Risiko, RueckgabeDef
 from app.registry import Registry
-from app.validation import ValidierungsFehler, pruefe_wert_fuer_ziel
+from app.validation import ValidierungsFehler, pruefe_wert_fuer_ziel, verweis_teile
 
 
 class GenerierungsFehler(ValueError):
@@ -48,6 +48,8 @@ class SchrittInfo:
     koerper: list[str]
     pruefung: list[str]
     bestaetigen: bool  # rote Bestätigung im Script
+    # Nach erfolgreichem Schritt: Rückgabewerte normalisieren (außerhalb jeder Umleitung/Gruppe)
+    nachher: list[str] = field(default_factory=list)
 
     @property
     def bezeichnung(self) -> str:
@@ -125,6 +127,13 @@ class Generator(ABC):
         zeilen: list[str] = []
         zeilen += self.kopf(ir, defs)
         zeilen += self.praeambel(ir, len(bloecke), braucht_admin)
+        rueckgaben = [
+            (escaping.variable_setzen(self.ziel, nr, r.id), r)
+            for nr, b in enumerate(defs, 1)
+            for r in b.rueckgaben(self.ziel)
+        ]
+        if rueckgaben:
+            zeilen += self.rueckgaben_vorbelegen(rueckgaben)
         zeilen += self.emit_liste(ir.schritte)
         zeilen += self.abschluss(ir)
 
@@ -171,6 +180,11 @@ class Generator(ABC):
             koerper=koerper,
             pruefung=pruefung,
             bestaetigen=block.risiko is Risiko.ROT and not dry,
+            nachher=[
+                z
+                for r in block.rueckgaben(self.ziel)
+                for z in self.rueckgabe_normalisieren(escaping.variable_setzen(self.ziel, self._nr, r.id), r)
+            ],
         )
         return self.schritt(info)
 
@@ -225,7 +239,9 @@ class Generator(ABC):
                     kontext[p.id] = escaping.leer()
                     continue
                 pruefe_wert_fuer_ziel(wert, self.ziel)
-                if isinstance(wert.wert, bool):
+                if p.typ is ParamTyp.VARIABLE and isinstance(wert.wert, str):
+                    kontext[p.id] = escaping.variable_lesen(self.ziel, *verweis_teile(wert.wert))
+                elif isinstance(wert.wert, bool):
                     kontext[p.id] = escaping.wahrheitswert(self.ziel, wert.wert)
                 elif isinstance(wert.wert, int):
                     kontext[p.id] = escaping.zahl(wert.wert)
@@ -239,6 +255,8 @@ class Generator(ABC):
                 kontext[name] = escaping.leer()
             else:
                 kontext[name] = escaping.literal(self.ziel, unc_zu_smb_url(quelle.wert))
+        for r in block.rueckgaben(self.ziel):
+            kontext[RUECKGABE_PRAEFIX + r.id] = escaping.variable_setzen(self.ziel, self._nr, r.id)
         kontext["whatif"] = escaping.vertraut(" -WhatIf" if dry and self.ziel is Ziel.POWERSHELL else "")
         # Linux/macOS: privilegierte Befehle laufen über okm_sudo (root: direkt, sonst sudo)
         kontext["sudo"] = escaping.vertraut("okm_sudo " if block.recht(self.ziel) is Recht.ROOT else "")
@@ -273,6 +291,10 @@ class Generator(ABC):
             p.id: ("" if (v := schritt.parameter.get(p.id)) is None or v.wert is None else str(v.wert))
             for p in block.parameter
         }
+        for p in block.parameter:
+            if p.typ is ParamTyp.VARIABLE and werte[p.id]:
+                nr, rid = verweis_teile(werte[p.id])
+                werte[p.id] = f"Wert {rid} aus Schritt {nr}"
         return " ".join(vorlage.render(**werte).split())
 
     def kommentar_zeilen(self, ir: ScriptIR, defs: list[BlockDef]) -> list[str]:
@@ -373,6 +395,14 @@ class Generator(ABC):
 
     @abstractmethod
     def ist_kommentar(self, zeile: str) -> bool: ...
+
+    @abstractmethod
+    def rueckgaben_vorbelegen(self, rueckgaben: list[tuple[Escaped, RueckgabeDef]]) -> list[str]:
+        """Alle Rückgabevariablen vor dem ersten Schritt auf „unbekannt“ setzen."""
+
+    @abstractmethod
+    def rueckgabe_normalisieren(self, name: Escaped, r: RueckgabeDef) -> list[str]:
+        """Zahl → nur Ziffern (sonst unbekannt), ja/nein → fester Wahrheitswert."""
 
 
 def einruecken(zeilen: list[str], tiefe: int) -> list[str]:

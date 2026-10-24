@@ -1,5 +1,5 @@
 id: ping
-version: 1
+version: 2
 name: Ping auf Ziel
 kategorie: Netzwerk
 beschreibung: Prüft, ob ein Rechner oder Gerät im Netzwerk antwortet.
@@ -25,34 +25,63 @@ parameter:
     typ: ja_nein
     pflicht: false
     standard: false
+rueckgabe:
+  - id: erreichbar
+    typ: ja_nein
+    beschreibung: Das Ziel hat geantwortet
+  - id: ms
+    typ: zahl
+    beschreibung: Mittlere Antwortzeit in Millisekunden (leer, wenn keine Antwort)
+    ziele: [powershell, bash, zsh]
 ziele:
   powershell: |
-    ping.exe -n {{ anzahl }} {{ ziel }}
-    if ($LASTEXITCODE -ne 0) {
+    $okmAusgabe = @(ping.exe -n {{ anzahl }} {{ ziel }})
+    $okmRc = $LASTEXITCODE
+    $okmAusgabe
+    # ping.exe meldet auch "Zielhost nicht erreichbar" (Antwort eines Routers) mit Exit-Code 0 –
+    # erreichbar ist das Ziel nur, wenn eine Antwort mit TTL kam.
+    {{ rueckgabe_erreichbar }} = ($okmRc -eq 0) -and (($okmAusgabe -join ' ') -match 'TTL=')
+    $okmZeiten = [regex]::Matches(($okmAusgabe -join ' '), '=\s*(\d+)\s*ms')
+    if ({{ rueckgabe_erreichbar }} -and $okmZeiten.Count -gt 0) {
+        # letzte Angabe = Mittelwert (de: "Mittelwert = 8ms", en: "Average = 8ms")
+        {{ rueckgabe_ms }} = $okmZeiten[$okmZeiten.Count - 1].Groups[1].Value
+    }
+    if (-not {{ rueckgabe_erreichbar }}) {
     {% if abbrechen %}
         throw 'Das Ziel antwortet nicht.'
     {% else %}
         Write-Host 'Hinweis: Das Ziel hat nicht (vollständig) geantwortet.' -ForegroundColor Yellow
-        $global:LASTEXITCODE = 0
     {% endif %}
     }
+    $global:LASTEXITCODE = 0
   cmd: |
     ping -n {{ anzahl }} {{ ziel }}
-    {% if not abbrechen %}
+    rem "set" setzt in .cmd-Dateien den Errorlevel auf 0 – daher erst danach "cmd /c exit"
     if errorlevel 1 (
+      set {{ rueckgabe_erreichbar }}=0
+    {% if abbrechen %}
+      cmd /c exit 1
+    {% else %}
       echo Hinweis: Das Ziel hat nicht vollständig geantwortet.
       cmd /c exit 0
+    {% endif %}
+    ) else (
+      set {{ rueckgabe_erreichbar }}=1
     )
-    {% endif %}
-  bash: |
+  bash: &ping_sh |
+    okm_rc=0
+    okm_ausgabe=$(ping -c {{ anzahl }} {{ ziel }} 2>&1) || okm_rc=$?
+    printf '%s\n' "$okm_ausgabe"
+    if [ "$okm_rc" -eq 0 ]; then
+      {{ rueckgabe_erreichbar }}=1
+      # "rtt min/avg/max/mdev = 11.1/12.6/…" (Linux) bzw. "round-trip min/avg/…" (macOS)
+      {{ rueckgabe_ms }}=$(printf '%s\n' "$okm_ausgabe" | awk -F/ '/min\/avg/ { printf "%.0f", $5 }')
+    else
+      {{ rueckgabe_erreichbar }}=0
     {% if abbrechen %}
-    ping -c {{ anzahl }} {{ ziel }}
+      false
     {% else %}
-    ping -c {{ anzahl }} {{ ziel }} || printf '%s\n' 'Hinweis: Das Ziel hat nicht (vollständig) geantwortet.'
+      printf '%s\n' 'Hinweis: Das Ziel hat nicht (vollständig) geantwortet.'
     {% endif %}
-  zsh: |
-    {% if abbrechen %}
-    ping -c {{ anzahl }} {{ ziel }}
-    {% else %}
-    ping -c {{ anzahl }} {{ ziel }} || printf '%s\n' 'Hinweis: Das Ziel hat nicht (vollständig) geantwortet.'
-    {% endif %}
+    fi
+  zsh: *ping_sh

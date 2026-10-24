@@ -197,14 +197,15 @@ def test_erneut_oeffnen_meldet_aenderungen(reg: Registry, db: Datenbank) -> None
         c, "drucker_einrichten", "bash", {"druckername": "Empfang", "drucker_ip": "10.0.0.5"}
     )
     # Bausteine haben sich seit dem Speichern geändert
-    reg.bloecke["ping"] = reg.bloecke["ping"].model_copy(update={"version": 2})
+    alt = reg.bloecke["ping"].version
+    reg.bloecke["ping"] = reg.bloecke["ping"].model_copy(update={"version": alt + 1})
     del reg.bloecke["drucker_ip"]
     seite = c.get(f"/baukasten?aus={sid}").text
-    assert "„Ping auf Ziel“ wurde seit dem Speichern geändert (Version 1 → 2)" in seite
+    assert f"„Ping auf Ziel“ wurde seit dem Speichern geändert (Version {alt} → {alt + 1})" in seite
     assert "Den Baustein „drucker_ip“ gibt es nicht mehr" in seite
     assert seite.count('name="schritt"') == 1
     detail = c.get(f"/skripte/{sid}").text
-    assert "2 (geändert)" in detail and "entfernt" in detail
+    assert f"{alt + 1} (geändert)" in detail and "entfernt" in detail
 
 
 # --- Rollen & Rezept-Freigabe ----------------------------------------------------

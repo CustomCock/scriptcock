@@ -1,5 +1,5 @@
 id: festplattenbelegung
-version: 1
+version: 2
 name: Festplattenbelegung anzeigen
 kategorie: System
 beschreibung: Zeigt für jedes Laufwerk, wie viel Speicherplatz belegt und frei ist.
@@ -7,11 +7,20 @@ risiko: gruen
 fortschritt: Festplattenbelegung wird ermittelt
 rechte:
   cmd: admin
+rueckgabe:
+  - id: frei_prozent
+    typ: zahl
+    beschreibung: "Freier Speicher des Systemlaufwerks (C: bzw. /) in Prozent"
+    ziele: [powershell, bash, zsh]
 ziele:
   powershell: |
     Get-PSDrive -PSProvider FileSystem |
         Where-Object { $null -ne $_.Used } |
         Format-Table Name, Root, @{ Name = 'Belegt (GB)'; Expression = { [math]::Round($_.Used / 1GB, 1) } }, @{ Name = 'Frei (GB)'; Expression = { [math]::Round($_.Free / 1GB, 1) } } -AutoSize
+    $okmSystem = Get-PSDrive -Name $env:SystemDrive.Substring(0, 1) -ErrorAction SilentlyContinue
+    if ($okmSystem -and ($okmSystem.Used + $okmSystem.Free) -gt 0) {
+        {{ rueckgabe_frei_prozent }} = [math]::Floor(100 * $okmSystem.Free / ($okmSystem.Used + $okmSystem.Free))
+    }
   cmd: |
     for %%D in (C D E F G H I J K L M N O P Q R S T U V W X Y Z) do if exist %%D:\ (
       echo Laufwerk %%D:
@@ -20,7 +29,9 @@ ziele:
     cmd /c exit 0
   bash: |
     df -h -x tmpfs -x devtmpfs -x squashfs -x overlay
+    {{ rueckgabe_frei_prozent }}=$(df -P / | awk 'NR == 2 { sub(/%/, "", $5); print 100 - $5 }')
   zsh: |
     df -h -l
+    {{ rueckgabe_frei_prozent }}=$(df -P / | awk 'NR == 2 { sub(/%/, "", $5); print 100 - $5 }')
 hinweise:
   cmd: Nutzt "fsutil", das unter Windows Administratorrechte benötigt.

@@ -15,6 +15,7 @@ Grundregeln (siehe docs/sicherheit.md):
 
 from __future__ import annotations
 
+import re
 import unicodedata
 from enum import StrEnum
 from typing import Any
@@ -137,6 +138,42 @@ def leer() -> Escaped:
 def vertraut(code: str) -> Escaped:
     """Vom Generator selbst erzeugter Code (z. B. `` -WhatIf``) – nie für Eingaben!"""
     return Escaped(code)
+
+
+# --- Rückgabewerte (Variablen, deren Namen nur der Generator vergibt) ----------
+
+_RUECKGABE_ID = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
+
+
+def variablen_name(ziel: Ziel, nr: int, rid: str) -> str:
+    """``OkmS3_frei_prozent`` / ``okm_s3_frei_prozent`` / ``OKM_S3_FREI_PROZENT``."""
+    if not (isinstance(nr, int) and nr > 0 and _RUECKGABE_ID.match(rid)):
+        raise UnsicherError(f"Ungültiger Rückgabewert: {nr}.{rid}")
+    if ziel is Ziel.POWERSHELL:
+        return f"OkmS{nr}_{rid}"
+    if ziel is Ziel.CMD:
+        return f"OKM_S{nr}_{rid.upper()}"
+    return f"okm_s{nr}_{rid}"
+
+
+def variable_setzen(ziel: Ziel, nr: int, rid: str) -> Escaped:
+    """Ziel einer Zuweisung im Block-Template (``{{ rueckgabe_x }} = …``)."""
+    name = variablen_name(ziel, nr, rid)
+    return Escaped("$script:" + name if ziel is Ziel.POWERSHELL else name)
+
+
+def variable_lesen(ziel: Ziel, nr: int, rid: str) -> Escaped:
+    """Vollständiger Ausdruck, der den Wert liest (wie ein Literal: Templates quoten nicht selbst).
+
+    Die Werte sind vom Generator normalisiert (Ziffern, 0/1 bzw. leer) – auch ``%…%`` in CMD
+    kann daher keine Sonderzeichen einschleusen.
+    """
+    name = variablen_name(ziel, nr, rid)
+    if ziel is Ziel.POWERSHELL:
+        return Escaped("$script:" + name, f"{nr}.{rid}")
+    if ziel is Ziel.CMD:
+        return Escaped(f'"%{name}%"', f"{nr}.{rid}")
+    return Escaped(f'"${name}"', f"{nr}.{rid}")
 
 
 # --- Ausgabe von beliebigem Text (Fortschrittsmeldungen, Simulation) ---------

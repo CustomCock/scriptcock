@@ -130,6 +130,10 @@ else
   OKM_SUDO_PID=$!
 fi
 
+# Rückgabewerte der Schritte (Namen vergibt der Baukasten; leer = unbekannt)
+okm_s1_erreichbar=''
+okm_s1_ms=''
+
 # --------------------------------------------------------------------
 # Schritt 1/2: Ping auf Ziel (Risiko: gruen)
 # --------------------------------------------------------------------
@@ -137,7 +141,19 @@ OKM_NR=1
 OKM_SCHRITT='1/2 (Ping auf Ziel)'
 OKM_TIPP='Ist das Gerät eingeschaltet und im selben Netz? Manche Geräte und Firewalls antworten grundsätzlich nicht auf Ping.'
 okm_info '[1/2] Ping auf 192.168.1.50 (2x) ...'
-ping -c 2 '192.168.1.50'
+okm_rc=0
+okm_ausgabe=$(ping -c 2 '192.168.1.50' 2>&1) || okm_rc=$?
+printf '%s\n' "$okm_ausgabe"
+if [ "$okm_rc" -eq 0 ]; then
+  okm_s1_erreichbar=1
+  # "rtt min/avg/max/mdev = 11.1/12.6/…" (Linux) bzw. "round-trip min/avg/…" (macOS)
+  okm_s1_ms=$(printf '%s\n' "$okm_ausgabe" | awk -F/ '/min\/avg/ { printf "%.0f", $5 }')
+else
+  okm_s1_erreichbar=0
+  false
+fi
+case "$okm_s1_erreichbar" in 1|true|ja) okm_s1_erreichbar=1 ;; '') ;; *) okm_s1_erreichbar=0 ;; esac
+[[ $okm_s1_ms =~ ^-?[0-9]+$ ]] || okm_s1_ms=''
 OKM_OK=$((OKM_OK + 1))
 okm_ok
 

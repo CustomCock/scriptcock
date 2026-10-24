@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from app.escaping import Ziel, powershell_literal
+from app.escaping import Escaped, Ziel, powershell_literal
 from app.generators.base import EINZUG, LINIE, Generator, SchrittInfo, einruecken
 from app.ir import ScriptIR
-from app.models.block import BlockDef
+from app.models.block import BlockDef, RueckgabeDef, RueckgabeTyp
 
 
 def _lit(text: str) -> str:
@@ -211,6 +211,7 @@ class PowerShellGenerator(Generator):
                 "    } | Out-Host",
                 "    if ($LASTEXITCODE -ne 0) { throw ('Prüfung endete mit Exit-Code ' + $LASTEXITCODE) }",
             ]
+        zeilen += einruecken(info.nachher, 4)
         zeilen += [
             "    $OkmErfolgreich++",
             "    Write-OkmOk",
@@ -253,3 +254,18 @@ class PowerShellGenerator(Generator):
 
     def abschluss(self, ir: ScriptIR) -> list[str]:
         return ["$OkmStatus = 'fertig'", "Exit-OkmScript 0"]
+
+    def rueckgaben_vorbelegen(self, rueckgaben: list[tuple[Escaped, RueckgabeDef]]) -> list[str]:
+        return [
+            "# Rückgabewerte der Schritte (Namen vergibt der Baukasten; $null = unbekannt)",
+            *(f"{name} = $null" for name, _ in rueckgaben),
+            "",
+        ]
+
+    def rueckgabe_normalisieren(self, name: Escaped, r: RueckgabeDef) -> list[str]:
+        if r.typ is RueckgabeTyp.ZAHL:
+            return [
+                f'if ("$({name})" -match \'^-?[0-9]+$\') {{ {name} = [long]"$({name})" }} '
+                f"else {{ {name} = $null }}"
+            ]
+        return [f"if ($null -ne {name}) {{ {name} = @('1', 'true', 'ja') -contains \"$({name})\" }}"]

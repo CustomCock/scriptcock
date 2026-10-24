@@ -67,6 +67,11 @@ UI-Formular / JSON ──► ScriptRequest ──► validation.py ──► Scr
   `admin_noetig` wird abgelehnt. Windows-Scripte starten sich per UAC selbst neu; bash/zsh holen
   einmal `sudo -v` + Keepalive. Root-Blöcke schreiben `{{ sudo }}` vor privilegierte Befehle
   (wird `okm_sudo `; bash = Funktion, zsh = Alias) – nie `sudo` direkt. `nie_root` bricht als root ab.
+- **Rückgabewerte**: `rueckgabe: [{id, typ: zahl|ja_nein, beschreibung, ziele?}]`; im Template
+  `{{ rueckgabe_<id> }}` als Zuweisungsziel (Namen `OkmS<n>_<id>`/`okm_s<n>_<id>`/`OKM_S<n>_<ID>` nur
+  vom Generator). Generator belegt vor Schritt 1 mit „unbekannt“ vor und normalisiert nach jedem
+  Schritt. Parametertyp `variable` (+ `variable_typ`) verweist mit `"<schritt>.<id>"` auf einen
+  früheren Schritt; `_BaumPruefer.verweis_pruefen` prüft Reihenfolge, Typ, Ziel und „Versuche“-Grenzen.
 - Ausgaben in Templates nur über die Helfer (`okm_info`/`okm_ok`/`okm_warn`/`okm_fehler`,
   `Write-OkmInfo`/`Write-OkmOk`/`Write-OkmWarnung`/`Write-OkmFehler`) – keine Farbcodes. `tipp:` im
   Block erscheint beim Fehler. Erwartete negative Ergebnisse (Ping ohne Antwort, Dienst gestoppt …)

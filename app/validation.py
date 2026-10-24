@@ -17,7 +17,7 @@ from urllib.parse import urlsplit
 from app import __version__
 from app.escaping import UnsicherError, Ziel, pruefe_zeichen
 from app.ir import BlockSchritt, Knoten, Optionen, ParamValue, ScriptIR, ScriptMeta, WennFehler, Wiederhole
-from app.models.block import ParameterDef, ParamTyp, Risiko
+from app.models.block import BlockDef, ParameterDef, ParamTyp, Risiko
 from app.models.request import (
     EingabeKnoten,
     SchrittEingabe,
@@ -277,6 +277,24 @@ def _url(text: str, p: ParameterDef) -> str:
     return text
 
 
+_VERWEIS = re.compile(r"^([1-9][0-9]{0,2})\.([a-z][a-z0-9_]{0,39})$")
+
+
+def _variable(text: str, p: ParameterDef) -> str:
+    """Verweis ``<schritt>.<rueckgabe_id>`` – ob es den Wert dort gibt, prüft ``_BaumPruefer``."""
+    if not _VERWEIS.match(text):
+        raise ValidierungsFehler(
+            "Bitte einen Wert aus einem vorherigen Schritt wählen "
+            "(Schritt-Nummer und Wert, z. B. 3.frei_prozent)."
+        )
+    return text
+
+
+def verweis_teile(wert: str) -> tuple[int, str]:
+    nr, rid = wert.split(".", 1)
+    return int(nr), rid
+
+
 def _auswahl(text: str, p: ParameterDef) -> str:
     erlaubt = [o.wert for o in p.optionen]
     if text not in erlaubt:
@@ -331,6 +349,7 @@ _TEXT_PRUEFER: dict[ParamTyp, Any] = {
     ParamTyp.URL: _url,
     ParamTyp.SHA256: _sha256,
     ParamTyp.AUSWAHL: _auswahl,
+    ParamTyp.VARIABLE: _variable,
 }
 
 
@@ -414,6 +433,11 @@ class _BaumPruefer:
         self.position = 0
         self.anzahl_bloecke = 0
         self.hat_rot = False
+        # Für Verweise auf Rückgabewerte: Schrittnummer -> (Block, umgebende „Versuche“-Blöcke).
+        # bash/zsh führen „Versuche“ in einer Subshell aus – dort gesetzte Werte gibt es danach nicht.
+        self.versuche: list[int] = []
+        self.anzahl_versuche = 0
+        self.bekannt: dict[int, tuple[BlockDef, tuple[int, ...]]] = {}
 
     def liste(self, eingaben: list[EingabeKnoten], tiefe: int) -> list[Knoten]:
         ergebnis: list[Knoten] = []
@@ -433,7 +457,10 @@ class _BaumPruefer:
         if isinstance(eingabe, WennFehlerEingabe):
             if not eingabe.versuche:
                 self.fehler.append(Feldfehler(i, None, "„Versuche“ braucht mindestens einen Schritt."))
+            self.anzahl_versuche += 1
+            self.versuche.append(self.anzahl_versuche)
             versuche = self.liste(eingabe.versuche, tiefe + 1)
+            self.versuche.pop()
             sonst = self.liste(eingabe.sonst, tiefe + 1)
             return WennFehler(versuche=versuche, sonst=sonst)
         # WiederholeEingabe
@@ -449,7 +476,10 @@ class _BaumPruefer:
 
     def block(self, i: int, eingabe: SchrittEingabe) -> BlockSchritt | None:
         self.anzahl_bloecke += 1
+        nr = self.anzahl_bloecke
         block = self.registry.bloecke.get(eingabe.block_id)
+        if block is not None:
+            self.bekannt[nr] = (block, tuple(self.versuche))
         if block is None:
             self.fehler.append(Feldfehler(i, None, f"Unbekannter Baustein „{eingabe.block_id}“."))
             return None
@@ -470,10 +500,45 @@ class _BaumPruefer:
             try:
                 wert = validiere_wert(p, eingabe.parameter.get(p.id))
                 pruefe_wert_fuer_ziel(wert, self.ziel)
+                if p.typ is ParamTyp.VARIABLE and isinstance(wert.wert, str):
+                    self.verweis_pruefen(nr, p, wert.wert)
                 werte[p.id] = wert
             except ValidierungsFehler as e:
                 self.fehler.append(Feldfehler(i, p.id, f"{p.label}: {e}"))
         return BlockSchritt(block_id=block.id, block_version=block.version, parameter=werte)
+
+    def verweis_pruefen(self, nr: int, p: ParameterDef, wert: str) -> None:
+        quelle_nr, rid = verweis_teile(wert)
+        if quelle_nr >= nr:
+            raise ValidierungsFehler(
+                f"Der Wert aus Schritt {quelle_nr} ist hier nicht verfügbar – er muss aus einem Schritt "
+                "vor diesem stammen."
+            )
+        if quelle_nr not in self.bekannt:
+            raise ValidierungsFehler(f"Schritt {quelle_nr} gibt es nicht.")
+        quelle, kette = self.bekannt[quelle_nr]
+        if not quelle.rueckgabe:
+            raise ValidierungsFehler(f"Schritt {quelle_nr} ({quelle.name}) liefert keine Werte.")
+        r = quelle.rueckgabe_def(rid)
+        if r is None:
+            namen = ", ".join(x.id for x in quelle.rueckgabe)
+            raise ValidierungsFehler(
+                f"Schritt {quelle_nr} ({quelle.name}) liefert keinen Wert „{rid}“ (nur: {namen})."
+            )
+        if r not in quelle.rueckgaben(self.ziel):
+            raise ValidierungsFehler(
+                f"Der Wert „{rid}“ aus Schritt {quelle_nr} ist für dieses Zielsystem nicht verfügbar."
+            )
+        if p.variable_typ is not None and r.typ is not p.variable_typ:
+            raise ValidierungsFehler(
+                f"„{rid}“ aus Schritt {quelle_nr} ist {r.typ.anzeige}, hier wird {p.variable_typ.anzeige} "
+                "gebraucht."
+            )
+        if tuple(self.versuche[: len(kette)]) != kette:
+            raise ValidierungsFehler(
+                f"Der Wert aus Schritt {quelle_nr} entsteht in einem „Versuche“-Block und ist außerhalb "
+                "davon nicht verfügbar."
+            )
 
 
 def validiere_request(

@@ -1,14 +1,20 @@
 id: uptime_neustart
-version: 1
+version: 2
 name: Letzter Neustart und ausstehender Neustart
 kategorie: Inventar
 beschreibung: Zeigt, wann der Rechner zuletzt gestartet wurde und ob ein Neustart aussteht (z. B. nach Updates).
 risiko: gruen
 fortschritt: Startzeit und ausstehende Neustarts werden geprüft
+rueckgabe:
+  - id: stunden
+    typ: zahl
+    beschreibung: Stunden seit dem letzten Start
+    ziele: [powershell, bash, zsh]
 ziele:
   powershell: |
     $okmStart = (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime
     $okmLaufzeit = (Get-Date) - $okmStart
+    {{ rueckgabe_stunden }} = [math]::Floor($okmLaufzeit.TotalHours)
     Write-Host ('Letzter Start: ' + $okmStart.ToString('dd.MM.yyyy HH:mm') + ' (vor ' + $okmLaufzeit.Days + ' Tagen)')
     $okmGruende = @()
     if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') { $okmGruende += 'Windows-Komponenten' }
@@ -24,6 +30,8 @@ ziele:
     reg query "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired" >nul 2>&1 && echo Neustart ausstehend: JA ^(Windows Update^) || echo Neustart ausstehend laut Windows Update: nein
   bash: |
     printf 'Letzter Start: %s (%s)\n' "$(uptime -s)" "$(uptime -p)"
+    okm_sekunden=$(cut -d' ' -f1 /proc/uptime)
+    {{ rueckgabe_stunden }}=$(( ${okm_sekunden%.*} / 3600 ))
     if [ -f /var/run/reboot-required ]; then
       printf '%s\n' 'Neustart ausstehend: JA'
       cat /var/run/reboot-required.pkgs 2>/dev/null || true
@@ -35,3 +43,6 @@ ziele:
   zsh: |
     printf 'Letzter Start: %s\n' "$(sysctl -n kern.boottime)"
     uptime
+    # "{ sec = 1729760000, usec = 0 } …" – erste Zahl nach "=" sind die Sekunden seit 1970
+    okm_start=$(sysctl -n kern.boottime | sed -E 's/^[^=]*= ([0-9]+).*/\1/')
+    {{ rueckgabe_stunden }}=$(( ($(date +%s) - okm_start) / 3600 ))

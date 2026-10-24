@@ -24,7 +24,7 @@ from pydantic import ValidationError
 
 from app.codeenv import code_umgebung, text_umgebung
 from app.escaping import Ziel
-from app.models.block import EINGEBAUTE_VARIABLEN, BlockDef, ParameterDef, Recht
+from app.models.block import EINGEBAUTE_VARIABLEN, RUECKGABE_PRAEFIX, BlockDef, ParameterDef, ParamTyp, Recht
 from app.models.recipe import RezeptDef, RezeptSchritt, feld_verweis, konstante
 from app.validation import ValidierungsFehler, pruefe_wert_fuer_ziel, validiere_wert
 
@@ -209,7 +209,8 @@ def _pruefe_block(block: BlockDef, reg: Registry, fehler: list[str]) -> None:
     param_ids = {p.id for p in block.parameter} | set(block.abgeleitete_variablen())
 
     for p in block.parameter:
-        if p.pflicht and p.beispiel is None and p.standard is None:
+        # Verweise auf Rückgabewerte hängen vom Script ab – dafür gibt es kein festes Beispiel.
+        if p.pflicht and p.beispiel is None and p.standard is None and p.typ is not ParamTyp.VARIABLE:
             fehler.append(f"{rel}: parameter.{p.id}: Pflichtparameter braucht 'beispiel' oder 'standard'")
         for name in ("beispiel", "standard"):
             wert = getattr(p, name)
@@ -230,7 +231,8 @@ def _pruefe_block(block: BlockDef, reg: Registry, fehler: list[str]) -> None:
                 fehler.append(f"{ort}: Template-Syntaxfehler in Zeile {e.lineno}: {e.message}")
                 continue
             variablen = meta.find_undeclared_variables(ast)
-            unbekannt = variablen - param_ids - EINGEBAUTE_VARIABLEN
+            rueckgaben = {RUECKGABE_PRAEFIX + r.id for r in block.rueckgaben(ziel)}
+            unbekannt = variablen - param_ids - EINGEBAUTE_VARIABLEN - rueckgaben
             if unbekannt:
                 fehler.append(f"{ort}: unbekannte Platzhalter: {', '.join(sorted(unbekannt))}")
             if "whatif" in variablen and ziel is not Ziel.POWERSHELL:
@@ -253,6 +255,18 @@ def _pruefe_block(block: BlockDef, reg: Registry, fehler: list[str]) -> None:
                 fehler.append(f"{ort}: Klammern außerhalb von Anführungszeichen sind nicht ausgeglichen")
             reg.vorlagen[(block.id, art, ziel)] = env.from_string(quelle)
             reg.variablen[(block.id, art, ziel)] = frozenset(variablen)
+
+    # Jeder Rückgabewert muss im Template seines Ziels gesetzt werden (sonst bliebe er „unbekannt“).
+    for ziel in block.ziele:
+        gesetzt = reg.variablen.get((block.id, "ziele", ziel), frozenset()) | reg.variablen.get(
+            (block.id, "pruefung", ziel), frozenset()
+        )
+        for r in block.rueckgaben(ziel):
+            if RUECKGABE_PRAEFIX + r.id not in gesetzt:
+                fehler.append(
+                    f"{rel}: ziele.{ziel.value}: Rückgabewert '{r.id}' wird nie gesetzt "
+                    f"({{{{ {RUECKGABE_PRAEFIX}{r.id} }}}} fehlt) – sonst 'ziele' der Rückgabe einschränken"
+                )
 
     if block.fortschritt is not None:
         try:

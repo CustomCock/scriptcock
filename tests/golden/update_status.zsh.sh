@@ -106,6 +106,10 @@ okm_info '=============================================='
 
 okm_info 'Rechte: ohne erhöhte Rechte'
 
+# Rückgabewerte der Schritte (Namen vergibt der Baukasten; leer = unbekannt)
+okm_s1_ausstehend=''
+okm_s2_stunden=''
+
 # --------------------------------------------------------------------
 # Schritt 1/2: Update-Status anzeigen (Risiko: gruen)
 # --------------------------------------------------------------------
@@ -113,7 +117,10 @@ OKM_NR=1
 OKM_SCHRITT='1/2 (Update-Status anzeigen)'
 OKM_TIPP=''
 okm_info '[1/2] Update-Status wird ermittelt ...'
-softwareupdate --list 2>&1 || true
+okm_liste=$(softwareupdate --list 2>&1 || true)
+printf '%s\n' "$okm_liste"
+okm_s1_ausstehend=$(printf '%s\n' "$okm_liste" | grep -c '^\* Label:' || true)
+[[ $okm_s1_ausstehend =~ ^-?[0-9]+$ ]] || okm_s1_ausstehend=''
 OKM_OK=$((OKM_OK + 1))
 okm_ok
 
@@ -126,6 +133,10 @@ OKM_TIPP=''
 okm_info '[2/2] Startzeit und ausstehende Neustarts werden geprüft ...'
 printf 'Letzter Start: %s\n' "$(sysctl -n kern.boottime)"
 uptime
+# "{ sec = 1729760000, usec = 0 } …" – erste Zahl nach "=" sind die Sekunden seit 1970
+okm_start=$(sysctl -n kern.boottime | sed -E 's/^[^=]*= ([0-9]+).*/\1/')
+okm_s2_stunden=$(( ($(date +%s) - okm_start) / 3600 ))
+[[ $okm_s2_stunden =~ ^-?[0-9]+$ ]] || okm_s2_stunden=''
 OKM_OK=$((OKM_OK + 1))
 okm_ok
 

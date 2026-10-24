@@ -114,6 +114,9 @@ if ($OkmPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrato
     }
 }
 
+# Rückgabewerte der Schritte (Namen vergibt der Baukasten; $null = unbekannt)
+$script:OkmS2_aktiv = $null
+
 # --------------------------------------------------------------------
 # Schritt 1/3: Sicherheits-Schnellcheck (Ampel) (Risiko: gruen)
 # --------------------------------------------------------------------
@@ -159,19 +162,23 @@ try {
     $global:LASTEXITCODE = 0
     . {
         $okmProdukte = Get-CimInstance -Namespace 'root\SecurityCenter2' -ClassName AntiVirusProduct -ErrorAction SilentlyContinue
+        $script:OkmS2_aktiv = $false
         foreach ($okmProdukt in $okmProdukte) {
             $okmHex = '{0:x6}' -f [int]$okmProdukt.productState
             $okmAktiv = $okmHex.Substring(2, 2) -in @('10', '11')
             $okmAktuell = $okmHex.Substring(4, 2) -eq '00'
+            if ($okmAktiv) { $script:OkmS2_aktiv = $true }
             Write-Host ($okmProdukt.displayName + ': ' + $(if ($okmAktiv) { 'aktiv' } else { 'NICHT aktiv' }) + ', Signaturen ' + $(if ($okmAktuell) { 'aktuell' } else { 'VERALTET' })) -ForegroundColor $(if ($okmAktiv -and $okmAktuell) { 'Green' } else { 'Red' })
         }
         if (-not $okmProdukte) { Write-Host 'Kein Eintrag im Sicherheitscenter (Server oder kein Virenschutz).' -ForegroundColor Yellow }
         $okmDefender = Get-MpComputerStatus -ErrorAction SilentlyContinue
+        if ($okmDefender -and $okmDefender.AntivirusEnabled -and $okmDefender.RealTimeProtectionEnabled) { $script:OkmS2_aktiv = $true }
         if ($okmDefender) {
             $okmDefender | Format-List AMRunningMode, AntivirusEnabled, RealTimeProtectionEnabled, AntivirusSignatureLastUpdated, QuickScanEndTime
         }
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
+    if ($null -ne $script:OkmS2_aktiv) { $script:OkmS2_aktiv = @('1', 'true', 'ja') -contains "$($script:OkmS2_aktiv)" }
     $OkmErfolgreich++
     Write-OkmOk
 } catch {

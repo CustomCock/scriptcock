@@ -1,5 +1,5 @@
 id: port_pruefen
-version: 1
+version: 2
 name: Port erreichbar prüfen
 kategorie: Netzwerk
 beschreibung: Prüft, ob auf einem Rechner ein bestimmter Netzwerk-Port (z. B. 443 für HTTPS) erreichbar ist.
@@ -22,10 +22,15 @@ parameter:
     typ: ja_nein
     pflicht: false
     standard: false
+rueckgabe:
+  - id: offen
+    typ: ja_nein
+    beschreibung: Der Port ist erreichbar
 ziele:
   powershell: |
     $okmTest = Test-NetConnection -ComputerName {{ ziel }} -Port {{ port }} -WarningAction SilentlyContinue
-    if ($okmTest.TcpTestSucceeded) {
+    {{ rueckgabe_offen }} = [bool]$okmTest.TcpTestSucceeded
+    if ({{ rueckgabe_offen }}) {
         Write-Host 'Der Port ist erreichbar.' -ForegroundColor Green
     } else {
     {% if abbrechen %}
@@ -36,8 +41,10 @@ ziele:
     }
   bash: |
     if timeout 5 bash -c 'exec 3<>"/dev/tcp/$1/$2"' okm {{ ziel }} {{ port }} 2>/dev/null; then
+      {{ rueckgabe_offen }}=1
       printf '%s\n' 'Der Port ist erreichbar.'
     else
+      {{ rueckgabe_offen }}=0
     {% if abbrechen %}
       printf '%s\n' 'Der Port ist nicht erreichbar.'
       false
@@ -47,8 +54,10 @@ ziele:
     fi
   zsh: |
     if nc -z -G 5 {{ ziel }} {{ port }} 2>/dev/null; then
+      {{ rueckgabe_offen }}=1
       printf '%s\n' 'Der Port ist erreichbar.'
     else
+      {{ rueckgabe_offen }}=0
     {% if abbrechen %}
       printf '%s\n' 'Der Port ist nicht erreichbar.'
       false

@@ -101,6 +101,11 @@ Write-OkmInfo '=============================================='
 
 Write-OkmInfo 'Rechte: ohne erhöhte Rechte'
 
+# Rückgabewerte der Schritte (Namen vergibt der Baukasten; $null = unbekannt)
+$script:OkmS3_erreichbar = $null
+$script:OkmS3_ms = $null
+$script:OkmS7_laeuft = $null
+
 # --------------------------------------------------------------------
 # Schritt 1/8: Meldung/Pause für den Benutzer (Risiko: gruen)
 # --------------------------------------------------------------------
@@ -150,12 +155,25 @@ try {
         try {
             $global:LASTEXITCODE = 0
             . {
-                ping.exe -n 4 '10.0.0.1'
-                if ($LASTEXITCODE -ne 0) {
+                $okmAusgabe = @(ping.exe -n 4 '10.0.0.1')
+                $okmRc = $LASTEXITCODE
+                $okmAusgabe
+                # ping.exe meldet auch "Zielhost nicht erreichbar" (Antwort eines Routers) mit Exit-Code 0 –
+                # erreichbar ist das Ziel nur, wenn eine Antwort mit TTL kam.
+                $script:OkmS3_erreichbar = ($okmRc -eq 0) -and (($okmAusgabe -join ' ') -match 'TTL=')
+                $okmZeiten = [regex]::Matches(($okmAusgabe -join ' '), '=\s*(\d+)\s*ms')
+                if ($script:OkmS3_erreichbar -and $okmZeiten.Count -gt 0) {
+                    # letzte Angabe = Mittelwert (de: "Mittelwert = 8ms", en: "Average = 8ms")
+                    $script:OkmS3_ms = $okmZeiten[$okmZeiten.Count - 1].Groups[1].Value
+                }
+                if (-not $script:OkmS3_erreichbar) {
                     throw 'Das Ziel antwortet nicht.'
                 }
+                $global:LASTEXITCODE = 0
             } | Out-Host
             if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
+            if ($null -ne $script:OkmS3_erreichbar) { $script:OkmS3_erreichbar = @('1', 'true', 'ja') -contains "$($script:OkmS3_erreichbar)" }
+            if ("$($script:OkmS3_ms)" -match '^-?[0-9]+$') { $script:OkmS3_ms = [long]"$($script:OkmS3_ms)" } else { $script:OkmS3_ms = $null }
             $OkmErfolgreich++
             Write-OkmOk
         } catch {
@@ -261,6 +279,7 @@ for ($OkmDurchlauf4 = 1; $OkmDurchlauf4 -le 3; $OkmDurchlauf4++) {
             $global:LASTEXITCODE = 0
             . {
                 $okmDienst = Get-Service -Name 'Spooler' -ErrorAction SilentlyContinue
+                $script:OkmS7_laeuft = ($null -ne $okmDienst) -and ($okmDienst.Status -eq 'Running')
                 if (-not $okmDienst) {
                     Write-OkmWarnung 'Diesen Dienst gibt es nicht.'
                 } else {
@@ -269,6 +288,7 @@ for ($OkmDurchlauf4 = 1; $OkmDurchlauf4 -le 3; $OkmDurchlauf4++) {
                 }
             } | Out-Host
             if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
+            if ($null -ne $script:OkmS7_laeuft) { $script:OkmS7_laeuft = @('1', 'true', 'ja') -contains "$($script:OkmS7_laeuft)" }
             $OkmErfolgreich++
             Write-OkmOk
         } catch {

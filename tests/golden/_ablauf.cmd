@@ -53,6 +53,10 @@ echo(==============================================
 echo(Rechte: ohne erhöhte Rechte
 >>"%OKM_LOG%" echo(Rechte: ohne erhöhte Rechte
 
+rem Rückgabewerte der Schritte (Namen vergibt der Baukasten; leer = unbekannt)
+set "OKM_S3_ERREICHBAR="
+set "OKM_S7_LAEUFT="
+
 rem --------------------------------------------------------------------
 rem Schritt 1/8: Meldung/Pause für den Benutzer (Risiko: gruen)
 rem --------------------------------------------------------------------
@@ -99,11 +103,19 @@ echo([3/8] Ping auf 10.0.0.1 ^(4x^) ...
 (call )
 (
 ping -n 4 "10.0.0.1"
+rem "set" setzt in .cmd-Dateien den Errorlevel auf 0 – daher erst danach "cmd /c exit"
+if errorlevel 1 (
+  set OKM_S3_ERREICHBAR=0
+  cmd /c exit 1
+) else (
+  set OKM_S3_ERREICHBAR=1
+)
 ) >"%OKM_TMP%" 2>&1
 set "OKM_RC=%ERRORLEVEL%"
 type "%OKM_TMP%"
 type "%OKM_TMP%" >>"%OKM_LOG%"
 if not "%OKM_RC%"=="0" goto :okm_sonst_2
+if defined OKM_S3_ERREICHBAR if not "%OKM_S3_ERREICHBAR%"=="1" set "OKM_S3_ERREICHBAR=0"
 set /a OKM_OK+=1 >nul
 echo(      OK
 >>"%OKM_LOG%" echo(      OK
@@ -208,13 +220,19 @@ echo([7/8] Status von Dienst Spooler wird abgefragt ...
 sc query "Spooler"
 if errorlevel 1 (
   echo Hinweis: Diesen Dienst gibt es nicht oder er lässt sich nicht abfragen.
-  cmd /c exit 0
+  set OKM_S7_LAEUFT=0
+) else (
+  set OKM_S7_LAEUFT=0
+  rem Der Zustand RUNNING ist auch auf deutschem Windows englisch
+  sc query "Spooler" | find "RUNNING" >nul && set OKM_S7_LAEUFT=1
 )
+cmd /c exit 0
 ) >"%OKM_TMP%" 2>&1
 set "OKM_RC=%ERRORLEVEL%"
 type "%OKM_TMP%"
 type "%OKM_TMP%" >>"%OKM_LOG%"
 if not "%OKM_RC%"=="0" goto :okm_sonst_5
+if defined OKM_S7_LAEUFT if not "%OKM_S7_LAEUFT%"=="1" set "OKM_S7_LAEUFT=0"
 set /a OKM_OK+=1 >nul
 echo(      OK
 >>"%OKM_LOG%" echo(      OK

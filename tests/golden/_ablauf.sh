@@ -135,6 +135,11 @@ okm_info '=============================================='
 
 okm_info 'Rechte: ohne erhöhte Rechte'
 
+# Rückgabewerte der Schritte (Namen vergibt der Baukasten; leer = unbekannt)
+okm_s3_erreichbar=''
+okm_s3_ms=''
+okm_s7_laeuft=''
+
 # --------------------------------------------------------------------
 # Schritt 1/8: Meldung/Pause für den Benutzer (Risiko: gruen)
 # --------------------------------------------------------------------
@@ -182,7 +187,19 @@ set +e
     OKM_SCHRITT='3/8 (Ping auf Ziel)'
     OKM_TIPP='Ist das Gerät eingeschaltet und im selben Netz? Manche Geräte und Firewalls antworten grundsätzlich nicht auf Ping.'
     okm_info '[3/8] Ping auf 10.0.0.1 (4x) ...'
-    ping -c 4 '10.0.0.1'
+    okm_rc=0
+    okm_ausgabe=$(ping -c 4 '10.0.0.1' 2>&1) || okm_rc=$?
+    printf '%s\n' "$okm_ausgabe"
+    if [ "$okm_rc" -eq 0 ]; then
+      okm_s3_erreichbar=1
+      # "rtt min/avg/max/mdev = 11.1/12.6/…" (Linux) bzw. "round-trip min/avg/…" (macOS)
+      okm_s3_ms=$(printf '%s\n' "$okm_ausgabe" | awk -F/ '/min\/avg/ { printf "%.0f", $5 }')
+    else
+      okm_s3_erreichbar=0
+      false
+    fi
+    case "$okm_s3_erreichbar" in 1|true|ja) okm_s3_erreichbar=1 ;; '') ;; *) okm_s3_erreichbar=0 ;; esac
+    [[ $okm_s3_ms =~ ^-?[0-9]+$ ]] || okm_s3_ms=''
     okm_geschafft
     okm_ok
 
@@ -284,12 +301,14 @@ for ((okm_durchlauf_4 = 1; okm_durchlauf_4 <= 3; okm_durchlauf_4++)); do
     # Exit-Codes von systemctl status: 0 läuft, 3 gestoppt, 4 unbekannt – Ergebnis, kein Fehler
     okm_rc=0
     systemctl --no-pager status 'Spooler' || okm_rc=$?
+    okm_s7_laeuft=0
     case "$okm_rc" in
-      0) ;;
+      0) okm_s7_laeuft=1 ;;
       3) okm_warn 'Der Dienst ist vorhanden, läuft aber nicht.' ;;
       4) okm_warn 'Diesen Dienst gibt es nicht.' ;;
       *) okm_fehler "systemctl endete mit Exit-Code $okm_rc."; false ;;
     esac
+    case "$okm_s7_laeuft" in 1|true|ja) okm_s7_laeuft=1 ;; '') ;; *) okm_s7_laeuft=0 ;; esac
     okm_geschafft
     okm_ok
 

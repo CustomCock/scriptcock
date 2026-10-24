@@ -94,6 +94,13 @@ Write-OkmInfo '=============================================='
 
 Write-OkmInfo 'Rechte: ohne erhöhte Rechte'
 
+# Rückgabewerte der Schritte (Namen vergibt der Baukasten; $null = unbekannt)
+$script:OkmS3_erreichbar = $null
+$script:OkmS3_ms = $null
+$script:OkmS5_erreichbar = $null
+$script:OkmS5_ms = $null
+$script:OkmS7_offen = $null
+
 # --------------------------------------------------------------------
 # Schritt 1/7: IP-Konfiguration anzeigen (Risiko: gruen)
 # --------------------------------------------------------------------
@@ -147,13 +154,25 @@ Write-OkmInfo '[3/7] Ping auf 1.1.1.1 (2x) ...'
 try {
     $global:LASTEXITCODE = 0
     . {
-        ping.exe -n 2 '1.1.1.1'
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host 'Hinweis: Das Ziel hat nicht (vollständig) geantwortet.' -ForegroundColor Yellow
-            $global:LASTEXITCODE = 0
+        $okmAusgabe = @(ping.exe -n 2 '1.1.1.1')
+        $okmRc = $LASTEXITCODE
+        $okmAusgabe
+        # ping.exe meldet auch "Zielhost nicht erreichbar" (Antwort eines Routers) mit Exit-Code 0 –
+        # erreichbar ist das Ziel nur, wenn eine Antwort mit TTL kam.
+        $script:OkmS3_erreichbar = ($okmRc -eq 0) -and (($okmAusgabe -join ' ') -match 'TTL=')
+        $okmZeiten = [regex]::Matches(($okmAusgabe -join ' '), '=\s*(\d+)\s*ms')
+        if ($script:OkmS3_erreichbar -and $okmZeiten.Count -gt 0) {
+            # letzte Angabe = Mittelwert (de: "Mittelwert = 8ms", en: "Average = 8ms")
+            $script:OkmS3_ms = $okmZeiten[$okmZeiten.Count - 1].Groups[1].Value
         }
+        if (-not $script:OkmS3_erreichbar) {
+            Write-Host 'Hinweis: Das Ziel hat nicht (vollständig) geantwortet.' -ForegroundColor Yellow
+        }
+        $global:LASTEXITCODE = 0
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
+    if ($null -ne $script:OkmS3_erreichbar) { $script:OkmS3_erreichbar = @('1', 'true', 'ja') -contains "$($script:OkmS3_erreichbar)" }
+    if ("$($script:OkmS3_ms)" -match '^-?[0-9]+$') { $script:OkmS3_ms = [long]"$($script:OkmS3_ms)" } else { $script:OkmS3_ms = $null }
     $OkmErfolgreich++
     Write-OkmOk
 } catch {
@@ -195,13 +214,25 @@ Write-OkmInfo '[5/7] Ping auf intranet.okm.local (4x) ...'
 try {
     $global:LASTEXITCODE = 0
     . {
-        ping.exe -n 4 'intranet.okm.local'
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host 'Hinweis: Das Ziel hat nicht (vollständig) geantwortet.' -ForegroundColor Yellow
-            $global:LASTEXITCODE = 0
+        $okmAusgabe = @(ping.exe -n 4 'intranet.okm.local')
+        $okmRc = $LASTEXITCODE
+        $okmAusgabe
+        # ping.exe meldet auch "Zielhost nicht erreichbar" (Antwort eines Routers) mit Exit-Code 0 –
+        # erreichbar ist das Ziel nur, wenn eine Antwort mit TTL kam.
+        $script:OkmS5_erreichbar = ($okmRc -eq 0) -and (($okmAusgabe -join ' ') -match 'TTL=')
+        $okmZeiten = [regex]::Matches(($okmAusgabe -join ' '), '=\s*(\d+)\s*ms')
+        if ($script:OkmS5_erreichbar -and $okmZeiten.Count -gt 0) {
+            # letzte Angabe = Mittelwert (de: "Mittelwert = 8ms", en: "Average = 8ms")
+            $script:OkmS5_ms = $okmZeiten[$okmZeiten.Count - 1].Groups[1].Value
         }
+        if (-not $script:OkmS5_erreichbar) {
+            Write-Host 'Hinweis: Das Ziel hat nicht (vollständig) geantwortet.' -ForegroundColor Yellow
+        }
+        $global:LASTEXITCODE = 0
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
+    if ($null -ne $script:OkmS5_erreichbar) { $script:OkmS5_erreichbar = @('1', 'true', 'ja') -contains "$($script:OkmS5_erreichbar)" }
+    if ("$($script:OkmS5_ms)" -match '^-?[0-9]+$') { $script:OkmS5_ms = [long]"$($script:OkmS5_ms)" } else { $script:OkmS5_ms = $null }
     $OkmErfolgreich++
     Write-OkmOk
 } catch {
@@ -240,13 +271,15 @@ try {
     $global:LASTEXITCODE = 0
     . {
         $okmTest = Test-NetConnection -ComputerName 'intranet.okm.local' -Port 443 -WarningAction SilentlyContinue
-        if ($okmTest.TcpTestSucceeded) {
+        $script:OkmS7_offen = [bool]$okmTest.TcpTestSucceeded
+        if ($script:OkmS7_offen) {
             Write-Host 'Der Port ist erreichbar.' -ForegroundColor Green
         } else {
             Write-Host 'Der Port ist NICHT erreichbar.' -ForegroundColor Yellow
         }
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
+    if ($null -ne $script:OkmS7_offen) { $script:OkmS7_offen = @('1', 'true', 'ja') -contains "$($script:OkmS7_offen)" }
     $OkmErfolgreich++
     Write-OkmOk
 } catch {

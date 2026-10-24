@@ -40,6 +40,10 @@ async def bloecke(request: Request, benutzer: Benutzer = Depends(aktueller_benut
                 "hinweise": {z.value: t for z, t in b.hinweise.items()},
                 "parameter_je_ziel": {z.value: sorted(benutzte_parameter(reg, b, z)) for z in b.ziele},
                 "parameter": [p.model_dump(mode="json") for p in b.parameter],
+                "rueckgabe": {
+                    z.value: [r.model_dump(mode="json", exclude={"ziele"}) for r in b.rueckgaben(z)]
+                    for z in b.ziele
+                },
             }
             for b in sorted(reg.bloecke.values(), key=lambda b: (b.kategorie, b.name))
         ],

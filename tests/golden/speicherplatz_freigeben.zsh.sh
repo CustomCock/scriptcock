@@ -107,6 +107,10 @@ okm_info '=============================================='
 
 okm_info 'Rechte: ohne erhöhte Rechte'
 
+# Rückgabewerte der Schritte (Namen vergibt der Baukasten; leer = unbekannt)
+okm_s1_frei_prozent=''
+okm_s3_frei_prozent=''
+
 # --------------------------------------------------------------------
 # Schritt 1/3: Festplattenbelegung anzeigen (Risiko: gruen)
 # --------------------------------------------------------------------
@@ -115,6 +119,8 @@ OKM_SCHRITT='1/3 (Festplattenbelegung anzeigen)'
 OKM_TIPP=''
 okm_info '[1/3] Festplattenbelegung wird ermittelt ...'
 df -h -l
+okm_s1_frei_prozent=$(df -P / | awk 'NR == 2 { sub(/%/, "", $5); print 100 - $5 }')
+[[ $okm_s1_frei_prozent =~ ^-?[0-9]+$ ]] || okm_s1_frei_prozent=''
 OKM_OK=$((OKM_OK + 1))
 okm_ok
 
@@ -145,6 +151,8 @@ OKM_SCHRITT='3/3 (Festplattenbelegung anzeigen)'
 OKM_TIPP=''
 okm_info '[3/3] Festplattenbelegung wird ermittelt ...'
 df -h -l
+okm_s3_frei_prozent=$(df -P / | awk 'NR == 2 { sub(/%/, "", $5); print 100 - $5 }')
+[[ $okm_s3_frei_prozent =~ ^-?[0-9]+$ ]] || okm_s3_frei_prozent=''
 OKM_OK=$((OKM_OK + 1))
 okm_ok
 

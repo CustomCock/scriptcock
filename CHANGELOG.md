@@ -2,6 +2,34 @@
 
 ## Backlog P1
 
+### Rückgabewerte und Variablen
+
+- **Block-Schema:** `rueckgabe: [{id, typ: zahl|ja_nein, beschreibung, ziele?}]`. Im Template ist
+  `{{ rueckgabe_<id> }}` das Zuweisungsziel; die Namen (`$script:OkmS3_frei_prozent`,
+  `okm_s3_frei_prozent`, `OKM_S3_FREI_PROZENT`) vergibt nur der Generator. Die Registry prüft,
+  dass jede Rückgabe im Template jedes ihrer Ziele gesetzt wird.
+- **Generator:** belegt alle Rückgaben vor Schritt 1 mit „unbekannt“ vor (`set -u` in bash) und
+  normalisiert sie nach jedem erfolgreichen Schritt (Zahl → nur Ziffern, ja/nein → fester Wert).
+  Bewusst nur diese zwei Typen: Freitext aus Systemausgaben könnte sonst in CMD per `%VAR%`
+  Sonderzeichen einschleusen.
+- **Parametertyp `variable`** (+ `variable_typ`): Wert `"<schritt>.<id>"`. Die Validierung prüft
+  Reihenfolge, vorhandenen Wert, Zielsystem, Typ und dass der Schritt nicht in einem „Versuche“-Block
+  liegt, der den aktuellen Schritt nicht umfasst (bash/zsh: Subshell). Fortschrittstexte zeigen
+  „Wert … aus Schritt n“.
+- **Bausteine mit Rückgabe** (je Version +1): `ping` (erreichbar, ms), `port_pruefen` (offen),
+  `dienst_status` (laeuft), `festplattenbelegung` (frei_prozent), `uptime_neustart` (stunden),
+  `update_status` (ausstehend), `virenschutz_status` (aktiv), `bitlocker_status` (verschluesselt).
+- `ping` unter PowerShell: `ping.exe` liefert bei „Zielhost nicht erreichbar“ (Antwort eines Routers)
+  Exit-Code 0 – erreichbar ist das Ziel jetzt nur mit einer Antwort mit `TTL=`.
+- `GET /api/v1/bloecke` liefert die Rückgaben je Ziel (für Blockly).
+- Tests: `tests/test_rueckgabe.py` – Schema, Registry, Verweis-Validierung, Generierung und Syntax
+  aller Ziele, Ausführung in bash/zsh/pwsh, alle acht Bausteine mit Attrappen (`ping`, `ping.exe`,
+  `systemctl`, `launchctl`, `nc`, `df`, `sysctl`, `apt`, `softwareupdate`).
+- **Golden-Files bewusst aktualisiert:** alle Scripte mit den acht Bausteinen (Vorbelegung,
+  geänderte Templates, Normalisierung nach dem Schritt).
+- Noch offen: Eingabe für `variable` in Listen-Modus/Blockly (vorerst Textfeld) – kommt mit
+  „Wenn … dann … sonst“.
+
 ### Kleine Fehler
 
 - `test_pause_nur_im_terminal[zsh]` schlug ohne installiertes zsh mit `FileNotFoundError` fehl.

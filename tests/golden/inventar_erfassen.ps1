@@ -93,6 +93,9 @@ Write-OkmInfo '=============================================='
 
 Write-OkmInfo 'Rechte: ohne erhöhte Rechte'
 
+# Rückgabewerte der Schritte (Namen vergibt der Baukasten; $null = unbekannt)
+$script:OkmS5_stunden = $null
+
 # --------------------------------------------------------------------
 # Schritt 1/6: Seriennummer und Modell (Risiko: gruen)
 # --------------------------------------------------------------------
@@ -204,6 +207,7 @@ try {
     . {
         $okmStart = (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime
         $okmLaufzeit = (Get-Date) - $okmStart
+        $script:OkmS5_stunden = [math]::Floor($okmLaufzeit.TotalHours)
         Write-Host ('Letzter Start: ' + $okmStart.ToString('dd.MM.yyyy HH:mm') + ' (vor ' + $okmLaufzeit.Days + ' Tagen)')
         $okmGruende = @()
         if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') { $okmGruende += 'Windows-Komponenten' }
@@ -216,6 +220,7 @@ try {
         }
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
+    if ("$($script:OkmS5_stunden)" -match '^-?[0-9]+$') { $script:OkmS5_stunden = [long]"$($script:OkmS5_stunden)" } else { $script:OkmS5_stunden = $null }
     $OkmErfolgreich++
     Write-OkmOk
 } catch {

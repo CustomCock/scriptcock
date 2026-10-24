@@ -43,6 +43,10 @@ echo(==============================================
 echo(Rechte: ohne erhöhte Rechte
 >>"%OKM_LOG%" echo(Rechte: ohne erhöhte Rechte
 
+rem Rückgabewerte der Schritte (Namen vergibt der Baukasten; leer = unbekannt)
+set "OKM_S2_ERREICHBAR="
+set "OKM_S4_ERREICHBAR="
+
 rem --------------------------------------------------------------------
 rem Schritt 1/5: IP-Konfiguration anzeigen (Risiko: gruen)
 rem --------------------------------------------------------------------
@@ -72,15 +76,20 @@ echo([2/5] Ping auf 1.1.1.1 ^(2x^) ...
 (call )
 (
 ping -n 2 "1.1.1.1"
+rem "set" setzt in .cmd-Dateien den Errorlevel auf 0 – daher erst danach "cmd /c exit"
 if errorlevel 1 (
+  set OKM_S2_ERREICHBAR=0
   echo Hinweis: Das Ziel hat nicht vollständig geantwortet.
   cmd /c exit 0
+) else (
+  set OKM_S2_ERREICHBAR=1
 )
 ) >"%OKM_TMP%" 2>&1
 set "OKM_RC=%ERRORLEVEL%"
 type "%OKM_TMP%"
 type "%OKM_TMP%" >>"%OKM_LOG%"
 if not "%OKM_RC%"=="0" goto :okm_fehler
+if defined OKM_S2_ERREICHBAR if not "%OKM_S2_ERREICHBAR%"=="1" set "OKM_S2_ERREICHBAR=0"
 set /a OKM_OK+=1 >nul
 echo(      OK
 >>"%OKM_LOG%" echo(      OK
@@ -115,15 +124,20 @@ echo([4/5] Ping auf intranet.okm.local ^(4x^) ...
 (call )
 (
 ping -n 4 "intranet.okm.local"
+rem "set" setzt in .cmd-Dateien den Errorlevel auf 0 – daher erst danach "cmd /c exit"
 if errorlevel 1 (
+  set OKM_S4_ERREICHBAR=0
   echo Hinweis: Das Ziel hat nicht vollständig geantwortet.
   cmd /c exit 0
+) else (
+  set OKM_S4_ERREICHBAR=1
 )
 ) >"%OKM_TMP%" 2>&1
 set "OKM_RC=%ERRORLEVEL%"
 type "%OKM_TMP%"
 type "%OKM_TMP%" >>"%OKM_LOG%"
 if not "%OKM_RC%"=="0" goto :okm_fehler
+if defined OKM_S4_ERREICHBAR if not "%OKM_S4_ERREICHBAR%"=="1" set "OKM_S4_ERREICHBAR=0"
 set /a OKM_OK+=1 >nul
 echo(      OK
 >>"%OKM_LOG%" echo(      OK

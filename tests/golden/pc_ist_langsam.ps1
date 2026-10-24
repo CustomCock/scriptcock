@@ -92,6 +92,9 @@ Write-OkmInfo '=============================================='
 
 Write-OkmInfo 'Rechte: ohne erhöhte Rechte'
 
+# Rückgabewerte der Schritte (Namen vergibt der Baukasten; $null = unbekannt)
+$script:OkmS3_frei_prozent = $null
+
 # --------------------------------------------------------------------
 # Schritt 1/5: „PC ist langsam“-Check (Risiko: gruen)
 # --------------------------------------------------------------------
@@ -160,8 +163,13 @@ try {
         Get-PSDrive -PSProvider FileSystem |
             Where-Object { $null -ne $_.Used } |
             Format-Table Name, Root, @{ Name = 'Belegt (GB)'; Expression = { [math]::Round($_.Used / 1GB, 1) } }, @{ Name = 'Frei (GB)'; Expression = { [math]::Round($_.Free / 1GB, 1) } } -AutoSize
+        $okmSystem = Get-PSDrive -Name $env:SystemDrive.Substring(0, 1) -ErrorAction SilentlyContinue
+        if ($okmSystem -and ($okmSystem.Used + $okmSystem.Free) -gt 0) {
+            $script:OkmS3_frei_prozent = [math]::Floor(100 * $okmSystem.Free / ($okmSystem.Used + $okmSystem.Free))
+        }
     } | Out-Host
     if ($LASTEXITCODE -ne 0) { throw ('Befehl endete mit Exit-Code ' + $LASTEXITCODE) }
+    if ("$($script:OkmS3_frei_prozent)" -match '^-?[0-9]+$') { $script:OkmS3_frei_prozent = [long]"$($script:OkmS3_frei_prozent)" } else { $script:OkmS3_frei_prozent = $null }
     $OkmErfolgreich++
     Write-OkmOk
 } catch {

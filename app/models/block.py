@@ -13,6 +13,8 @@ ID_MUSTER = r"^[a-z][a-z0-9_]*$"
 
 # Namen, die der Generator selbst in Code-Templates bereitstellt.
 EINGEBAUTE_VARIABLEN = frozenset({"whatif", "sudo"})
+# Platzhalter für Rückgabewerte: {{ rueckgabe_<id> }} = Variablenname, den der Generator vergibt.
+RUECKGABE_PRAEFIX = "rueckgabe_"
 
 WINDOWS = frozenset({Ziel.POWERSHELL, Ziel.CMD})
 UNIX = frozenset({Ziel.BASH, Ziel.ZSH})
@@ -65,6 +67,31 @@ class ParamTyp(StrEnum):
     SHA256 = "sha256"
     AUSWAHL = "auswahl"
     JA_NEIN = "ja_nein"
+    VARIABLE = "variable"  # Rückgabewert eines vorherigen Schritts, Wert "<schritt>.<rueckgabe_id>"
+
+
+class RueckgabeTyp(StrEnum):
+    """Bewusst nur Zahl und ja/nein: Der Generator normalisiert die Werte nach jedem Schritt,
+    damit Folgeschritte sie gefahrlos verwenden können (kein Freitext aus Systemausgaben)."""
+
+    ZAHL = "zahl"
+    JA_NEIN = "ja_nein"
+
+    @property
+    def anzeige(self) -> str:
+        return {"zahl": "Zahl", "ja_nein": "ja/nein"}[self.value]
+
+
+class RueckgabeDef(BaseModel):
+    """Ein Wert, den ein Block nach seinem Lauf liefert (``rueckgabe:`` im YAML)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(pattern=ID_MUSTER, max_length=40)
+    typ: RueckgabeTyp
+    beschreibung: str = Field(min_length=1)
+    # Leer = alle Ziele des Blocks. Sonst nur diese (z. B. Ping-Laufzeit nicht unter CMD).
+    ziele: list[Ziel] = Field(default_factory=list)
 
 
 class Option(BaseModel):
@@ -86,11 +113,13 @@ class ParameterDef(BaseModel):
     min: int | None = None
     max: int | None = None
     optionen: list[Option] = Field(default_factory=list)
+    # Nur bei typ: variable – welcher Rückgabetyp erwartet wird
+    variable_typ: RueckgabeTyp | None = None
 
     @field_validator("id")
     @classmethod
     def _nicht_eingebaut(cls, v: str) -> str:
-        if v in EINGEBAUTE_VARIABLEN:
+        if v in EINGEBAUTE_VARIABLEN or v.startswith(RUECKGABE_PRAEFIX):
             raise ValueError(f"'{v}' ist ein reservierter Name und kann nicht als Parameter-ID dienen")
         return v
 
@@ -104,6 +133,8 @@ class ParameterDef(BaseModel):
             raise ValueError("'min'/'max' sind nur beim Typ 'zahl' erlaubt")
         if self.min is not None and self.max is not None and self.min > self.max:
             raise ValueError("'min' ist größer als 'max'")
+        if (self.typ is ParamTyp.VARIABLE) != (self.variable_typ is not None):
+            raise ValueError("'variable_typ' (zahl oder ja_nein) gehört genau zum Typ 'variable'")
         return self
 
 
@@ -127,6 +158,7 @@ class BlockDef(BaseModel):
     # Hilfe bei einem Fehler, wird unter „FEHLER …“ als „Tipp: …“ ausgegeben.
     tipp: str = ""
     parameter: list[ParameterDef] = Field(default_factory=list)
+    rueckgabe: list[RueckgabeDef] = Field(default_factory=list)
     ziele: dict[Ziel, str]
     pruefung: dict[Ziel, str] = Field(default_factory=dict)
     dry_run: dict[Ziel, str] = Field(default_factory=dict)
@@ -160,6 +192,15 @@ class BlockDef(BaseModel):
             if fremd:
                 namen = ", ".join(sorted(z.value for z in fremd))
                 raise ValueError(f"'{feld}' enthält Ziele ohne Eintrag in 'ziele': {namen}")
+        rids = [r.id for r in self.rueckgabe]
+        doppelt = {i for i in rids if rids.count(i) > 1}
+        if doppelt:
+            raise ValueError(f"Rückgabe-ID(s) doppelt: {', '.join(sorted(doppelt))}")
+        for r in self.rueckgabe:
+            fremd = set(r.ziele) - set(self.ziele)
+            if fremd:
+                namen = ", ".join(sorted(z.value for z in fremd))
+                raise ValueError(f"rueckgabe.{r.id}.ziele enthält Ziele ohne Eintrag in 'ziele': {namen}")
         fremd = set(self.rechte) - set(self.ziele)
         if fremd:
             namen = ", ".join(sorted(z.value for z in fremd))
@@ -182,6 +223,15 @@ class BlockDef(BaseModel):
     def braucht_admin(self, ziel: Ziel) -> bool:
         """Erhöhte Rechte nötig (Windows: Administrator, Linux/macOS: sudo)."""
         return self.recht(ziel) in (Recht.ADMIN, Recht.ROOT)
+
+    def rueckgaben(self, ziel: Ziel) -> list[RueckgabeDef]:
+        """Rückgabewerte, die der Block unter ``ziel`` liefert."""
+        if not self.verfuegbar(ziel):
+            return []
+        return [r for r in self.rueckgabe if not r.ziele or ziel in r.ziele]
+
+    def rueckgabe_def(self, rid: str) -> RueckgabeDef | None:
+        return next((r for r in self.rueckgabe if r.id == rid), None)
 
     def param(self, param_id: str) -> ParameterDef | None:
         return next((p for p in self.parameter if p.id == param_id), None)

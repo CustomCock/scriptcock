@@ -112,6 +112,13 @@ okm_info '=============================================='
 
 okm_info 'Rechte: ohne erhöhte Rechte'
 
+# Rückgabewerte der Schritte (Namen vergibt der Baukasten; leer = unbekannt)
+okm_s3_erreichbar=''
+okm_s3_ms=''
+okm_s5_erreichbar=''
+okm_s5_ms=''
+okm_s7_offen=''
+
 # --------------------------------------------------------------------
 # Schritt 1/7: IP-Konfiguration anzeigen (Risiko: gruen)
 # --------------------------------------------------------------------
@@ -155,7 +162,19 @@ OKM_NR=3
 OKM_SCHRITT='3/7 (Ping auf Ziel)'
 OKM_TIPP='Ist das Gerät eingeschaltet und im selben Netz? Manche Geräte und Firewalls antworten grundsätzlich nicht auf Ping.'
 okm_info '[3/7] Ping auf 1.1.1.1 (2x) ...'
-ping -c 2 '1.1.1.1' || printf '%s\n' 'Hinweis: Das Ziel hat nicht (vollständig) geantwortet.'
+okm_rc=0
+okm_ausgabe=$(ping -c 2 '1.1.1.1' 2>&1) || okm_rc=$?
+printf '%s\n' "$okm_ausgabe"
+if [ "$okm_rc" -eq 0 ]; then
+  okm_s3_erreichbar=1
+  # "rtt min/avg/max/mdev = 11.1/12.6/…" (Linux) bzw. "round-trip min/avg/…" (macOS)
+  okm_s3_ms=$(printf '%s\n' "$okm_ausgabe" | awk -F/ '/min\/avg/ { printf "%.0f", $5 }')
+else
+  okm_s3_erreichbar=0
+  printf '%s\n' 'Hinweis: Das Ziel hat nicht (vollständig) geantwortet.'
+fi
+case "$okm_s3_erreichbar" in 1|true|ja) okm_s3_erreichbar=1 ;; '') ;; *) okm_s3_erreichbar=0 ;; esac
+[[ $okm_s3_ms =~ ^-?[0-9]+$ ]] || okm_s3_ms=''
 OKM_OK=$((OKM_OK + 1))
 okm_ok
 
@@ -177,7 +196,19 @@ OKM_NR=5
 OKM_SCHRITT='5/7 (Ping auf Ziel)'
 OKM_TIPP='Ist das Gerät eingeschaltet und im selben Netz? Manche Geräte und Firewalls antworten grundsätzlich nicht auf Ping.'
 okm_info '[5/7] Ping auf intranet.okm.local (4x) ...'
-ping -c 4 'intranet.okm.local' || printf '%s\n' 'Hinweis: Das Ziel hat nicht (vollständig) geantwortet.'
+okm_rc=0
+okm_ausgabe=$(ping -c 4 'intranet.okm.local' 2>&1) || okm_rc=$?
+printf '%s\n' "$okm_ausgabe"
+if [ "$okm_rc" -eq 0 ]; then
+  okm_s5_erreichbar=1
+  # "rtt min/avg/max/mdev = 11.1/12.6/…" (Linux) bzw. "round-trip min/avg/…" (macOS)
+  okm_s5_ms=$(printf '%s\n' "$okm_ausgabe" | awk -F/ '/min\/avg/ { printf "%.0f", $5 }')
+else
+  okm_s5_erreichbar=0
+  printf '%s\n' 'Hinweis: Das Ziel hat nicht (vollständig) geantwortet.'
+fi
+case "$okm_s5_erreichbar" in 1|true|ja) okm_s5_erreichbar=1 ;; '') ;; *) okm_s5_erreichbar=0 ;; esac
+[[ $okm_s5_ms =~ ^-?[0-9]+$ ]] || okm_s5_ms=''
 OKM_OK=$((OKM_OK + 1))
 okm_ok
 
@@ -206,10 +237,13 @@ OKM_SCHRITT='7/7 (Port erreichbar prüfen)'
 OKM_TIPP='Läuft der Dienst auf dem Zielrechner, und lässt die Firewall den Port durch?'
 okm_info '[7/7] Port 443 auf intranet.okm.local wird geprüft ...'
 if timeout 5 bash -c 'exec 3<>"/dev/tcp/$1/$2"' okm 'intranet.okm.local' 443 2>/dev/null; then
+  okm_s7_offen=1
   printf '%s\n' 'Der Port ist erreichbar.'
 else
+  okm_s7_offen=0
   printf '%s\n' 'Der Port ist NICHT erreichbar.'
 fi
+case "$okm_s7_offen" in 1|true|ja) okm_s7_offen=1 ;; '') ;; *) okm_s7_offen=0 ;; esac
 OKM_OK=$((OKM_OK + 1))
 okm_ok
 
