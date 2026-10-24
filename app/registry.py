@@ -65,7 +65,13 @@ _VERBOTE: dict[Ziel, list[tuple[re.Pattern[str], str]]] = {
         ),
     ],
 }
-_VERBOTE[Ziel.ZSH] = _VERBOTE[Ziel.BASH]
+_VERBOTE[Ziel.ZSH] = [
+    *_VERBOTE[Ziel.BASH],
+    (
+        re.compile(r"(^|[;&|(]\s*|\$\(\s*)log\s", re.M),
+        "In zsh ist „log“ ein eingebautes Kommando (angemeldete Benutzer) – „command log …“ verwenden",
+    ),
+]
 
 
 def platzhalter_in_quotes(quelle: str, ziel: Ziel) -> list[int]:

@@ -1,0 +1,83 @@
+id: pakete_aktualisieren
+version: 1
+name: Pakete aktualisieren
+kategorie: Software
+beschreibung: Aktualisiert ein bestimmtes Programm – oder alle über den gewählten Paketmanager installierten Programme.
+hilfe: |
+  Ohne Paket-ID wird alles aktualisiert (winget: alle Programme mit bekannter Quelle; apt: alle Pakete).
+  Für das komplette Betriebssystem-Update gibt es eigene Bausteine (Linux-Upgrade, macOS-Updates).
+risiko: gelb
+fortschritt: "{% if paket %}{{ paket }} wird{% else %}Alle Pakete werden{% endif %} aktualisiert"
+tipp: Laufen die betroffenen Programme noch? Manche Updates brauchen geschlossene Programme.
+rechte:
+  bash: root
+  zsh: nie_root
+parameter:
+  - id: paket
+    label: Paketname bzw. Paket-ID (leer = alle)
+    typ: paketname
+    pflicht: false
+    beispiel: Mozilla.Firefox
+  - id: paketmanager
+    label: Paketmanager
+    typ: auswahl
+    standard: standard
+    optionen:
+      - wert: standard
+        label: "Standard (Windows: winget, Linux: apt, macOS: brew)"
+      - wert: apt
+        label: "apt (Linux: Debian, Ubuntu)"
+      - wert: dnf
+        label: "dnf (Linux: Fedora, RHEL, Rocky)"
+      - wert: flatpak
+        label: Flatpak (Linux, Flathub)
+      - wert: brew
+        label: brew – Formeln (macOS)
+      - wert: brew_cask
+        label: brew --cask – Apps (macOS)
+ziele:
+  powershell: |
+    {% if paket %}
+    winget.exe upgrade --id {{ paket }} -e --silent --accept-package-agreements --accept-source-agreements
+    {% else %}
+    winget.exe upgrade --all --silent --accept-package-agreements --accept-source-agreements
+    {% endif %}
+  cmd: |
+    {% if paket %}
+    winget upgrade --id {{ paket }} -e --silent --accept-package-agreements --accept-source-agreements
+    {% else %}
+    winget upgrade --all --silent --accept-package-agreements --accept-source-agreements
+    {% endif %}
+  bash: |
+    {% if paketmanager.wert in ('brew', 'brew_cask') %}
+    printf '%s\n' 'Dieser Paketmanager ist unter Linux nicht verfügbar – bitte apt, dnf oder Flatpak wählen.'
+    false
+    {% elif paketmanager.wert == 'flatpak' %}
+    {{ sudo }}flatpak update -y --noninteractive{% if paket %} {{ paket }}{% endif %}
+
+    {% elif paketmanager.wert == 'dnf' %}
+    {{ sudo }}dnf upgrade -y{% if paket %} {{ paket }}{% endif %}
+
+    {% else %}
+    {{ sudo }}apt-get update
+    {% if paket %}
+    {{ sudo }}apt-get install --only-upgrade -y {{ paket }}
+    {% else %}
+    {{ sudo }}apt-get upgrade -y
+    {% endif %}
+    {% endif %}
+  zsh: |
+    {% if paketmanager.wert in ('apt', 'dnf', 'flatpak') %}
+    printf '%s\n' 'Dieser Paketmanager ist unter macOS nicht verfügbar – bitte brew oder brew --cask wählen.'
+    false
+    {% else %}
+    if ! command -v brew >/dev/null 2>&1; then
+      printf '%s\n' 'Homebrew ist nicht installiert. Bitte an die IT wenden.'
+      false
+    fi
+    brew update
+    brew upgrade{% if paketmanager.wert == 'brew_cask' %} --cask{% endif %}{% if paket %} {{ paket }}{% endif %}
+
+    {% endif %}
+hinweise:
+  zsh: Benötigt Homebrew. Das Script NICHT mit sudo starten – Homebrew verweigert root.

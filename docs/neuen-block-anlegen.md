@@ -158,6 +158,9 @@ Weitere Regeln, die beim Start geprüft werden:
 | `dateiname` | ein Name ohne Ordner; nicht `.`/`..`, kein Punkt am Ende, keine Windows-Gerätenamen (`CON`, `nul.txt`) | `Bericht 2026.docx` |
 | `rechnername` | 1–15 Zeichen, Buchstaben/Ziffern/`-`, nicht nur Ziffern; wird großgeschrieben | `PC-EMPFANG-01` |
 | `dnsname` | Name für DNS-Abfragen; ein Teil darf mit `_` beginnen (SRV), wird kleingeschrieben | `_ldap._tcp.okm.local` |
+| `pfad_oder_unc` | Windows-Pfad **oder** `\\server\freigabe\…` (Setup-Dateien vom Fileserver) | `\\fs01\Software\app.msi` |
+| `version` | 1 bis 4 Zahlen mit Punkt | `115.3.0` |
+| `msi_eigenschaft` | `NAME=wert`: Name in Großbuchstaben, Wert ohne Leerzeichen/Quotes | `ALLUSERS=1` |
 | `liste` | mehrere Werte vom Typ `listen_typ`, siehe unten | `80, 443` |
 | `variable` | Rückgabewert eines Schritts davor, siehe Abschnitt 6 | `3.frei_prozent` |
 

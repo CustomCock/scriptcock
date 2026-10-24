@@ -1,0 +1,48 @@
+id: logdatei_ende
+version: 1
+name: Ende einer Logdatei anzeigen
+kategorie: Logs
+beschreibung: Zeigt die letzten Zeilen einer Logdatei – optional nur Zeilen, die einen Suchbegriff enthalten.
+hilfe: |
+  Groß-/Kleinschreibung spielt beim Suchbegriff keine Rolle. Windows-CMD: ohne Suchbegriff.
+risiko: gruen
+fortschritt: "Letzte {{ zeilen }} Zeilen von {{ pfad }}"
+tipp: Stimmt der Pfad, und darf die Datei gelesen werden (manche Logs nur mit Admin/sudo)?
+parameter:
+  - id: pfad
+    label: Logdatei
+    typ: pfad
+    beispiel: C:\ProgramData\Firma\app.log
+  - id: zeilen
+    label: Anzahl Zeilen
+    typ: zahl
+    min: 1
+    max: 2000
+    standard: 50
+  - id: suche
+    label: Nur Zeilen mit (optional)
+    typ: text_kurz
+    pflicht: false
+    beispiel: error
+ziele:
+  powershell: |
+    {% if suche %}
+    Select-String -LiteralPath {{ pfad }} -Pattern {{ suche }} -SimpleMatch | Select-Object -Last {{ zeilen }} | ForEach-Object -Process { $_.Line }
+    {% else %}
+    Get-Content -LiteralPath {{ pfad }} -Tail {{ zeilen }}
+    {% endif %}
+  cmd: |
+    set OKM_LOGDATEI={{ pfad }}
+    set OKM_ZEILEN={{ zeilen }}
+    powershell -NoProfile -Command "Get-Content -LiteralPath $env:OKM_LOGDATEI.Trim([char]34) -Tail ([int]$env:OKM_ZEILEN)"
+  bash: &log_sh |
+    if [ ! -r {{ pfad }} ]; then
+      okm_fehler 'Die Datei gibt es nicht oder sie darf nicht gelesen werden.'
+      false
+    fi
+    {% if suche %}
+    { grep -i -F -- {{ suche }} {{ pfad }} || true; } | tail -n {{ zeilen }}
+    {% else %}
+    tail -n {{ zeilen }} -- {{ pfad }}
+    {% endif %}
+  zsh: *log_sh

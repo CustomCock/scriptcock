@@ -1,0 +1,34 @@
+id: drucker_server_verbinden
+version: 1
+name: Drucker vom Druckserver verbinden
+kategorie: Drucker
+beschreibung: Verbindet einen freigegebenen Drucker vom Druckserver (\\server\drucker) für den angemeldeten Benutzer – optional als Standarddrucker.
+hilfe: |
+  Der Treiber kommt vom Druckserver. Seit dem „PrintNightmare“-Update dürfen das ohne Admin nur Treiber,
+  die der Druckserver bzw. eine Gruppenrichtlinie freigibt – sonst erscheint eine Rückfrage oder ein Fehler.
+risiko: gelb
+fortschritt: "Drucker {{ freigabe }} wird verbunden"
+tipp: Ist der Druckserver erreichbar, und stimmt der Freigabename? Fehlt der Treiber, die IT fragen (Point-and-Print-Richtlinie).
+parameter:
+  - id: freigabe
+    label: Druckerfreigabe
+    typ: unc_pfad
+    beispiel: \\printserver\Empfang-Farbe
+  - id: standard
+    label: Als Standarddrucker festlegen
+    typ: ja_nein
+    pflicht: false
+    standard: false
+ziele:
+  powershell: |
+    Add-Printer -ConnectionName {{ freigabe }}{{ whatif }}
+    {% if standard %}
+    $okmDrucker = Get-CimInstance -ClassName Win32_Printer | Where-Object { $_.Name -eq {{ freigabe }} }
+    if ($okmDrucker) { Invoke-CimMethod -InputObject $okmDrucker -MethodName SetDefaultPrinter | Out-Null; Write-Host 'Als Standarddrucker festgelegt.' }
+    {% endif %}
+    Get-Printer | Where-Object { $_.Name -eq {{ freigabe }} } | Format-Table Name, DriverName, PortName -AutoSize
+  cmd: |
+    rundll32 printui.dll,PrintUIEntry /in /n {{ freigabe }}
+    {% if standard %}
+    rundll32 printui.dll,PrintUIEntry /y /n {{ freigabe }}
+    {% endif %}

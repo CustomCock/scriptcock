@@ -81,6 +81,11 @@ class ParamTyp(StrEnum):
     DATEINAME = "dateiname"  # ein Datei-/Ordnername ohne Pfad (kein . / .., keine reservierten Namen)
     RECHNERNAME = "rechnername"  # NetBIOS-tauglich: 1–15 Zeichen, Buchstaben/Ziffern/-, → GROSS
     DNSNAME = "dnsname"  # Name für DNS-Abfragen, Labels dürfen mit _ beginnen (_ldap._tcp.…)
+    PFAD_ODER_UNC = (
+        "pfad_oder_unc"  # Windows-Pfad oder \\\\server\\freigabe\\… (Setup-Dateien vom Fileserver)
+    )
+    VERSION = "version"  # 1 bis 4 Zahlen mit Punkt, z. B. 115.3.0
+    MSI_EIGENSCHAFT = "msi_eigenschaft"  # NAME=wert, öffentliche MSI-Eigenschaft ohne Leerzeichen/Quotes
     LISTE = "liste"  # mehrere Werte vom Typ ``listen_typ``
 
 

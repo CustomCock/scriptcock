@@ -1,0 +1,75 @@
+id: eventlog_export
+version: 1
+name: Ereignisprotokoll exportieren
+kategorie: Logs
+beschreibung: Speichert die Ereignisse der letzten Tage in eine Datei – zum Weitergeben an den Support. Windows .evtx, Linux Systemjournal, macOS Unified Log.
+hilfe: |
+  Windows: Datei landet auf dem Desktop (oder im angegebenen Ordner) und lässt sich in der Ereignisanzeige öffnen.
+  Windows-CMD exportiert das ganze Protokoll (ohne Zeitraum). Linux/macOS: Textdatei.
+risiko: gruen
+fortschritt: "Ereignisse der letzten {{ tage }} Tage werden exportiert"
+tipp: Ist genug Platz frei? Das Sicherheitsprotokoll braucht Administratorrechte.
+rechte:
+  powershell: admin
+  cmd: admin
+  bash: root
+parameter:
+  - id: protokoll
+    label: Protokoll (Windows)
+    typ: auswahl
+    standard: System
+    optionen:
+      - wert: System
+        label: System
+      - wert: Application
+        label: Anwendung
+      - wert: Security
+        label: Sicherheit
+      - wert: Setup
+        label: Setup
+  - id: tage
+    label: Zeitraum (Tage)
+    typ: tage
+    max: 90
+    standard: 7
+  - id: ordner
+    label: Zielordner (optional)
+    typ: pfad
+    pflicht: false
+ziele:
+  powershell: |
+    {% if ordner %}
+    $okmOrdner = {{ ordner }}
+    {% else %}
+    $okmOrdner = [Environment]::GetFolderPath('Desktop')
+    {% endif %}
+    $okmDatei = Join-Path -Path $okmOrdner -ChildPath ({{ protokoll }} + '-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.evtx')
+    $okmMs = [long]{{ tage }} * 86400000
+    wevtutil.exe epl {{ protokoll }} $okmDatei ('/q:*[System[TimeCreated[timediff(@SystemTime) <= ' + $okmMs + ']]]') /ow:true
+    if ($LASTEXITCODE -eq 0) { Write-Host ('Exportiert: ' + $okmDatei) }
+  cmd: |
+    {% if ordner %}
+    wevtutil epl {{ protokoll }} {{ ordner }}\okm-ereignisse.evtx /ow:true
+    if not errorlevel 1 echo Exportiert: {{ ordner }}\okm-ereignisse.evtx
+    {% else %}
+    wevtutil epl {{ protokoll }} "%USERPROFILE%\Desktop\okm-ereignisse.evtx" /ow:true
+    if not errorlevel 1 echo Exportiert auf den Desktop: okm-ereignisse.evtx
+    {% endif %}
+  bash: |
+    {% if ordner %}
+    okm_ordner={{ ordner }}
+    {% else %}
+    okm_ordner=$HOME
+    {% endif %}
+    okm_datei=$okm_ordner/journal-$(date +%Y%m%d-%H%M%S).txt
+    {{ sudo }}journalctl --no-pager --since=-{{ tage }}d -o short-iso > "$okm_datei"
+    printf 'Exportiert: %s (%s Zeilen)\n' "$okm_datei" "$(wc -l < "$okm_datei" | tr -d ' ')"
+  zsh: |
+    {% if ordner %}
+    okm_ordner={{ ordner }}
+    {% else %}
+    okm_ordner=$HOME/Desktop
+    {% endif %}
+    okm_datei=$okm_ordner/unified-log-$(date +%Y%m%d-%H%M%S).txt
+    command log show --last {{ tage }}d --style compact > "$okm_datei"
+    printf 'Exportiert: %s (%s Zeilen)\n' "$okm_datei" "$(wc -l < "$okm_datei" | tr -d ' ')"

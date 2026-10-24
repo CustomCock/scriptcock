@@ -1,0 +1,53 @@
+id: msi_installieren
+version: 1
+name: MSI-Paket installieren
+kategorie: Software
+beschreibung: Installiert ein MSI-Paket ohne Rückfragen (z. B. vom Fileserver) und schreibt ein ausführliches Installationsprotokoll.
+hilfe: |
+  Eigenschaften wie ALLUSERS=1 oder INSTALLDIR=C:\Programme\Tool lassen sich mitgeben (ohne Leerzeichen).
+  Exit-Code 3010 heißt „erfolgreich, Neustart nötig“ – das gilt hier als Erfolg mit Hinweis.
+risiko: gelb
+fortschritt: "{{ datei }} wird installiert"
+tipp: Im Installationsprotokoll (Pfad steht oben) nach „Return value 3“ suchen – dort steht die Ursache.
+rechte:
+  powershell: admin
+  cmd: admin
+parameter:
+  - id: datei
+    label: MSI-Datei
+    typ: pfad_oder_unc
+    beispiel: \\fileserver\Software\Tool\tool.msi
+  - id: eigenschaften
+    label: MSI-Eigenschaften (optional)
+    typ: liste
+    listen_typ: msi_eigenschaft
+    pflicht: false
+    beispiel: ALLUSERS=1, REBOOT=ReallySuppress
+ziele:
+  powershell: |
+    $okmProtokoll = Join-Path -Path $env:TEMP -ChildPath ('okm-msi-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log')
+    Write-Host ('Installationsprotokoll: ' + $okmProtokoll)
+    $okmArgumente = '/i "' + {{ datei }} + '" /qn /norestart /l*v "' + $okmProtokoll + '"'
+    {% if eigenschaften %}
+    $okmArgumente = $okmArgumente + ' ' + ({{ eigenschaften }} -join ' ')
+    {% endif %}
+    $okmProzess = Start-Process -FilePath 'msiexec.exe' -ArgumentList $okmArgumente -Wait -PassThru{{ whatif }}
+    if ($okmProzess) {
+        if ($okmProzess.ExitCode -eq 3010 -or $okmProzess.ExitCode -eq 1641) {
+            Write-OkmWarnung 'Installiert – für den Abschluss ist ein Neustart nötig.'
+        } elseif ($okmProzess.ExitCode -ne 0) {
+            throw ('msiexec endete mit Exit-Code ' + $okmProzess.ExitCode)
+        }
+    }
+  cmd: |
+    echo Installationsprotokoll: %TEMP%\okm-msi.log
+    msiexec /i {{ datei }} /qn /norestart /l*v "%TEMP%\okm-msi.log"{% if eigenschaften %} {{ eigenschaften }}{% endif %}
+
+    if errorlevel 3010 if not errorlevel 3011 (
+      echo Installiert - für den Abschluss ist ein Neustart nötig.
+      cmd /c exit 0
+    )
+    if errorlevel 1641 if not errorlevel 1642 (
+      echo Installiert - für den Abschluss ist ein Neustart nötig.
+      cmd /c exit 0
+    )

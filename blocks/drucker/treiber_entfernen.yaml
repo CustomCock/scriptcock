@@ -1,0 +1,29 @@
+id: treiber_entfernen
+version: 1
+name: Druckertreiber entfernen
+kategorie: Drucker
+beschreibung: Entfernt einen Druckertreiber, z. B. einen alten oder fehlerhaften. Drucker, die ihn noch nutzen, müssen vorher entfernt werden.
+risiko: gelb
+fortschritt: "Druckertreiber {{ name }} wird entfernt"
+tipp: Nutzt noch ein Drucker diesen Treiber? Erst den Drucker entfernen, dann den Treiber.
+rechte:
+  powershell: admin
+  cmd: admin
+parameter:
+  - id: name
+    label: Treibername
+    typ: text_kurz
+    beispiel: HP Universal Printing PCL 6
+  - id: aus_speicher
+    label: Auch aus dem Treiberspeicher löschen
+    typ: ja_nein
+    pflicht: false
+    standard: false
+ziele:
+  powershell: |
+    $okmNutzer = @(Get-Printer -ErrorAction SilentlyContinue | Where-Object { $_.DriverName -eq {{ name }} })
+    if ($okmNutzer.Count -gt 0) { throw ('Der Treiber wird noch genutzt von: ' + (($okmNutzer | ForEach-Object { $_.Name }) -join ', ')) }
+    Remove-PrinterDriver -Name {{ name }}{% if aus_speicher %} -RemoveFromDriverStore{% endif %}{{ whatif }}
+    Write-Host 'Treiber entfernt.'
+  cmd: |
+    rundll32 printui.dll,PrintUIEntry /dd /m {{ name }}

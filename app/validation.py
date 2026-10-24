@@ -505,6 +505,36 @@ def _dnsname(text: str, p: ParameterDef) -> str:
     return name
 
 
+def _pfad_oder_unc(text: str, p: ParameterDef) -> str:
+    if text.replace("/", "\\").startswith("\\\\"):
+        return _unc(text, p)
+    try:
+        return _pfad_windows(text, p)
+    except ValidierungsFehler:
+        raise ValidierungsFehler(
+            "Bitte einen Windows-Pfad (C:\\Setup\\app.msi) oder einen Netzwerkpfad "
+            "(\\\\fileserver\\Software\\app.msi) angeben."
+        ) from None
+
+
+def _version(text: str, p: ParameterDef) -> str:
+    if not re.fullmatch(r"[0-9]{1,9}(\.[0-9]{1,9}){0,3}", text):
+        raise ValidierungsFehler("Bitte eine Versionsnummer wie 115.3.0 angeben (1 bis 4 Zahlen mit Punkt).")
+    return text
+
+
+_MSI_EIGENSCHAFT = re.compile(r"^[A-Z][A-Z0-9_]{0,63}=[A-Za-z0-9_.\-:\\{}]{0,200}$")
+
+
+def _msi_eigenschaft(text: str, p: ParameterDef) -> str:
+    if not _MSI_EIGENSCHAFT.match(text):
+        raise ValidierungsFehler(
+            "Bitte eine MSI-Eigenschaft wie ALLUSERS=1 angeben: Name in Großbuchstaben, Wert ohne "
+            "Leerzeichen und Anführungszeichen (erlaubt: Buchstaben, Ziffern, _ . - : \\ { })."
+        )
+    return text
+
+
 def registry_reg_form(pfad: str) -> str:
     """``HKLM:\\SOFTWARE\\x`` → ``HKLM\\SOFTWARE\\x`` (Schreibweise von reg.exe)."""
     return pfad.replace(":\\", "\\", 1)
@@ -524,6 +554,7 @@ LISTEN_MIT_LEERZEICHEN = frozenset(
         ParamTyp.PROZESSNAME,
         ParamTyp.REGISTRY_PFAD,
         ParamTyp.DATEINAME,
+        ParamTyp.PFAD_ODER_UNC,
     }
 )
 MAX_LISTE = 20
@@ -633,6 +664,9 @@ _TEXT_PRUEFER: dict[ParamTyp, Any] = {
     ParamTyp.DATEINAME: _dateiname,
     ParamTyp.RECHNERNAME: _rechnername,
     ParamTyp.DNSNAME: _dnsname,
+    ParamTyp.PFAD_ODER_UNC: _pfad_oder_unc,
+    ParamTyp.VERSION: _version,
+    ParamTyp.MSI_EIGENSCHAFT: _msi_eigenschaft,
 }
 
 

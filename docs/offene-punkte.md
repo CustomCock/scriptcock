@@ -52,6 +52,12 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 | `http_check` | cmd | Nutzt `curl.exe` (ab Windows 10 1803); kein Statuscode als Rückgabe, nur „erreichbar“. Proxy-Einstellungen des Systems werden nicht übernommen. |
 | `ports_pruefen` | cmd | Gibt es für CMD nicht (kein Bordmittel). |
 | `wake_on_lan` | bash/zsh | Ohne `wakeonlan` wird python3 gebraucht (auf macOS nicht immer installiert). |
+| `msi_installieren`, `exe_installieren`, `treiber_installieren`, `treiber_entfernen`, `drucker_server_verbinden` | powershell/cmd | Nur unter Windows ausführbar – unter Linux nur Text/Syntax geprüft. Exit-Codes (3010, 1641, 259) auf Win 11 bestätigen. |
+| `exe_installieren` | powershell/cmd | Nur vier feste Silent-Profile; Installer mit eigenen Schaltern (z. B. Lizenzschlüssel) gehen bewusst nicht. CMD-Profil InstallShield (`/v"/qn …"`) auf echtem Setup prüfen. |
+| `drucker_server_verbinden` | bash/zsh | Gibt es nur für Windows (CUPS/SMB-Drucker brauchen Anmeldedaten und Treiberwahl). Point-and-Print-Richtlinie kann die Treiberinstallation ohne Admin verhindern. |
+| `software_version` | cmd | Gibt es für CMD nicht. macOS sucht nur unter `/Applications`; Windows nur Einträge mit DisplayVersion. |
+| `eventlog_export` | cmd | Exportiert das ganze Protokoll (ohne Zeitraum) als `okm-ereignisse.evtx`. |
+| `logdatei_ende` | powershell | Liest mit der Standard-Codierung von PowerShell 5.1 – UTF-8-Logs ohne BOM können Umlaute falsch zeigen. |
 | alle Datei-Bausteine aus Paket 1 | powershell/cmd | Unter Linux nur Syntax/Lint geprüft (Windows-Pfade), auf Win 11 ausführen. |
 | alle | powershell/cmd | Ausführen-Checkliste (`docs/test-vms.md`, Abschnitt 4): alle Windows-Zellen (Doppelklick/„Mit PowerShell ausführen“, UAC angefordert/abgelehnt, Konsole UTF-8, Fenster bleibt offen) sind noch **nicht** auf Win 11 geprüft. |
 | alle | bash/zsh | Checkliste bisher nur im Linux-Container mit Attrappen (`ping`, `sudo`); auf Debian 12 und echtem macOS (Terminal.app, echtes sudo) wiederholen. |

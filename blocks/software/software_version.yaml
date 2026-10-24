@@ -1,0 +1,92 @@
+id: software_version
+version: 1
+name: Installierte Version prüfen
+kategorie: Software
+beschreibung: Prüft, ob ein Programm installiert ist und mindestens eine bestimmte Version hat – z. B. vor einem Update oder für einen „Wenn“-Block.
+hilfe: |
+  Windows: Teil des Namens wie unter „Apps & Features“ (z. B. Firefox, 7-Zip). Linux: Paketname (dpkg bzw. rpm).
+  macOS: App-Name ohne .app (z. B. Google Chrome) aus /Applications.
+  Verglichen werden die ersten Zahlen der Version (115.3.0esr gilt als 115.3.0).
+risiko: gruen
+fortschritt: "Version von {{ name }} wird geprüft"
+parameter:
+  - id: name
+    label: Programm
+    typ: text_kurz
+    beispiel: Firefox
+  - id: mindestens
+    label: Mindestens Version
+    typ: version
+    beispiel: "115.0"
+rueckgabe:
+  - id: installiert
+    typ: ja_nein
+    beschreibung: Das Programm ist installiert
+  - id: aktuell
+    typ: ja_nein
+    beschreibung: Die installierte Version ist mindestens so hoch wie angegeben
+ziele:
+  powershell: |
+    $okmSchluessel = @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*', 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*', 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*')
+    $okmName = '*' + {{ name }} + '*'
+    $okmTreffer = @(Get-ItemProperty -Path $okmSchluessel -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like $okmName -and $_.DisplayVersion })
+    {{ rueckgabe_installiert }} = $okmTreffer.Count -gt 0
+    {{ rueckgabe_aktuell }} = $false
+    $okmMindestens = [version]((({{ mindestens }} + '.0.0.0').Split('.')[0..3]) -join '.')
+    foreach ($okmEintrag in $okmTreffer) {
+        $okmNummer = [regex]::Match($okmEintrag.DisplayVersion, '^[0-9]+(\.[0-9]+){0,3}').Value
+        if (-not $okmNummer) { continue }
+        $okmIst = [version]((($okmNummer + '.0.0.0').Split('.')[0..3]) -join '.')
+        Write-Host ($okmEintrag.DisplayName + ': Version ' + $okmEintrag.DisplayVersion)
+        if ($okmIst -ge $okmMindestens) { {{ rueckgabe_aktuell }} = $true }
+    }
+    if (-not {{ rueckgabe_installiert }}) { Write-OkmWarnung 'Nicht installiert.' }
+    elseif (-not {{ rueckgabe_aktuell }}) { Write-OkmWarnung ('Älter als ' + {{ mindestens }} + '.') }
+    else { Write-Host ('Mindestens Version ' + {{ mindestens }} + ' – in Ordnung.') }
+  bash: |
+    okm_ist=''
+    if command -v dpkg-query >/dev/null 2>&1; then
+      okm_ist=$(dpkg-query -W -f '${Version}' {{ name }} 2>/dev/null || true)
+    elif command -v rpm >/dev/null 2>&1; then
+      okm_ist=$(rpm -q --qf '%{VERSION}' {{ name }} 2>/dev/null || true)
+      case "$okm_ist" in *'not installed'*) okm_ist='' ;; esac
+    fi
+    {{ rueckgabe_aktuell }}=0
+    if [ -z "$okm_ist" ]; then
+      {{ rueckgabe_installiert }}=0
+      okm_warn 'Nicht installiert.'
+    else
+      {{ rueckgabe_installiert }}=1
+      printf 'Installiert: Version %s\n' "$okm_ist"
+      # Epoche (1:) entfernen, nur die führenden Zahlen vergleichen
+      okm_zahl=$(printf '%s\n' "$okm_ist" | sed -E 's/^[0-9]+://; s/^([0-9]+(\.[0-9]+)*).*/\1/')
+      okm_min={{ mindestens }}
+      if [ "$(printf '%s\n%s\n' "$okm_min" "$okm_zahl" | sort -V | head -n 1)" = "$okm_min" ]; then
+        {{ rueckgabe_aktuell }}=1
+        printf 'Mindestens Version %s – in Ordnung.\n' "$okm_min"
+      else
+        okm_warn "Älter als $okm_min."
+      fi
+    fi
+  zsh: |
+    okm_app=/Applications/{{ name }}.app
+    okm_ist=''
+    if [ -d "$okm_app" ]; then
+      okm_ist=$(defaults read "$okm_app/Contents/Info" CFBundleShortVersionString 2>/dev/null || true)
+    fi
+    {{ rueckgabe_aktuell }}=0
+    if [ -z "$okm_ist" ]; then
+      {{ rueckgabe_installiert }}=0
+      okm_warn 'Nicht installiert (keine App unter /Applications).'
+    else
+      {{ rueckgabe_installiert }}=1
+      printf 'Installiert: Version %s\n' "$okm_ist"
+      okm_zahl=$(printf '%s\n' "$okm_ist" | sed -E 's/^([0-9]+(\.[0-9]+)*).*/\1/')
+      okm_min={{ mindestens }}
+      if [ "$(printf '%s\n%s\n' "$okm_min" "$okm_zahl" | sort -V | head -n 1)" = "$okm_min" ]; then
+        {{ rueckgabe_aktuell }}=1
+        printf 'Mindestens Version %s – in Ordnung.\n' "$okm_min"
+      else
+        okm_warn "Älter als $okm_min."
+      fi
+    fi

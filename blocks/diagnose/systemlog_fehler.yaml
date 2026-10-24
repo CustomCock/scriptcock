@@ -1,5 +1,5 @@
 id: systemlog_fehler
-version: 1
+version: 2
 name: "Systemlog: letzte Fehler anzeigen"
 kategorie: Diagnose
 beschreibung: Zeigt Fehlermeldungen aus dem Systemprotokoll der letzten Stunden (Linux journalctl, macOS log show).
@@ -19,4 +19,4 @@ ziele:
   bash: |
     journalctl --no-pager -p err -n 200 --since=-{{ stunden }}h
   zsh: |
-    log show --last {{ stunden }}h --predicate 'messageType == error' --style compact | tail -n 200
+    command log show --last {{ stunden }}h --predicate 'messageType == error' --style compact | tail -n 200

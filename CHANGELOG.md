@@ -2,6 +2,29 @@
 
 ## Backlog P1
 
+### Paket 3: Software-, Drucker- und Log-Bausteine
+
+- **Software:** `paket_entfernen` und `pakete_aktualisieren` (ein Paket oder alle; winget, apt, dnf,
+  Flatpak, Homebrew), `msi_installieren` (still, ausführliches Protokoll, MSI-Eigenschaften als Liste,
+  3010/1641 = „Neustart nötig“), `exe_installieren` (feste Silent-Profile), `software_version`
+  (installiert? mindestens Version X? – Rückgaben `installiert`/`aktuell`; Versionsvergleich, nicht Text:
+  115.10 > 115.3).
+- **Drucker:** `drucker_server_verbinden` (`\\server\drucker`, optional Standarddrucker),
+  `treiber_installieren` (INF vom Fileserver per pnputil, optional als Druckertreiber; 259 = schon
+  vorhanden), `treiber_entfernen` (bricht ab, wenn noch ein Drucker den Treiber nutzt).
+- **Logs:** `logdatei_ende` (letzte N Zeilen, optional nur mit Suchbegriff), `eventlog_export`
+  (Windows .evtx mit Zeitraum, Linux Systemjournal, macOS Unified Log).
+- Neue Typen: `pfad_oder_unc`, `version`, `msi_eigenschaft`.
+- **Fehler gefunden: zsh-Builtin `log`.** In zsh ist `log` ein eingebautes Kommando (zeigt angemeldete
+  Benutzer). **Ursache:** `log show …` in zsh-Templates rief das Builtin auf statt `/usr/bin/log` –
+  `systemlog_fehler` brach auf dem Mac mit „too many arguments“ ab, `diagnosepaket` legte wegen
+  `|| true` still eine leere `log.txt` ab. **Lösung:** `command log show …` (beide Bausteine Version +1);
+  die Registry lehnt nacktes `log` in zsh-Templates jetzt ab.
+- Tests: `tests/test_paket3.py` – Paketmanager in bash (als root) und Homebrew in zsh (als „nobody“,
+  weil Homebrew root verweigert), `software_version` mit dpkg-Attrappe, Logs mit echten Dateien,
+  Journal/Unified-Log-Export mit Attrappen; Windows-Bausteine: feste Schalter, Exit-Code-Behandlung,
+  „erst prüfen, dann entfernen“, freie MSI-Argumente werden abgelehnt.
+
 ### Paket 2: Registry- und Netzwerk-Bausteine
 
 - **Registry (Windows):** `registry_lesen` (ein Wert oder alle Werte, Rückgabe `vorhanden`),

@@ -1,0 +1,66 @@
+id: exe_installieren
+version: 1
+name: Setup.exe still installieren
+kategorie: Software
+beschreibung: Installiert ein Programm aus einer Setup-Datei ohne Rückfragen – mit den passenden Schaltern für gängige Installer.
+hilfe: |
+  Welcher Installer? Steht oft im Eigenschaften-Dialog der Datei oder auf der Herstellerseite.
+  Inno Setup: /VERYSILENT … · NSIS: /S · InstallShield (MSI-basiert): /s /v"/qn" · WiX/Burn: /quiet.
+  Eigene Schalter sind bewusst nicht möglich (Sicherheit). Für MSI-Dateien „MSI-Paket installieren“ nutzen.
+risiko: gelb
+fortschritt: "{{ datei }} wird installiert"
+tipp: Passt das Profil zum Installer? Mit falschem Profil öffnet sich ein Fenster oder das Setup bricht ab.
+rechte:
+  powershell: admin
+  cmd: admin
+parameter:
+  - id: datei
+    label: Setup-Datei (.exe)
+    typ: pfad_oder_unc
+    beispiel: \\fileserver\Software\Tool\setup.exe
+  - id: profil
+    label: Installer-Typ
+    typ: auswahl
+    standard: inno
+    optionen:
+      - wert: inno
+        label: Inno Setup (/VERYSILENT)
+      - wert: nsis
+        label: NSIS (/S)
+      - wert: installshield
+        label: InstallShield mit MSI (/s /v"/qn")
+      - wert: burn
+        label: WiX Burn (/quiet)
+ziele:
+  powershell: |
+    {% if profil.wert == 'inno' %}
+    $okmSchalter = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-'
+    {% elif profil.wert == 'nsis' %}
+    $okmSchalter = '/S'
+    {% elif profil.wert == 'installshield' %}
+    $okmSchalter = '/s /v"/qn /norestart"'
+    {% else %}
+    $okmSchalter = '/quiet /norestart'
+    {% endif %}
+    $okmProzess = Start-Process -FilePath {{ datei }} -ArgumentList $okmSchalter -Wait -PassThru{{ whatif }}
+    if ($okmProzess) {
+        if ($okmProzess.ExitCode -eq 3010 -or $okmProzess.ExitCode -eq 1641) {
+            Write-OkmWarnung 'Installiert – für den Abschluss ist ein Neustart nötig.'
+        } elseif ($okmProzess.ExitCode -ne 0) {
+            throw ('Das Setup endete mit Exit-Code ' + $okmProzess.ExitCode)
+        }
+    }
+  cmd: |
+    {% if profil.wert == 'inno' %}
+    start "" /wait {{ datei }} /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+    {% elif profil.wert == 'nsis' %}
+    start "" /wait {{ datei }} /S
+    {% elif profil.wert == 'installshield' %}
+    start "" /wait {{ datei }} /s /v"/qn /norestart"
+    {% else %}
+    start "" /wait {{ datei }} /quiet /norestart
+    {% endif %}
+    if errorlevel 3010 if not errorlevel 3011 (
+      echo Installiert - für den Abschluss ist ein Neustart nötig.
+      cmd /c exit 0
+    )

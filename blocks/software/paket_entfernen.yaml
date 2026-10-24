@@ -1,0 +1,69 @@
+id: paket_entfernen
+version: 1
+name: Paket/Software entfernen
+kategorie: Software
+beschreibung: Deinstalliert ein Programm über den Paketmanager des Systems (Windows winget, Linux apt/dnf/Flatpak, macOS Homebrew).
+hilfe: |
+  Die Paket-ID steht im Software-Katalog. Benutzerdaten (Einstellungen, Dokumente) bleiben in der Regel erhalten.
+  Linux apt: „remove“ – Konfigurationsdateien bleiben (kein „purge“).
+risiko: gelb
+fortschritt: "{{ paket }} wird entfernt"
+tipp: Ist das Programm über diesen Paketmanager installiert worden? Paket-ID im Software-Katalog prüfen.
+rechte:
+  bash: root
+  zsh: nie_root
+parameter:
+  - id: paket
+    label: Paketname bzw. Paket-ID
+    typ: paketname
+    beispiel: Mozilla.Firefox
+  - id: paketmanager
+    label: Paketmanager
+    typ: auswahl
+    standard: standard
+    optionen:
+      - wert: standard
+        label: "Standard (Windows: winget, Linux: apt, macOS: brew)"
+      - wert: winget
+        label: winget (Windows)
+      - wert: apt
+        label: "apt (Linux: Debian, Ubuntu)"
+      - wert: dnf
+        label: "dnf (Linux: Fedora, RHEL, Rocky)"
+      - wert: flatpak
+        label: Flatpak (Linux, Flathub)
+      - wert: brew
+        label: brew – Formel (macOS)
+      - wert: brew_cask
+        label: brew --cask – App (macOS)
+ziele:
+  powershell: |
+    winget.exe uninstall --id {{ paket }} -e --silent --accept-source-agreements
+  cmd: |
+    winget uninstall --id {{ paket }} -e --silent --accept-source-agreements
+  bash: |
+    {% if paketmanager.wert in ('winget', 'brew', 'brew_cask') %}
+    printf '%s\n' 'Dieser Paketmanager ist unter Linux nicht verfügbar – bitte apt, dnf oder Flatpak wählen.'
+    false
+    {% elif paketmanager.wert == 'flatpak' %}
+    {{ sudo }}flatpak uninstall -y --noninteractive {{ paket }}
+    {% elif paketmanager.wert == 'dnf' %}
+    {{ sudo }}dnf remove -y {{ paket }}
+    {% else %}
+    {{ sudo }}apt-get remove -y {{ paket }}
+    {% endif %}
+  zsh: |
+    {% if paketmanager.wert in ('winget', 'apt', 'dnf', 'flatpak') %}
+    printf '%s\n' 'Dieser Paketmanager ist unter macOS nicht verfügbar – bitte brew oder brew --cask wählen.'
+    false
+    {% else %}
+    if ! command -v brew >/dev/null 2>&1; then
+      printf '%s\n' 'Homebrew ist nicht installiert. Bitte an die IT wenden.'
+      false
+    fi
+    brew uninstall{% if paketmanager.wert == 'brew_cask' %} --cask{% endif %} {{ paket }}
+    {% endif %}
+hinweise:
+  powershell: Benötigt winget (App-Installer, ab Windows 10 1809 enthalten).
+  cmd: Benötigt winget (App-Installer, ab Windows 10 1809 enthalten).
+  zsh: Benötigt Homebrew. Das Script NICHT mit sudo starten – Homebrew verweigert root.

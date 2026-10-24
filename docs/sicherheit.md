@@ -89,6 +89,13 @@ erneut durch dieselbe Validierung.
 - **Protokoll** jedes Laufs (`%TEMP%` bzw. `/tmp`), Pfad wird am Ende ausgegeben.
 - **SHA-256** jedes erzeugten Scripts wird gespeichert und angezeigt.
 
+### Installer-Argumente
+
+`exe_installieren` kennt nur feste Silent-Profile (Inno, NSIS, InstallShield, WiX Burn) – freie Schalter
+wären eine Kommandozeile durch die Hintertür. `msi_installieren` erlaubt nur MSI-Eigenschaften
+`NAME=wert` (Name in Großbuchstaben, Wert ohne Leerzeichen und Anführungszeichen), keine Schalter wie
+`/qb` oder `TRANSFORMS` mit Pfaden mit Leerzeichen.
+
 ### Rückgabewerte
 
 Werte, die Blöcke zur Laufzeit ermitteln (z. B. freier Speicher), sind keine Benutzereingaben, landen

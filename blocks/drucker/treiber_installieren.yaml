@@ -1,0 +1,46 @@
+id: treiber_installieren
+version: 1
+name: Treiber aus INF installieren
+kategorie: Drucker
+beschreibung: Fügt einen Treiber (INF-Datei, z. B. vom Fileserver) dem Treiberspeicher hinzu – optional gleich als Druckertreiber.
+hilfe: |
+  Für Druckertreiber den genauen Treibernamen aus der INF-Datei angeben (z. B. „HP Universal Printing PCL 6“),
+  dann steht er beim Einrichten eines Druckers zur Auswahl.
+  Exit-Code 259 von pnputil heißt „Treiber war schon vorhanden“ und gilt als Erfolg.
+risiko: gelb
+fortschritt: "Treiber {{ inf }} wird installiert"
+tipp: Passt der Treiber zur Windows-Version (64 Bit)? Liegen alle Dateien des Treibers neben der INF-Datei?
+rechte:
+  powershell: admin
+  cmd: admin
+parameter:
+  - id: inf
+    label: INF-Datei
+    typ: pfad_oder_unc
+    beispiel: \\fileserver\Treiber\HP\hpcu270u.inf
+  - id: druckertreiber
+    label: Name des Druckertreibers (optional)
+    typ: text_kurz
+    pflicht: false
+    beispiel: HP Universal Printing PCL 6
+ziele:
+  powershell: |
+    pnputil.exe /add-driver {{ inf }} /install
+    if ($LASTEXITCODE -eq 259) { Write-Host 'Der Treiber war schon vorhanden.'; $global:LASTEXITCODE = 0 }
+    elseif ($LASTEXITCODE -eq 3010) { Write-OkmWarnung 'Installiert – Neustart nötig.'; $global:LASTEXITCODE = 0 }
+    {% if druckertreiber %}
+    if ($LASTEXITCODE -eq 0) { Add-PrinterDriver -Name {{ druckertreiber }}{{ whatif }}; Write-Host 'Als Druckertreiber verfügbar.' }
+    {% endif %}
+  cmd: |
+    pnputil /add-driver {{ inf }} /install
+    if errorlevel 259 if not errorlevel 260 (
+      echo Der Treiber war schon vorhanden.
+      cmd /c exit 0
+    )
+    if errorlevel 3010 if not errorlevel 3011 (
+      echo Installiert - Neustart nötig.
+      cmd /c exit 0
+    )
+    {% if druckertreiber %}
+    if not errorlevel 1 rundll32 printui.dll,PrintUIEntry /ia /m {{ druckertreiber }} /f {{ inf }}
+    {% endif %}
