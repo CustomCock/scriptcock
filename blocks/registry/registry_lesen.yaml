@@ -1,0 +1,53 @@
+id: registry_lesen
+version: 1
+name: Registry-Wert lesen
+kategorie: Registry
+beschreibung: Zeigt einen Wert aus der Registry an – oder alle Werte eines Schlüssels. Ändert nichts.
+risiko: gruen
+fortschritt: "Registry {{ schluessel }} wird gelesen"
+tipp: Stimmt der Pfad (HKLM bzw. HKCU, Schreibweise)? Manche Schlüssel gibt es nur in 64-Bit-Ansicht.
+parameter:
+  - id: schluessel
+    label: Schlüssel
+    typ: registry_pfad
+    beispiel: HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion
+  - id: wert
+    label: Name des Werts (leer = alle Werte)
+    typ: text_kurz
+    pflicht: false
+    beispiel: DisplayVersion
+rueckgabe:
+  - id: vorhanden
+    typ: ja_nein
+    beschreibung: Schlüssel bzw. Wert ist vorhanden
+ziele:
+  powershell: |
+    {{ rueckgabe_vorhanden }} = $false
+    if (-not (Test-Path -LiteralPath {{ schluessel }})) {
+        Write-OkmWarnung 'Diesen Schlüssel gibt es nicht.'
+    } else {
+    {% if wert %}
+        $okmWerte = Get-ItemProperty -LiteralPath {{ schluessel }} -Name {{ wert }} -ErrorAction SilentlyContinue
+        if ($null -eq $okmWerte) {
+            Write-OkmWarnung 'Diesen Wert gibt es in dem Schlüssel nicht.'
+        } else {
+            {{ rueckgabe_vorhanden }} = $true
+            Write-Host ({{ wert }} + ' = ' + $okmWerte.{{ wert }})
+        }
+    {% else %}
+        {{ rueckgabe_vorhanden }} = $true
+        $okmSchluessel = Get-Item -LiteralPath {{ schluessel }}
+        foreach ($okmName in $okmSchluessel.GetValueNames()) {
+            Write-Host ($okmName + ' = ' + $okmSchluessel.GetValue($okmName))
+        }
+    {% endif %}
+    }
+  cmd: |
+    reg query {{ schluessel_reg }}{% if wert %} /v {{ wert }}{% endif %}
+
+    if errorlevel 1 (
+      echo Hinweis: Schlüssel bzw. Wert gibt es nicht.
+      set {{ rueckgabe_vorhanden }}=0
+    ) else (
+      set {{ rueckgabe_vorhanden }}=1
+    )

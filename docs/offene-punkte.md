@@ -46,6 +46,12 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 | `rechner_umbenennen` | powershell/cmd | In einer Domäne braucht `Rename-Computer` Domänen-Anmeldedaten – dann schlägt der Schritt mit Meldung fehl. |
 | `zeit_sync` | bash | Nutzt `chronyc makestep`, sonst `timedatectl set-ntp` + Neustart von `systemd-timesyncd`; andere NTP-Dienste (ntpd) nicht abgedeckt. |
 | `zeit_sync`, `zeitzone_setzen`, `rechner_umbenennen` | zsh | `sntp`, `systemsetup`, `scutil` nur mit Attrappen getestet. |
+| `registry_lesen`, `registry_backup`, `registry_setzen` | powershell/cmd | Nur unter Windows sinnvoll, unter Linux nur Syntax/Lint geprüft. 32-/64-Bit-Ansicht (WOW6432Node) wird nicht gesondert behandelt. CMD legt die Sicherung als `okm-registry-<Zufallszahl>.reg` im TEMP-Ordner ab. |
+| `registry_setzen` | powershell/cmd | Fehlende Schlüssel werden ohne Sicherung angelegt (es gibt nichts zu sichern); wer sie wieder loswerden will, muss sie von Hand löschen. |
+| `dns_abfrage` | powershell/cmd | `Resolve-DnsName` gibt es unter Linux nicht – nur Syntax geprüft. CMD (`nslookup`) liefert keinen Rückgabewert. |
+| `http_check` | cmd | Nutzt `curl.exe` (ab Windows 10 1803); kein Statuscode als Rückgabe, nur „erreichbar“. Proxy-Einstellungen des Systems werden nicht übernommen. |
+| `ports_pruefen` | cmd | Gibt es für CMD nicht (kein Bordmittel). |
+| `wake_on_lan` | bash/zsh | Ohne `wakeonlan` wird python3 gebraucht (auf macOS nicht immer installiert). |
 | alle Datei-Bausteine aus Paket 1 | powershell/cmd | Unter Linux nur Syntax/Lint geprüft (Windows-Pfade), auf Win 11 ausführen. |
 | alle | powershell/cmd | Ausführen-Checkliste (`docs/test-vms.md`, Abschnitt 4): alle Windows-Zellen (Doppelklick/„Mit PowerShell ausführen“, UAC angefordert/abgelehnt, Konsole UTF-8, Fenster bleibt offen) sind noch **nicht** auf Win 11 geprüft. |
 | alle | bash/zsh | Checkliste bisher nur im Linux-Container mit Attrappen (`ping`, `sudo`); auf Debian 12 und echtem macOS (Terminal.app, echtes sudo) wiederholen. |

@@ -492,6 +492,19 @@ def _rechnername(text: str, p: ParameterDef) -> str:
     return text.upper()
 
 
+_DNS_LABEL = re.compile(r"^_?[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
+
+
+def _dnsname(text: str, p: ParameterDef) -> str:
+    name = text.rstrip(".").lower()
+    if not name or len(name) > 253 or not all(_DNS_LABEL.match(t) for t in name.split(".")):
+        raise ValidierungsFehler(
+            "Das ist kein gültiger DNS-Name. Erlaubt sind Buchstaben, Ziffern, Bindestriche und Punkte; "
+            "ein Teil darf mit _ beginnen, z. B. okm.local oder _ldap._tcp.okm.local"
+        )
+    return name
+
+
 def registry_reg_form(pfad: str) -> str:
     """``HKLM:\\SOFTWARE\\x`` → ``HKLM\\SOFTWARE\\x`` (Schreibweise von reg.exe)."""
     return pfad.replace(":\\", "\\", 1)
@@ -619,6 +632,7 @@ _TEXT_PRUEFER: dict[ParamTyp, Any] = {
     ParamTyp.REGISTRY_PFAD: _registry_pfad,
     ParamTyp.DATEINAME: _dateiname,
     ParamTyp.RECHNERNAME: _rechnername,
+    ParamTyp.DNSNAME: _dnsname,
 }
 
 

@@ -1,0 +1,53 @@
+id: wake_on_lan
+version: 1
+name: Rechner per Wake-on-LAN starten
+kategorie: Netzwerk
+beschreibung: Schickt ein „Magic Packet“ an die MAC-Adresse eines Rechners, um ihn aus dem Ruhezustand oder ausgeschaltet zu starten.
+hilfe: |
+  Wake-on-LAN muss im BIOS/UEFI und in der Netzwerkkarte des Zielrechners aktiviert sein.
+  Broadcast: 255.255.255.255 für das eigene Netz, sonst die Broadcast-Adresse des Zielnetzes (z. B. 192.168.10.255).
+  Linux/macOS: nutzt „wakeonlan“, falls installiert, sonst python3.
+risiko: gelb
+fortschritt: "Magic Packet an {{ mac }} wird gesendet"
+tipp: Ist Wake-on-LAN am Zielrechner aktiv, und ist die Broadcast-Adresse richtig?
+parameter:
+  - id: mac
+    label: MAC-Adresse des Zielrechners
+    typ: mac
+    beispiel: 00:1A:2B:3C:4D:5E
+  - id: broadcast
+    label: Broadcast-Adresse
+    typ: ipv4
+    standard: 255.255.255.255
+  - id: port
+    label: UDP-Port
+    typ: port
+    standard: 9
+ziele:
+  powershell: |
+    $okmMac = [byte[]](({{ mac }} -split ':') | ForEach-Object { [Convert]::ToByte($_, 16) })
+    $okmPaket = [byte[]](@(0xFF) * 6) + ($okmMac * 16)
+    $okmUdp = New-Object System.Net.Sockets.UdpClient
+    try {
+        $okmUdp.EnableBroadcast = $true
+        [void]$okmUdp.Send($okmPaket, $okmPaket.Length, {{ broadcast }}, {{ port }})
+    } finally { $okmUdp.Close() }
+    Write-Host ('Magic Packet gesendet an ' + {{ mac }} + ' über ' + {{ broadcast }} + ':' + {{ port }})
+  cmd: |
+    set OKM_WOL_MAC={{ mac }}
+    set OKM_WOL_ZIEL={{ broadcast }}
+    set OKM_WOL_PORT={{ port }}
+    powershell -NoProfile -Command "$m=[byte[]](($env:OKM_WOL_MAC.Trim([char]34) -split ':') | ForEach-Object { [Convert]::ToByte($_, 16) }); $p=[byte[]](@(0xFF)*6)+($m*16); $u=New-Object System.Net.Sockets.UdpClient; $u.EnableBroadcast=$true; [void]$u.Send($p, $p.Length, $env:OKM_WOL_ZIEL.Trim([char]34), [int]$env:OKM_WOL_PORT); $u.Close()"
+    if not errorlevel 1 echo Magic Packet gesendet.
+  bash: &wol_sh |
+    if command -v wakeonlan >/dev/null 2>&1; then
+      wakeonlan -i {{ broadcast }} -p {{ port }} {{ mac }}
+    elif command -v python3 >/dev/null 2>&1; then
+      # einzeilig: Schritte in „Versuche“/„Wenn“ werden eingerückt – mehrzeiliger Python-Code ginge kaputt
+      python3 -c 'import socket, sys; m = bytes.fromhex(sys.argv[1].replace(":", "")); s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1); s.sendto(b"\xff" * 6 + m * 16, (sys.argv[2], int(sys.argv[3])))' {{ mac }} {{ broadcast }} {{ port }}
+      printf 'Magic Packet gesendet an %s\n' {{ mac }}
+    else
+      okm_fehler 'Weder wakeonlan noch python3 ist installiert.'
+      false
+    fi
+  zsh: *wol_sh

@@ -1,0 +1,37 @@
+id: registry_backup
+version: 1
+name: Registry-Schlüssel sichern
+kategorie: Registry
+beschreibung: Exportiert einen Registry-Schlüssel samt Unterschlüsseln in eine .reg-Datei – vor Änderungen an der Registry.
+hilfe: |
+  Ohne Zieldatei landet die Sicherung im TEMP-Ordner (okm-registry-JJJJMMTT-hhmmss.reg).
+  Zurückspielen: Doppelklick auf die .reg-Datei oder „reg import Datei.reg“.
+risiko: gelb
+fortschritt: "Registry {{ schluessel }} wird gesichert"
+tipp: Gibt es den Schlüssel, und darf in den Zielordner geschrieben werden?
+parameter:
+  - id: schluessel
+    label: Schlüssel
+    typ: registry_pfad
+    beispiel: HKCU:\Software\Microsoft\Office
+  - id: ziel
+    label: Zieldatei .reg (optional)
+    typ: pfad
+    pflicht: false
+ziele:
+  powershell: |
+    {% if ziel %}
+    $okmDatei = {{ ziel }}
+    {% else %}
+    $okmDatei = Join-Path -Path $env:TEMP -ChildPath ('okm-registry-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.reg')
+    {% endif %}
+    reg.exe export {{ schluessel_reg }} $okmDatei /y
+    if ($LASTEXITCODE -eq 0) { Write-Host ('Sicherung: ' + $okmDatei) }
+  cmd: |
+    {% if ziel %}
+    reg export {{ schluessel_reg }} {{ ziel }} /y
+    if not errorlevel 1 echo Sicherung: {{ ziel }}
+    {% else %}
+    reg export {{ schluessel_reg }} "%TEMP%\okm-registry-%RANDOM%.reg" /y
+    if not errorlevel 1 echo Sicherung im TEMP-Ordner: okm-registry-*.reg
+    {% endif %}

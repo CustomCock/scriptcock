@@ -157,6 +157,7 @@ Weitere Regeln, die beim Start geprüft werden:
 | `registry_pfad` | wird zu `HKLM:\…` (HKLM, HKCU, HKCR, HKU, HKCC; Langform erlaubt) | `HKLM:\SOFTWARE\Firma` |
 | `dateiname` | ein Name ohne Ordner; nicht `.`/`..`, kein Punkt am Ende, keine Windows-Gerätenamen (`CON`, `nul.txt`) | `Bericht 2026.docx` |
 | `rechnername` | 1–15 Zeichen, Buchstaben/Ziffern/`-`, nicht nur Ziffern; wird großgeschrieben | `PC-EMPFANG-01` |
+| `dnsname` | Name für DNS-Abfragen; ein Teil darf mit `_` beginnen (SRV), wird kleingeschrieben | `_ldap._tcp.okm.local` |
 | `liste` | mehrere Werte vom Typ `listen_typ`, siehe unten | `80, 443` |
 | `variable` | Rückgabewert eines Schritts davor, siehe Abschnitt 6 | `3.frei_prozent` |
 

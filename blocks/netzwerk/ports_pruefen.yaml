@@ -1,0 +1,87 @@
+id: ports_pruefen
+version: 1
+name: Mehrere Ports prüfen
+kategorie: Netzwerk
+beschreibung: Prüft für mehrere Ports, ob ein Rechner Verbindungen annimmt (z. B. 80, 443, 3389) – mit einer Zeile pro Port.
+risiko: gruen
+fortschritt: "Ports {{ ports }} auf {{ ziel }} werden geprüft"
+tipp: Läuft der Dienst auf dem Zielrechner, und lässt die Firewall den Port zu?
+parameter:
+  - id: ziel
+    label: Ziel (IP-Adresse oder Rechnername)
+    typ: ip_oder_hostname
+    beispiel: server01.okm.local
+  - id: ports
+    label: Ports
+    typ: liste
+    listen_typ: port
+    max_anzahl: 50
+    beispiel: [80, 443, 3389]
+  - id: abbrechen
+    label: Script abbrechen, wenn ein Port zu ist
+    typ: ja_nein
+    pflicht: false
+    standard: false
+rueckgabe:
+  - id: offen
+    typ: zahl
+    beschreibung: Anzahl offener Ports
+  - id: alle_offen
+    typ: ja_nein
+    beschreibung: Alle angegebenen Ports sind offen
+ziele:
+  powershell: |
+    {{ rueckgabe_offen }} = 0
+    $okmPorts = {{ ports }}
+    foreach ($okmPort in $okmPorts) {
+        $okmClient = New-Object System.Net.Sockets.TcpClient
+        try {
+            $okmVersuch = $okmClient.BeginConnect({{ ziel }}, $okmPort, $null, $null)
+            $okmAuf = $okmVersuch.AsyncWaitHandle.WaitOne(3000) -and $okmClient.Connected
+        } catch { $okmAuf = $false } finally { $okmClient.Close() }
+        if ($okmAuf) { {{ rueckgabe_offen }}++; Write-Host ('Port ' + $okmPort + ': offen') } else { Write-Host ('Port ' + $okmPort + ': ZU') -ForegroundColor Yellow }
+    }
+    {{ rueckgabe_alle_offen }} = {{ rueckgabe_offen }} -eq $okmPorts.Count
+    {% if abbrechen %}
+    if (-not {{ rueckgabe_alle_offen }}) { throw 'Mindestens ein Port ist zu.' }
+    {% endif %}
+  bash: |
+    okm_offen=0
+    okm_anzahl=0
+    for okm_port in {{ ports }}; do
+      okm_anzahl=$((okm_anzahl + 1))
+      if timeout 3 bash -c 'exec 3<>"/dev/tcp/$1/$2"' okm {{ ziel }} "$okm_port" 2>/dev/null; then
+        okm_offen=$((okm_offen + 1))
+        printf 'Port %s: offen\n' "$okm_port"
+      else
+        printf 'Port %s: ZU\n' "$okm_port"
+      fi
+    done
+    {{ rueckgabe_offen }}=$okm_offen
+    if [ "$okm_offen" -eq "$okm_anzahl" ]; then {{ rueckgabe_alle_offen }}=1; else {{ rueckgabe_alle_offen }}=0; fi
+    {% if abbrechen %}
+    if [ "$okm_offen" -ne "$okm_anzahl" ]; then
+      okm_fehler 'Mindestens ein Port ist zu.'
+      false
+    fi
+    {% endif %}
+  zsh: |
+    okm_offen=0
+    okm_anzahl=0
+    for okm_port in {{ ports }}; do
+      okm_anzahl=$((okm_anzahl + 1))
+      if nc -z -G 3 {{ ziel }} "$okm_port" 2>/dev/null; then
+        okm_offen=$((okm_offen + 1))
+        printf 'Port %s: offen\n' "$okm_port"
+      else
+        printf 'Port %s: ZU\n' "$okm_port"
+      fi
+    done
+    {{ rueckgabe_offen }}=$okm_offen
+    if [ "$okm_offen" -eq "$okm_anzahl" ]; then {{ rueckgabe_alle_offen }}=1; else {{ rueckgabe_alle_offen }}=0; fi
+    {% if abbrechen %}
+    if [ "$okm_offen" -ne "$okm_anzahl" ]; then
+      okm_fehler 'Mindestens ein Port ist zu.'
+      false
+    fi
+    {% endif %}

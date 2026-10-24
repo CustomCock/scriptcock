@@ -2,6 +2,21 @@
 
 ## Backlog P1
 
+### Paket 2: Registry- und Netzwerk-Bausteine
+
+- **Registry (Windows):** `registry_lesen` (ein Wert oder alle Werte, Rückgabe `vorhanden`),
+  `registry_backup` (Export als .reg, ohne Ziel in den TEMP-Ordner), `registry_setzen` (rot;
+  DWORD/QWORD/REG_SZ/REG_EXPAND_SZ, **sichert vorhandene Schlüssel automatisch** und bricht ab, wenn
+  die Sicherung scheitert; zeigt den neuen Wert).
+- **Netzwerk:** `dns_abfrage` (A/AAAA/MX/TXT/SRV/CNAME/NS, optional eigener DNS-Server, Rückgabe
+  `gefunden`), `http_check` (Statuscode, Antwortzeit, Rückgaben `erreichbar`/`status`/`ms`),
+  `ports_pruefen` (Liste von Ports, eine Zeile pro Port, Rückgaben `offen`/`alle_offen`),
+  `wake_on_lan` (Magic Packet an MAC über Broadcast-Adresse und Port).
+- Neuer Parametertyp `dnsname` (Labels dürfen mit `_` beginnen, für SRV-Namen).
+- Tests: `tests/test_paket2.py` – http_check, ports_pruefen und wake_on_lan laufen echt gegen
+  localhost (HTTP-Server, offener/geschlossener Port, UDP-Empfänger, Paket byte-genau geprüft) in
+  bash, zsh und pwsh; dns_abfrage mit dig-Attrappe; registry_setzen: Sicherung steht vor der Änderung.
+
 ### Paket 1: Datei- und System-Bausteine
 
 - **Neu (10 Bausteine):** `verschieben` (Vorhandenes nur mit „Überschreiben“), `umbenennen`,

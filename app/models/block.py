@@ -80,6 +80,7 @@ class ParamTyp(StrEnum):
     REGISTRY_PFAD = "registry_pfad"  # → HKLM:\\SOFTWARE\\… (abgeleitet: <id>_reg ohne Doppelpunkt)
     DATEINAME = "dateiname"  # ein Datei-/Ordnername ohne Pfad (kein . / .., keine reservierten Namen)
     RECHNERNAME = "rechnername"  # NetBIOS-tauglich: 1–15 Zeichen, Buchstaben/Ziffern/-, → GROSS
+    DNSNAME = "dnsname"  # Name für DNS-Abfragen, Labels dürfen mit _ beginnen (_ldap._tcp.…)
     LISTE = "liste"  # mehrere Werte vom Typ ``listen_typ``
 
 

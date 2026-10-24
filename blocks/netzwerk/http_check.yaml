@@ -1,0 +1,89 @@
+id: http_check
+version: 1
+name: Webseite/Dienst per HTTP prüfen
+kategorie: Netzwerk
+beschreibung: Ruft eine Adresse auf und zeigt Statuscode und Antwortzeit – z. B. ob das Intranet, ein Drucker-Webinterface oder eine API antwortet.
+hilfe: |
+  Weiterleitungen werden verfolgt. Als erreichbar gilt ein Statuscode von 200 bis 399.
+risiko: gruen
+fortschritt: "{{ url }} wird aufgerufen"
+tipp: Stimmt die Adresse? Läuft der Dienst, und lässt die Firewall bzw. der Proxy die Verbindung zu?
+parameter:
+  - id: url
+    label: Adresse
+    typ: url
+    beispiel: https://intranet.okm.local
+  - id: zeitlimit
+    label: Höchstens warten (Sekunden)
+    typ: dauer_sek
+    max: 120
+    standard: 10
+  - id: abbrechen
+    label: Script abbrechen, wenn nicht erreichbar
+    typ: ja_nein
+    pflicht: false
+    standard: false
+rueckgabe:
+  - id: erreichbar
+    typ: ja_nein
+    beschreibung: Statuscode 200 bis 399
+  - id: status
+    typ: zahl
+    beschreibung: HTTP-Statuscode (leer, wenn keine Verbindung)
+    ziele: [powershell, bash, zsh]
+  - id: ms
+    typ: zahl
+    beschreibung: Antwortzeit in Millisekunden
+    ziele: [powershell, bash, zsh]
+ziele:
+  powershell: |
+    $okmUhr = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        $okmAntwort = Invoke-WebRequest -Uri {{ url }} -UseBasicParsing -TimeoutSec {{ zeitlimit }} -MaximumRedirection 5
+        {{ rueckgabe_status }} = [int]$okmAntwort.StatusCode
+    } catch {
+        if ($_.Exception.Response) { {{ rueckgabe_status }} = [int]$_.Exception.Response.StatusCode } else { Write-Host ('Keine Verbindung: ' + $_.Exception.Message) }
+    }
+    {{ rueckgabe_ms }} = [int]$okmUhr.ElapsedMilliseconds
+    {{ rueckgabe_erreichbar }} = ($null -ne {{ rueckgabe_status }}) -and ({{ rueckgabe_status }} -ge 200) -and ({{ rueckgabe_status }} -lt 400)
+    if ($null -ne {{ rueckgabe_status }}) { Write-Host ('HTTP-Status: ' + {{ rueckgabe_status }} + ', Antwortzeit: ' + {{ rueckgabe_ms }} + ' ms') }
+    if (-not {{ rueckgabe_erreichbar }}) {
+    {% if abbrechen %}
+        throw 'Die Adresse ist nicht erreichbar.'
+    {% else %}
+        Write-OkmWarnung 'Die Adresse ist nicht (richtig) erreichbar.'
+    {% endif %}
+    }
+  cmd: |
+    curl.exe -sS -L -o NUL -w "HTTP-Status: %%{http_code}, Antwortzeit: %%{time_total} s\n" --max-time {{ zeitlimit }} {{ url }}
+    if errorlevel 1 (
+      set {{ rueckgabe_erreichbar }}=0
+      echo Keine Verbindung.
+      cmd /c exit {% if abbrechen %}1{% else %}0{% endif %}
+
+    ) else (
+      set {{ rueckgabe_erreichbar }}=1
+    )
+  bash: &http_sh |
+    okm_rc=0
+    okm_antwort=$(curl -sS -L -o /dev/null -w '%{http_code} %{time_total}' --max-time {{ zeitlimit }} {{ url }} 2>&1) || okm_rc=$?
+    okm_code=${okm_antwort%% *}
+    if [ "$okm_rc" -eq 0 ] && [ "$okm_code" != 000 ]; then
+      {{ rueckgabe_status }}=$okm_code
+      {{ rueckgabe_ms }}=$(printf '%s\n' "$okm_antwort" | awk '{ printf "%.0f", $2 * 1000 }')
+      printf 'HTTP-Status: %s, Antwortzeit: %s ms\n' "$okm_code" "$(printf '%s\n' "$okm_antwort" | awk '{ printf "%.0f", $2 * 1000 }')"
+    else
+      printf 'Keine Verbindung: %s\n' "$okm_antwort"
+    fi
+    if [ "$okm_rc" -eq 0 ] && [ "$okm_code" -ge 200 ] && [ "$okm_code" -lt 400 ]; then
+      {{ rueckgabe_erreichbar }}=1
+    else
+      {{ rueckgabe_erreichbar }}=0
+    {% if abbrechen %}
+      okm_fehler 'Die Adresse ist nicht erreichbar.'
+      false
+    {% else %}
+      okm_warn 'Die Adresse ist nicht (richtig) erreichbar.'
+    {% endif %}
+    fi
+  zsh: *http_sh

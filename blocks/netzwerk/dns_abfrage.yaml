@@ -1,0 +1,70 @@
+id: dns_abfrage
+version: 1
+name: DNS-Eintrag abfragen
+kategorie: Netzwerk
+beschreibung: Fragt einen bestimmten DNS-Eintrag ab (A, AAAA, MX, TXT, SRV, CNAME, NS) – optional bei einem bestimmten DNS-Server.
+hilfe: |
+  Beispiele: MX für example.de zeigt die Mailserver, SRV für _ldap._tcp.okm.local die Domänencontroller.
+  Linux/macOS: nutzt dig (Debian: apt install bind9-dnsutils) oder host.
+risiko: gruen
+fortschritt: "DNS {{ typ }} für {{ name }} wird abgefragt"
+tipp: Stimmt der Name? Antwortet der DNS-Server (Firewall, VPN)?
+parameter:
+  - id: name
+    label: Name
+    typ: dnsname
+    beispiel: okm.local
+  - id: typ
+    label: Eintragstyp
+    typ: auswahl
+    standard: A
+    optionen:
+      - wert: A
+        label: A (IPv4-Adresse)
+      - wert: AAAA
+        label: AAAA (IPv6-Adresse)
+      - wert: MX
+        label: MX (Mailserver)
+      - wert: TXT
+        label: TXT (Text, z. B. SPF)
+      - wert: SRV
+        label: SRV (Dienst, z. B. Domänencontroller)
+      - wert: CNAME
+        label: CNAME (Alias)
+      - wert: NS
+        label: NS (Nameserver)
+  - id: server
+    label: DNS-Server (optional)
+    typ: ip_oder_hostname
+    pflicht: false
+rueckgabe:
+  - id: gefunden
+    typ: ja_nein
+    beschreibung: Es gibt mindestens einen Eintrag dieses Typs
+    ziele: [powershell, bash, zsh]
+ziele:
+  powershell: |
+    $okmAntwort = @(Resolve-DnsName -Name {{ name }} -Type {{ typ }}{% if server %} -Server {{ server }}{% endif %} -ErrorAction SilentlyContinue | Where-Object { $_.Section -eq 'Answer' })
+    {{ rueckgabe_gefunden }} = $okmAntwort.Count -gt 0
+    if ({{ rueckgabe_gefunden }}) { $okmAntwort | Format-Table -AutoSize | Out-String -Width 200 } else { Write-OkmWarnung 'Kein Eintrag gefunden.' }
+  cmd: |
+    nslookup -type={{ typ }} {{ name }}{% if server %} {{ server }}{% endif %}
+
+    cmd /c exit 0
+  bash: &dns_sh |
+    if command -v dig >/dev/null 2>&1; then
+      okm_antwort=$(dig +short -t {{ typ }} {{ name }}{% if server %} @{{ server }}{% endif %} 2>&1 || true)
+    elif command -v host >/dev/null 2>&1; then
+      okm_antwort=$(host -t {{ typ }} {{ name }}{% if server %} {{ server }}{% endif %} 2>&1 | grep -vE 'not found|has no|^Using|^Name:|^Address|^Aliases|^$' || true)
+    else
+      okm_fehler 'Weder dig noch host ist installiert (Debian: apt install bind9-dnsutils).'
+      false
+    fi
+    if [ -n "$okm_antwort" ]; then
+      {{ rueckgabe_gefunden }}=1
+      printf '%s\n' "$okm_antwort"
+    else
+      {{ rueckgabe_gefunden }}=0
+      okm_warn 'Kein Eintrag gefunden.'
+    fi
+  zsh: *dns_sh
