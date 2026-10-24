@@ -106,9 +106,13 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 
 ## Rückgabewerte & Variablen
 
-- Der Parametertyp `variable` ist in Validierung und Generator fertig, aber noch **kein Baustein
-  nutzt ihn** und es gibt noch keine Eingabe dafür in Listen-Modus und Blockly (kommt mit „Wenn …
-  dann … sonst“). Bis dahin zeigt die Oberfläche ein Textfeld (`3.frei_prozent`).
+- Der Parametertyp `variable` wird noch von **keinem Baustein** genutzt. Blockly zeigt dafür eine
+  Auswahl der Werte davor; der Listen-Modus nur ein Textfeld (`3.frei_prozent`).
+- „Wenn … dann … sonst“, „Abbrechen“, „Warten“, „Bestätigung“ und „Notiz“ gibt es nur in Blockly
+  (Listen-Modus und Rezepte: Backlog P2).
+- „Abbrechen“ ist innerhalb von „Versuche“ nicht erlaubt (in bash/zsh würde nur die Subshell enden).
+- Blockly zeigt bei „Wenn“ alle Vergleiche; ob der Vergleich zum Werttyp passt (Zahl bzw. ja/nein),
+  meldet erst die Prüfung im Backend.
 - Rückgaben in Schleifen: Es gilt der Wert des letzten Durchlaufs.
 - Rückgaben im Dry-Run bleiben „unbekannt“ (die Befehle laufen nicht).
 

@@ -20,7 +20,7 @@ from app.ir import ScriptIR
 from app.registry import Registry
 from app.routes.pages import HLJS_SPRACHE, _render, _sitzung
 from app.service import Benutzer, Ergebnis, rechte_hinweis
-from app.validation import MAX_TIEFE, MAX_WIEDERHOLUNGEN, FehlerSammlung
+from app.validation import MAX_TIEFE, MAX_WARTEN, MAX_WIEDERHOLUNGEN, FehlerSammlung
 
 router = APIRouter()
 
@@ -39,6 +39,12 @@ def katalog(reg: Registry) -> list[dict[str, Any]]:
             "admin": {z.value: b.braucht_admin(z) for z in b.ziele},
             "genutzt": {z.value: sorted(reg.benutzte_parameter(b, z)) for z in b.ziele},
             "parameter": [p.model_dump(mode="json") for p in b.parameter],
+            "rueckgabe": {
+                z.value: [
+                    {"id": r.id, "typ": r.typ.value, "beschreibung": r.beschreibung} for r in b.rueckgaben(z)
+                ]
+                for z in b.ziele
+            },
         }
         for b in sorted(reg.bloecke.values(), key=lambda b: (b.kategorie, b.name))
     ]
@@ -84,6 +90,7 @@ async def blockly_seite(
         "sprachen": {zz.value: HLJS_SPRACHE[zz] for zz in Ziel},
         "katalog": katalog(reg),
         "max_wiederholungen": MAX_WIEDERHOLUNGEN,
+        "max_warten": MAX_WARTEN,
         "max_tiefe": MAX_TIEFE,
         "vorbelegung": vorbelegung,
     }

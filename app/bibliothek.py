@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.db import Bewertung, GespeichertesScript
 from app.escaping import UnsicherError, Ziel, pruefe_zeichen
 from app.export import exportiere
-from app.ir import Knoten, ScriptIR, WennFehler, Wiederhole
+from app.ir import Abbrechen, Bestaetigung, Knoten, Kommentar, ScriptIR, Warten, Wenn, WennFehler, Wiederhole
 from app.registry import Registry
 from app.service import Benutzer
 from app.validation import FehlerSammlung, Feldfehler, ValidierungsFehler
@@ -335,6 +335,17 @@ def baum_wiederherstellen(
     hinweise: list[str] = []
 
     def knoten(k: Knoten) -> dict[str, Any] | None:
+        if isinstance(k, Wenn):
+            return {
+                "art": "wenn",
+                "wert": k.wert,
+                "vergleich": k.vergleich.value,
+                "zahl": k.zahl,
+                "dann": liste(k.dann),
+                "sonst": liste(k.sonst),
+            }
+        if isinstance(k, Abbrechen | Warten | Bestaetigung | Kommentar):
+            return k.model_dump(mode="json")
         if isinstance(k, WennFehler):
             return {"art": "wenn_fehler", "versuche": liste(k.versuche), "sonst": liste(k.sonst)}
         if isinstance(k, Wiederhole):

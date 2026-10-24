@@ -623,3 +623,111 @@ def test_editor_bibliothek_und_erneut_oeffnen(server: str, browser) -> None:
     assert seite.is_visible("[data-editor-banner]")
     assert "echo aus_dem_editor" in seite.evaluate("() => window.OkmEditor.wert()")
     assert js_fehler == []
+
+
+# --- Backlog P1: Ablauf-Blöcke „Wenn“, „Abbrechen“ … im Blockly-Modus ------------------------
+
+
+def test_blockly_wenn_mit_rueckgabewert(server: str, browser) -> None:
+    import json
+    import urllib.request
+
+    seite = browser.new_page(viewport={"width": 1280, "height": 1100})
+    js_fehler: list[str] = []
+    seite.on("pageerror", lambda e: js_fehler.append(str(e)))
+    seite.goto(f"{server}/blockly?ziel=bash")
+    seite.locator(".blocklyDraggable", has_text="Script").first.wait_for()
+    seite.evaluate("() => { try { localStorage.clear(); } catch (e) {} }")
+
+    # Per Blockly-API: Ping → Wenn (erreichbar ist nein) → Abbrechen; danach Notiz/Warten
+    seite.evaluate(
+        """() => {
+          const ws = window.okmBlockly.arbeitsflaeche;
+          const start = ws.getBlocksByType('ablauf_start')[0];
+          const ping = ws.newBlock('bk_ping'); ping.initSvg(); ping.render();
+          ping.setFieldValue('10.0.0.7', 'ziel');
+          start.getInput('SCHRITTE').connection.connect(ping.previousConnection);
+          const wenn = ws.newBlock('ablauf_wenn'); wenn.initSvg(); wenn.render();
+          ping.nextConnection.connect(wenn.previousConnection);
+          const ende = ws.newBlock('ablauf_abbrechen'); ende.initSvg(); ende.render();
+          ende.setFieldValue('Drucker aus', 'MELDUNG'); ende.setFieldValue(3, 'CODE');
+          wenn.getInput('DANN').connection.connect(ende.previousConnection);
+          const notiz = ws.newBlock('ablauf_kommentar'); notiz.initSvg(); notiz.render();
+          wenn.nextConnection.connect(notiz.previousConnection);
+          window.okmTest = { wenn: wenn.id, ping: ping.id };
+        }"""
+    )
+    # Auswahl zeigt die Werte des Schritts davor (Zielsystem bash)
+    optionen = seite.evaluate(
+        "() => window.okmBlockly.arbeitsflaeche.getBlockById(window.okmTest.wenn)"
+        ".getField('WERT').getOptions(false).map(o => o[0])"
+    )
+    assert optionen == [
+        "Schritt 1 · Ping auf Ziel: Das Ziel hat geantwortet",
+        "Schritt 1 · Ping auf Ziel: Mittlere Antwortzeit in Millisekunden (leer, wenn keine Antwort)",
+    ]
+    seite.evaluate(
+        """() => { const w = window.okmBlockly.arbeitsflaeche.getBlockById(window.okmTest.wenn);
+                   w.setFieldValue(window.okmTest.ping + '|erreichbar', 'WERT');
+                   w.setFieldValue('nein', 'VERGLEICH'); }"""
+    )
+    assert not seite.evaluate(
+        "() => window.okmBlockly.arbeitsflaeche.getBlockById(window.okmTest.wenn).getField('ZAHL').isVisible()"
+    )
+    anfrage = seite.evaluate("() => window.okmBlockly.serialisieren().anfrage.schritte")
+    assert anfrage[1] == {
+        "art": "wenn",
+        "wert": "1.erreichbar",
+        "vergleich": "nein",
+        "zahl": None,
+        "dann": [{"art": "abbrechen", "meldung": "Drucker aus", "code": 3}],
+        "sonst": [],
+    }
+    assert anfrage[2] == {"art": "kommentar", "text": "Was hier passiert"}
+    warte_editor(seite, 'if [ "$okm_s1_erreichbar" = 0 ]; then', 8000)
+    assert "Planmäßig beendet: " in seite.evaluate("() => window.OkmEditor.wert()")
+
+    # Umsortieren: Wenn vor den Ping → Server meldet den Fehler am Wenn-Block
+    seite.evaluate(
+        """() => { const ws = window.okmBlockly.arbeitsflaeche;
+                   const start = ws.getBlocksByType('ablauf_start')[0];
+                   const wenn = ws.getBlockById(window.okmTest.wenn), ping = ws.getBlockById(window.okmTest.ping);
+                   wenn.unplug(true); ping.unplug(true);
+                   start.getInput('SCHRITTE').connection.connect(wenn.previousConnection);
+                   wenn.nextConnection.connect(ping.previousConnection); }"""
+    )
+    seite.locator("#bl-fehler", has_text="vor diesem").wait_for(timeout=8000)
+
+    # Gespeichertes Script mit den neuen Knoten erneut öffnen
+    kontext = seite.context
+    cookies = "; ".join(f"{c['name']}={c['value']}" for c in kontext.cookies())
+    nutzlast = {
+        "ziel": "bash",
+        "titel": "Ablauf neu",
+        "quelle": "blockly",
+        "schritte": [
+            {"art": "kommentar", "text": "Prüft den Drucker"},
+            {"art": "block", "block_id": "ping", "parameter": {"ziel": "10.0.0.7", "anzahl": "1"}},
+            {
+                "art": "wenn",
+                "wert": "1.ms",
+                "vergleich": "groesser",
+                "zahl": 100,
+                "dann": [{"art": "warten", "sekunden": 2}],
+                "sonst": [{"art": "bestaetigung", "meldung": "Weiter?"}],
+            },
+        ],
+    }
+    req = urllib.request.Request(
+        f"{server}/api/v1/skripte",
+        data=json.dumps(nutzlast).encode(),
+        headers={"Content-Type": "application/json", "X-Okm-Request": "1", "Cookie": cookies},
+    )
+    sid = json.loads(urllib.request.urlopen(req).read())["id"]
+    seite.goto(f"{server}/blockly?aus={sid}")
+    warte_editor(seite, "Notiz: Prüft den Drucker", 8000)
+    wieder = seite.evaluate("() => window.okmBlockly.serialisieren().anfrage.schritte")
+    assert wieder[2]["wert"] == "1.ms" and wieder[2]["zahl"] == 100 and wieder[2]["vergleich"] == "groesser"
+    assert wieder[2]["dann"] == [{"art": "warten", "sekunden": 2}]
+    assert wieder[2]["sonst"] == [{"art": "bestaetigung", "meldung": "Weiter?"}]
+    assert js_fehler == []

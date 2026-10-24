@@ -11,6 +11,13 @@
   var FARBEN = { gruen: "#2e7d32", gelb: "#b7791f", rot: "#c4161c" };
   var FARBE_ABLAUF = "#8c7440"; // Sandgelb (dunkel) – gut lesbar auf dunklem Grund
   var FARBE_START = "#e3262e";
+  var FARBE_NOTIZ = "#5c5c66";
+  var VERGLEICHE = [
+    ["<", "kleiner"], [">", "groesser"], ["=", "gleich"], ["≠", "ungleich"],
+    ["≤", "kleiner_gleich"], ["≥", "groesser_gleich"],
+    ["ist ja", "ja"], ["ist nein", "nein"], ["ist unbekannt", "unbekannt"]
+  ];
+  var MIT_ZAHL = { kleiner: true, groesser: true, gleich: true, ungleich: true, kleiner_gleich: true, groesser_gleich: true };
 
   function init() {
     var datenEl = document.getElementById("bl-daten");
@@ -37,8 +44,92 @@
     }
     var RECHTS = (Blockly.inputs && Blockly.inputs.Align) ? Blockly.inputs.Align.RIGHT : Blockly.ALIGN_RIGHT;
 
+    // --- Schritte in Vorordnung (gleiche Reihenfolge wie Validierung und Generator) -----
+    var KINDER = {
+      ablauf_start: ["SCHRITTE"], ablauf_wenn_fehler: ["VERSUCHE", "SONST"],
+      ablauf_wiederhole: ["RUMPF"], ablauf_wenn: ["DANN", "SONST"]
+    };
+    function durchlaufe(block, besuch) {
+      for (var b = block; b; b = b.getNextBlock()) {
+        if (!b.isEnabled()) { continue; }
+        if (besuch(b) === false) { return false; }
+        var kinder = KINDER[b.type] || [];
+        for (var i = 0; i < kinder.length; i++) {
+          if (durchlaufe(b.getInputTargetBlock(kinder[i]), besuch) === false) { return false; }
+        }
+      }
+      return true;
+    }
+    function scriptStart() {
+      var start = ws.getBlocksByType("ablauf_start")[0];
+      return start ? start.getInputTargetBlock("SCHRITTE") : null;
+    }
+    /* Block-ID -> Schrittnummer (nur Bausteine zählen, wie "[3/7]" im Script) */
+    function nummern() {
+      var n = 0, karte = {};
+      durchlaufe(scriptStart(), function (b) { if (b.type.indexOf("bk_") === 0) { karte[b.id] = ++n; } });
+      return karte;
+    }
+    /* "Block-ID|wert" (stabil beim Umsortieren) -> "3.wert" für das Backend */
+    function verweisText(wert) {
+      var trenner = wert ? wert.lastIndexOf("|") : -1; // Blockly-IDs können selbst "|" enthalten
+      if (trenner < 0) { return ""; }
+      var nr = nummern()[wert.slice(0, trenner)];
+      return nr ? nr + "." + wert.slice(trenner + 1) : "";
+    }
+    /* Auswahl der Rückgabewerte aller Schritte vor diesem Block; typ = "zahl"/"ja_nein"/null */
+    function verweisOptionen(feld, typ) {
+      var eigener = feld.getSourceBlock();
+      var optionen = [];
+      var n = 0;
+      if (ws && eigener) {
+        durchlaufe(scriptStart(), function (b) {
+          if (b.id === eigener.id) { return false; }
+          if (b.type.indexOf("bk_") !== 0) { return true; }
+          n++;
+          var def = katalog[b.type.slice(3)];
+          ((def && def.rueckgabe[ziel()]) || []).forEach(function (r) {
+            if (typ && r.typ !== typ) { return; }
+            optionen.push(["Schritt " + n + " · " + def.name + ": " + r.beschreibung, b.id + "|" + r.id]);
+          });
+          return true;
+        });
+      }
+      var aktuell = feld.getValue();
+      if (aktuell && !optionen.some(function (o) { return o[1] === aktuell; })) {
+        optionen.unshift(["(Wert nicht mehr verfügbar)", aktuell]);
+      }
+      if (!optionen.length) { optionen.push(["(kein passender Wert davor)", ""]); }
+      return optionen;
+    }
+    /* Dropdown, das auch Werte annimmt, die (noch) nicht in der Liste stehen – z. B. beim Laden,
+       bevor die vorherigen Schritte verbunden sind. Geprüft wird ohnehin im Backend. */
+    class VerweisFeld extends Blockly.FieldDropdown {
+      constructor(typ) {
+        super(function () { return verweisOptionen(this, typ); });
+      }
+      doClassValidation_(wert) { return typeof wert === "string" ? wert : null; }
+      // Optionen hängen von der Arbeitsfläche ab – Blockly würde sie sonst zwischenspeichern
+      doValueUpdate_(wert) {
+        this.generatedOptions = null;
+        super.doValueUpdate_(wert);
+      }
+      aktualisieren() {
+        this.doValueUpdate_(this.getValue());
+        this.forceRerender();
+      }
+    }
+    function verweiseAktualisieren() {
+      ws.getAllBlocks(false).forEach(function (b) {
+        b.inputList.forEach(function (eingabe) {
+          eingabe.fieldRow.forEach(function (f) { if (f instanceof VerweisFeld) { f.aktualisieren(); } });
+        });
+      });
+    }
+
     // --- Blockdefinitionen aus dem Katalog -------------------------------------------
     function feldFuer(p) {
+      if (p.typ === "variable") { return new VerweisFeld(p.variable_typ); }
       if (p.typ === "ja_nein") {
         return new Blockly.FieldCheckbox(p.standard ? "TRUE" : "FALSE");
       }
@@ -117,6 +208,69 @@
         this.setTooltip("Führt die Schritte darin mehrmals hintereinander aus (höchstens " + daten.max_wiederholungen + "-mal).");
       }
     };
+    Blockly.Blocks.ablauf_wenn = {
+      init: function () {
+        var block = this;
+        this.appendDummyInput("BEDINGUNG").appendField("Wenn")
+          .appendField(new VerweisFeld(null), "WERT")
+          .appendField(new Blockly.FieldDropdown(VERGLEICHE, function (neu) {
+            var zahl = block.getField("ZAHL");
+            if (zahl) { zahl.setVisible(!!MIT_ZAHL[neu]); }
+            return neu;
+          }), "VERGLEICH")
+          .appendField(new Blockly.FieldNumber(10), "ZAHL");
+        this.appendStatementInput("DANN").setCheck("schritt").appendField("dann");
+        this.appendStatementInput("SONST").setCheck("schritt").appendField("sonst");
+        this.setPreviousStatement(true, "schritt");
+        this.setNextStatement(true, "schritt");
+        this.setColour(FARBE_ABLAUF);
+        this.setTooltip("Prüft einen Wert, den ein Schritt davor geliefert hat (z. B. freier Speicher in %). " +
+          "Ist der Wert unbekannt, gilt nur „ist unbekannt“ als erfüllt.");
+      }
+    };
+    Blockly.Blocks.ablauf_abbrechen = {
+      init: function () {
+        this.appendDummyInput().appendField("Script beenden:")
+          .appendField(new Blockly.FieldTextInput("Nichts zu tun"), "MELDUNG");
+        this.appendDummyInput().setAlign(RECHTS).appendField("Exit-Code")
+          .appendField(new Blockly.FieldNumber(0, 0, 99, 1), "CODE");
+        this.setPreviousStatement(true, "schritt");
+        this.setColour(FARBE_ABLAUF);
+        this.setTooltip("Beendet das Script hier mit dieser Meldung. Exit-Code 0 = ohne Fehler " +
+          "(wichtig für Fernwartung/Monitoring). Nicht innerhalb von „Versuche“.");
+      }
+    };
+    Blockly.Blocks.ablauf_warten = {
+      init: function () {
+        this.appendDummyInput().appendField("Warte")
+          .appendField(new Blockly.FieldNumber(5, 1, daten.max_warten, 1), "SEKUNDEN").appendField("Sekunden");
+        this.setPreviousStatement(true, "schritt");
+        this.setNextStatement(true, "schritt");
+        this.setColour(FARBE_ABLAUF);
+        this.setTooltip("Wartet, z. B. bis ein Dienst gestartet ist (höchstens " + daten.max_warten + " Sekunden).");
+      }
+    };
+    Blockly.Blocks.ablauf_bestaetigung = {
+      init: function () {
+        this.appendDummyInput().appendField("Weiter nur bei JA:")
+          .appendField(new Blockly.FieldTextInput("Wirklich fortfahren?"), "MELDUNG");
+        this.setPreviousStatement(true, "schritt");
+        this.setNextStatement(true, "schritt");
+        this.setColour(FARBE_ABLAUF);
+        this.setTooltip("Fragt den Benutzer. Nur bei der Eingabe JA geht es weiter, sonst wird abgebrochen " +
+          "(auch ohne Benutzer, z. B. in der Fernwartung).");
+      }
+    };
+    Blockly.Blocks.ablauf_kommentar = {
+      init: function () {
+        this.appendDummyInput().appendField("Notiz:")
+          .appendField(new Blockly.FieldTextInput("Was hier passiert"), "TEXT");
+        this.setPreviousStatement(true, "schritt");
+        this.setNextStatement(true, "schritt");
+        this.setColour(FARBE_NOTIZ);
+        this.setTooltip("Steht nur als Kommentar im Script – zur Dokumentation, ohne Ausgabe.");
+      }
+    };
 
     // --- Toolbox (automatisch aus der Registry) ----------------------------------------
     function toolbox() {
@@ -131,7 +285,12 @@
         kind: "categoryToolbox",
         contents: [{
           kind: "category", name: "Ablauf", colour: FARBE_ABLAUF,
-          contents: [{ kind: "block", type: "ablauf_wenn_fehler" }, { kind: "block", type: "ablauf_wiederhole" }]
+          contents: [
+            { kind: "block", type: "ablauf_wenn" }, { kind: "block", type: "ablauf_wenn_fehler" },
+            { kind: "block", type: "ablauf_wiederhole" }, { kind: "block", type: "ablauf_warten" },
+            { kind: "block", type: "ablauf_bestaetigung" }, { kind: "block", type: "ablauf_abbrechen" },
+            { kind: "block", type: "ablauf_kommentar" }
+          ]
         }].concat(reihenfolge.map(function (k) {
           return { kind: "category", name: k, colour: "#b89f61", contents: kategorien[k] };
         }))
@@ -177,8 +336,27 @@
       for (var i = zustaende.length - 2; i >= 0; i--) { zustaende[i].next = { block: zustaende[i + 1] }; }
       return zustaende[0] || null;
     }
+    var ladeNr = 0;
+    /* "3.wert" -> "okm-s3|wert" (Bausteine bekommen beim Laden die IDs okm-s1, okm-s2 …) */
+    function verweisLaden(text) {
+      var m = /^(\d+)\.(\w+)$/.exec(text || "");
+      return m ? "okm-s" + m[1] + "|" + m[2] : "";
+    }
     function einzel(k) {
       var z;
+      if (k.art === "wenn") {
+        z = {
+          type: "ablauf_wenn", inputs: {},
+          fields: { WERT: verweisLaden(k.wert), VERGLEICH: k.vergleich, ZAHL: k.zahl === null || k.zahl === undefined ? 10 : k.zahl }
+        };
+        var d = kette(k.dann); if (d) { z.inputs.DANN = { block: d }; }
+        var so = kette(k.sonst); if (so) { z.inputs.SONST = { block: so }; }
+        return z;
+      }
+      if (k.art === "abbrechen") { return { type: "ablauf_abbrechen", fields: { MELDUNG: k.meldung, CODE: k.code } }; }
+      if (k.art === "warten") { return { type: "ablauf_warten", fields: { SEKUNDEN: k.sekunden } }; }
+      if (k.art === "bestaetigung") { return { type: "ablauf_bestaetigung", fields: { MELDUNG: k.meldung } }; }
+      if (k.art === "kommentar") { return { type: "ablauf_kommentar", fields: { TEXT: k.text } }; }
       if (k.art === "wenn_fehler") {
         z = { type: "ablauf_wenn_fehler", inputs: {} };
         var v = kette(k.versuche); if (v) { z.inputs.VERSUCHE = { block: v }; }
@@ -192,17 +370,20 @@
       }
       var def = katalog[k.block_id];
       if (!def) { return null; }
+      var id = "okm-s" + (++ladeNr);
       var felder = {};
       def.parameter.forEach(function (p) {
         if (k.parameter[p.id] === undefined) { return; }
         var wert = k.parameter[p.id];
         if (p.typ === "ja_nein") { wert = wert === "true" ? "TRUE" : "FALSE"; }
         else if (p.typ === "zahl" || p.typ === "port") { wert = Number(wert); }
+        else if (p.typ === "variable") { wert = verweisLaden(wert); }
         felder[p.id] = wert;
       });
-      return { type: "bk_" + def.id, fields: felder };
+      return { type: "bk_" + def.id, id: id, fields: felder };
     }
     function startBlock(schritte) {
+      ladeNr = 0;
       var zustand = { type: "ablauf_start", x: 24, y: 24, deletable: false, inputs: {} };
       var k = kette(schritte || []);
       if (k) { zustand.inputs.SCHRITTE = { block: k }; }
@@ -249,12 +430,25 @@
         if (b.type === "ablauf_wiederhole") {
           return { art: "wiederhole", anzahl: b.getFieldValue("ANZAHL"), rumpf: liste(b.getInputTargetBlock("RUMPF")) };
         }
+        if (b.type === "ablauf_wenn") {
+          var vergleich = b.getFieldValue("VERGLEICH");
+          return {
+            art: "wenn", wert: verweisText(b.getFieldValue("WERT")), vergleich: vergleich,
+            zahl: MIT_ZAHL[vergleich] ? b.getFieldValue("ZAHL") : null,
+            dann: liste(b.getInputTargetBlock("DANN")), sonst: liste(b.getInputTargetBlock("SONST"))
+          };
+        }
+        if (b.type === "ablauf_abbrechen") { return { art: "abbrechen", meldung: b.getFieldValue("MELDUNG"), code: b.getFieldValue("CODE") }; }
+        if (b.type === "ablauf_warten") { return { art: "warten", sekunden: b.getFieldValue("SEKUNDEN") }; }
+        if (b.type === "ablauf_bestaetigung") { return { art: "bestaetigung", meldung: b.getFieldValue("MELDUNG") }; }
+        if (b.type === "ablauf_kommentar") { return { art: "kommentar", text: b.getFieldValue("TEXT") }; }
         var def = katalog[b.type.slice(3)];
         if (def.risiko === "rot") { hatRot = true; }
         var parameter = {};
         def.parameter.forEach(function (p) {
           var wert = b.getFieldValue(p.id);
           if (p.typ === "ja_nein") { wert = wert === "TRUE" ? "true" : "false"; }
+          else if (p.typ === "variable") { wert = verweisText(wert); }
           else if (wert !== null && wert !== undefined) { wert = String(wert); }
           parameter[p.id] = wert;
         });
@@ -359,7 +553,13 @@
       window.clearTimeout(zeitgeber);
       zeitgeber = window.setTimeout(vorschau, 600);
     }
-    ws.addChangeListener(function (ev) { if (!ev.isUiEvent) { spaeter(); } });
+    ws.addChangeListener(function (ev) {
+      if (ev.isUiEvent) { return; }
+      // Schrittnummern/verfügbare Werte ändern sich beim Verschieben – Anzeige nachziehen
+      if (ev.type === Blockly.Events.BLOCK_MOVE || ev.type === Blockly.Events.BLOCK_CREATE ||
+          ev.type === Blockly.Events.BLOCK_DELETE) { verweiseAktualisieren(); }
+      spaeter();
+    });
     titelEl.addEventListener("input", spaeter);
     dryEl.addEventListener("change", vorschau);
     rotEl.addEventListener("change", vorschau);
@@ -371,6 +571,7 @@
         if (b.queueRender) { b.queueRender(); } else if (b.render) { b.render(); }
       });
       try { window.history.replaceState(null, "", "?ziel=" + encodeURIComponent(ziel())); } catch (e) { /* egal */ }
+      verweiseAktualisieren();
       vorschau();
     });
 

@@ -10,8 +10,8 @@ from __future__ import annotations
 from typing import ClassVar
 
 from app.escaping import Escaped, Ziel, echo_cmd, kommentar_text
-from app.generators.base import EINZUG, LINIE, Generator, SchrittInfo
-from app.ir import ScriptIR
+from app.generators.base import EINZUG, LINIE, PLANMAESSIG, Generator, SchrittInfo
+from app.ir import ScriptIR, Vergleich
 from app.models.block import BlockDef, RueckgabeDef, RueckgabeTyp
 
 LOG = '"%OKM_LOG%"'
@@ -159,32 +159,40 @@ class CmdGenerator(Generator):
             "",
         ]
 
+    @staticmethod
+    def _beides(text: str) -> list[str]:
+        # Text mit %VARIABLEN% (vom Generator, keine Benutzerwerte) auf Konsole und ins Log
+        return [f"echo({text}", f">>{LOG} echo({text}"]
+
+    def _fuss(self, *texte: str, vorher: list[str] | None = None) -> list[str]:
+        """Zusammenfassung + Aufräumen; ``vorher`` = bereits escapte Zeilen direkt unter der Linie."""
+        zeilen = [*_echo_beides(LINIE), *(vorher or [])]
+        for text in texte:
+            zeilen += self._beides(text)
+        return [
+            *zeilen,
+            *self._beides(f" Protokoll: {LOG}"),
+            *_echo_beides(LINIE),
+            f"del {TMP} >nul 2>&1",
+            "if not defined OKM_KEINE_PAUSE pause",
+            "endlocal",
+        ]
+
+    def _bisher(self) -> str:
+        if self.mit_kontrolle:
+            return " Erfolgreich bis dahin: %OKM_OK% Schritte."
+        return " Erfolgreich bis dahin: %OKM_OK% von %OKM_GESAMT% Schritten."
+
     def abschluss(self, ir: ScriptIR) -> list[str]:
         if self.mit_kontrolle:
             fertig = " Fertig: %OKM_OK% Schritte erfolgreich ausgeführt."
             fehler = " Abgebrochen bei Schritt %OKM_SCHRITT%."
-            bisher = " Erfolgreich bis dahin: %OKM_OK% Schritte."
         else:
             fertig = " Fertig: %OKM_OK% von %OKM_GESAMT% Schritten erfolgreich."
             fehler = " Abgebrochen bei Schritt %OKM_SCHRITT% von %OKM_GESAMT%."
-            bisher = " Erfolgreich bis dahin: %OKM_OK% von %OKM_GESAMT% Schritten."
-
-        def beides(text: str) -> list[str]:
-            # Text mit %VARIABLEN% (vom Generator, keine Benutzerwerte) auf Konsole und ins Log
-            return [f"echo({text}", f">>{LOG} echo({text}"]
-
-        def fuss(*texte: str) -> list[str]:
-            zeilen = [*_echo_beides(LINIE)]
-            for text in texte:
-                zeilen += beides(text)
-            return [
-                *zeilen,
-                *beides(f" Protokoll: {LOG}"),
-                *_echo_beides(LINIE),
-                f"del {TMP} >nul 2>&1",
-                "if not defined OKM_KEINE_PAUSE pause",
-                "endlocal",
-            ]
+        bisher = self._bisher()
+        beides = self._beides
+        fuss = self._fuss
 
         rechte = (
             [
@@ -246,3 +254,76 @@ class CmdGenerator(Generator):
             # Bleibt nach Entfernen von Ziffern und "-" etwas übrig, ist es keine Zahl.
             return [f'if defined {name} for /f "delims=-0123456789" %%z in ("%{name}%") do set "{name}="']
         return [f'if defined {name} if not "%{name}%"=="1" set "{name}=0"']
+
+    _OPERATOR: ClassVar[dict[Vergleich, str]] = {
+        Vergleich.GLEICH: "EQU",
+        Vergleich.UNGLEICH: "NEQ",
+        Vergleich.KLEINER: "LSS",
+        Vergleich.GROESSER: "GTR",
+        Vergleich.KLEINER_GLEICH: "LEQ",
+        Vergleich.GROESSER_GLEICH: "GEQ",
+    }
+
+    def wenn(
+        self,
+        nr: int,
+        name: str,
+        typ: RueckgabeTyp,
+        vergleich: Vergleich,
+        zahl: int | None,
+        text: str,
+        dann: list[str],
+        sonst: list[str],
+    ) -> list[str]:
+        # Nur Sprungmarken, keine ( … )-Blöcke. %NAME% ist normalisiert (Ziffern bzw. 0/1).
+        sonst_label = f":okm_wenn_sonst_{nr}"
+        if vergleich is Vergleich.UNBEKANNT:
+            sprung = [f"if defined {name} goto {sonst_label}"]
+        elif vergleich is Vergleich.JA:
+            sprung = [f'if not "%{name}%"=="1" goto {sonst_label}']
+        elif vergleich is Vergleich.NEIN:
+            sprung = [f'if not "%{name}%"=="0" goto {sonst_label}']
+        else:
+            sprung = [
+                f"if not defined {name} goto {sonst_label}",
+                f"if not %{name}% {self._OPERATOR[vergleich]} {int(zahl or 0)} goto {sonst_label}",
+            ]
+        return [
+            f"rem ===== Wenn {kommentar_text(Ziel.CMD, text)} (Block {nr}) =====",
+            *sprung,
+            *_echo_beides("Bedingung erfüllt: " + text),
+            *dann,
+            f"goto :okm_wenn_ende_{nr}",
+            sonst_label,
+            *_echo_beides("Bedingung nicht erfüllt: " + text),
+            *sonst,
+            f":okm_wenn_ende_{nr}",
+            f"rem ===== Ende Wenn (Block {nr}) =====",
+            "",
+        ]
+
+    def abbrechen(self, meldung: str, code: int) -> list[str]:
+        return [
+            f"rem ===== Beenden (Exit-Code {code}) =====",
+            *self._fuss(self._bisher(), vorher=_echo_beides(PLANMAESSIG + meldung)),
+            f"exit /b {int(code)}",
+            "",
+        ]
+
+    def warten(self, sekunden: int, text: str) -> list[str]:
+        # "timeout" scheitert bei umgeleiteter Eingabe (Fernwartung) – ping auf localhost wartet zuverlässig
+        return [*_echo_beides(text), f"ping -n {int(sekunden) + 1} 127.0.0.1 >nul", ""]
+
+    def bestaetigung(self, meldung: str) -> list[str]:
+        return [
+            *_echo_beides(meldung),
+            'set "OKM_ANTWORT="',
+            'set /p "OKM_ANTWORT=Zum Fortfahren JA eingeben (alles andere bricht ab): "',
+            "if not defined OKM_ANTWORT goto :okm_abbruch",
+            'set "OKM_ANTWORT=%OKM_ANTWORT:"=%"',
+            'if not "%OKM_ANTWORT%"=="JA" goto :okm_abbruch',
+            "",
+        ]
+
+    def kommentar(self, text: str) -> str:
+        return f"rem Notiz: {text}"

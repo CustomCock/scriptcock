@@ -10,8 +10,8 @@ from __future__ import annotations
 from typing import ClassVar
 
 from app.escaping import Escaped, Ziel, sh_literal
-from app.generators.base import EINZUG, LINIE, Generator, SchrittInfo, einruecken
-from app.ir import ScriptIR
+from app.generators.base import EINZUG, LINIE, PLANMAESSIG, Generator, SchrittInfo, einruecken
+from app.ir import ScriptIR, Vergleich
 from app.models.block import BlockDef, RueckgabeDef, RueckgabeTyp
 
 NIE_ROOT_TEXT = "Dieses Script darf nicht als root (mit sudo) gestartet werden: "
@@ -199,6 +199,11 @@ class ShGenerator(Generator):
             f"    fertig) {fertig} ;;",
             f"    abbruch) okm_info {_lit(ABBRUCH_TEXT)} ;;",
             f"    rechte) okm_info {_lit(' Abgebrochen: fehlende Rechte.')} ;;",
+            *(
+                [f"    beendet) printf '%s%s\\n' {_lit(PLANMAESSIG)} \"$OKM_GRUND\"; {bisher} ;;"]
+                if self.hat_abbrechen
+                else []
+            ),
             f"    *) {fehler}; {bisher} ;;",
             "  esac",
             "  printf ' Protokoll: %s\\n' \"$OKM_LOG\"",
@@ -234,6 +239,74 @@ class ShGenerator(Generator):
 
     def fehler_ort(self) -> list[str]:
         raise NotImplementedError
+
+    _OPERATOR: ClassVar[dict[Vergleich, str]] = {
+        Vergleich.GLEICH: "-eq",
+        Vergleich.UNGLEICH: "-ne",
+        Vergleich.KLEINER: "-lt",
+        Vergleich.GROESSER: "-gt",
+        Vergleich.KLEINER_GLEICH: "-le",
+        Vergleich.GROESSER_GLEICH: "-ge",
+    }
+
+    def wenn(
+        self,
+        nr: int,
+        name: str,
+        typ: RueckgabeTyp,
+        vergleich: Vergleich,
+        zahl: int | None,
+        text: str,
+        dann: list[str],
+        sonst: list[str],
+    ) -> list[str]:
+        v = f'"${name}"'
+        if vergleich is Vergleich.UNBEKANNT:
+            bedingung = f"[ -z {v} ]"
+        elif vergleich is Vergleich.JA:
+            bedingung = f"[ {v} = 1 ]"
+        elif vergleich is Vergleich.NEIN:
+            bedingung = f"[ {v} = 0 ]"
+        else:
+            bedingung = f"[ -n {v} ] && [ {v} {self._OPERATOR[vergleich]} {int(zahl or 0)} ]"
+        return [
+            f"# ===== Wenn {text} (Block {nr}) =====",
+            f"if {bedingung}; then",
+            f"  okm_info {_lit('Bedingung erfüllt: ' + text)}",
+            *einruecken(dann, 2),
+            "else",
+            f"  okm_info {_lit('Bedingung nicht erfüllt: ' + text)}",
+            *einruecken(sonst, 2),
+            "fi",
+            f"# ===== Ende Wenn (Block {nr}) =====",
+            "",
+        ]
+
+    def abbrechen(self, meldung: str, code: int) -> list[str]:
+        return [
+            f"# ===== Beenden (Exit-Code {code}) =====",
+            f"OKM_GRUND={_lit(meldung)}",
+            "OKM_STATUS=beendet",
+            f"exit {int(code)}",
+            "",
+        ]
+
+    def warten(self, sekunden: int, text: str) -> list[str]:
+        return [f"okm_info {_lit(text)}", f"sleep {int(sekunden)}", ""]
+
+    def bestaetigung(self, meldung: str) -> list[str]:
+        return [
+            f"okm_warn {_lit(meldung)}",
+            'okm_antwort=""',
+            self.lies_antwort("Zum Fortfahren JA eingeben (alles andere bricht ab): "),
+            'if [ "$okm_antwort" != "JA" ]; then',
+            *([f"  exit {self.ABBRUCH_CODE}"] if self.im_versuch else ["  OKM_STATUS=abbruch", "  exit 2"]),
+            "fi",
+            "",
+        ]
+
+    def kommentar(self, text: str) -> str:
+        return f"# Notiz: {text}"
 
     def rueckgaben_vorbelegen(self, rueckgaben: list[tuple[Escaped, RueckgabeDef]]) -> list[str]:
         return [

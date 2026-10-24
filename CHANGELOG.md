@@ -2,6 +2,26 @@
 
 ## Backlog P1
 
+### Blockly: Wenn … dann … sonst, Abbrechen, Warten, Bestätigung, Notiz
+
+- **Neue IR-Knoten** (IR-Version 3): `wenn` (Vergleich auf einen Rückgabewert: = ≠ < > ≤ ≥ bei
+  Zahlen, „ist ja/nein“ bei ja/nein, „ist unbekannt“ bei beiden), `abbrechen` (Meldung + Exit-Code
+  0–99, Status „Planmäßig beendet“), `warten` (1–3600 s), `bestaetigung` (weiter nur bei JA, sonst
+  Abbruch – auch ohne Benutzer) und `kommentar` (nur als Kommentar im Script).
+- Umsetzung in allen vier Generatoren; CMD nur mit Sprungmarken, Warten per `ping 127.0.0.1`
+  (`timeout` scheitert bei umgeleiteter Eingabe). Ist ein Wert unbekannt, sind alle Vergleiche
+  falsch – auf allen Zielen gleich. Die Ausgabe zeigt „Bedingung (nicht) erfüllt: …“.
+- **Validierung:** Vergleich passt zum Werttyp, Vergleichszahl vorhanden, Verweis auf einen Schritt
+  davor; „Abbrechen“ ist in „Versuche“ verboten (bash/zsh beenden dort nur die Subshell).
+- Zählweise: `hat_verzweigung()` (Versuche/Wiederhole/Wenn) statt „irgendein Kontrollknoten“ – ein
+  Script mit Notiz oder Warten bleibt bei „X von Y Schritten“. **Golden-Files unverändert.**
+- **Blockly:** fünf neue Blöcke in „Ablauf“; Werte-Auswahl mit den Rückgabewerten der Schritte davor
+  (passend zum Zielsystem), die beim Umsortieren mitwandert; auch für Parameter vom Typ `variable`.
+  „Erneut öffnen“ stellt die neuen Knoten wieder her.
+- Tests: `tests/test_ablauf.py` (Validierung, Fehlerpositionen, Syntax aller Ziele, Ausführung in
+  bash/zsh/pwsh für alle Vergleiche, Abbrechen mit Exit-Code, Warten, Bestätigung inkl. „Versuche“),
+  Browser-Test für Werte-Auswahl, Serialisierung, Fehler beim Umsortieren und Wiederöffnen.
+
 ### Rückgabewerte und Variablen
 
 - **Block-Schema:** `rueckgabe: [{id, typ: zahl|ja_nein, beschreibung, ziele?}]`. Im Template ist

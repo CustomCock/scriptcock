@@ -16,12 +16,32 @@ from urllib.parse import urlsplit
 
 from app import __version__
 from app.escaping import UnsicherError, Ziel, pruefe_zeichen
-from app.ir import BlockSchritt, Knoten, Optionen, ParamValue, ScriptIR, ScriptMeta, WennFehler, Wiederhole
-from app.models.block import BlockDef, ParameterDef, ParamTyp, Risiko
+from app.ir import (
+    Abbrechen,
+    Bestaetigung,
+    BlockSchritt,
+    Knoten,
+    Kommentar,
+    Optionen,
+    ParamValue,
+    ScriptIR,
+    ScriptMeta,
+    Vergleich,
+    Warten,
+    Wenn,
+    WennFehler,
+    Wiederhole,
+)
+from app.models.block import BlockDef, ParameterDef, ParamTyp, Risiko, RueckgabeDef, RueckgabeTyp
 from app.models.request import (
+    AbbrechenEingabe,
+    BestaetigungEingabe,
     EingabeKnoten,
+    KommentarEingabe,
     SchrittEingabe,
     ScriptRequest,
+    WartenEingabe,
+    WennEingabe,
     WennFehlerEingabe,
     WiederholeEingabe,
 )
@@ -417,6 +437,15 @@ MAX_WIEDERHOLUNGEN = 50
 _ANZAHL = ParameterDef(
     id="anzahl", label="Anzahl Wiederholungen", typ=ParamTyp.ZAHL, min=1, max=MAX_WIEDERHOLUNGEN
 )
+MAX_WARTEN = 3600
+_SEKUNDEN = ParameterDef(id="sekunden", label="Sekunden", typ=ParamTyp.ZAHL, min=1, max=MAX_WARTEN)
+_CODE = ParameterDef(id="code", label="Exit-Code", typ=ParamTyp.ZAHL, min=0, max=99)
+_MELDUNG = ParameterDef(id="meldung", label="Meldung", typ=ParamTyp.TEXT)
+_NOTIZ = ParameterDef(id="text", label="Notiz", typ=ParamTyp.TEXT)
+_VERWEIS_WERT = ParameterDef(id="wert", label="Wert", typ=ParamTyp.VARIABLE, variable_typ=RueckgabeTyp.ZAHL)
+_VERGLEICHSZAHL = ParameterDef(
+    id="zahl", label="Vergleichszahl", typ=ParamTyp.ZAHL, min=-999_999_999, max=999_999_999
+)
 
 
 class _BaumPruefer:
@@ -452,6 +481,8 @@ class _BaumPruefer:
         self.position += 1
         if isinstance(eingabe, SchrittEingabe):
             return self.block(i, eingabe)
+        if isinstance(eingabe, AbbrechenEingabe | WartenEingabe | BestaetigungEingabe | KommentarEingabe):
+            return self.blatt(i, eingabe)
         if tiefe >= MAX_TIEFE:
             self.fehler.append(Feldfehler(i, None, f"Höchstens {MAX_TIEFE} Ebenen ineinander verschachteln."))
         if isinstance(eingabe, WennFehlerEingabe):
@@ -463,6 +494,8 @@ class _BaumPruefer:
             self.versuche.pop()
             sonst = self.liste(eingabe.sonst, tiefe + 1)
             return WennFehler(versuche=versuche, sonst=sonst)
+        if isinstance(eingabe, WennEingabe):
+            return self.wenn(i, eingabe, tiefe)
         # WiederholeEingabe
         anzahl = 1
         try:
@@ -473,6 +506,84 @@ class _BaumPruefer:
         if not eingabe.rumpf:
             self.fehler.append(Feldfehler(i, None, "„Wiederhole“ braucht mindestens einen Schritt."))
         return Wiederhole(anzahl=anzahl, rumpf=self.liste(eingabe.rumpf, tiefe + 1))
+
+    def _wert(self, i: int, p: ParameterDef, roh: Any) -> Any:
+        try:
+            return validiere_wert(p, roh).wert
+        except ValidierungsFehler as e:
+            self.fehler.append(Feldfehler(i, p.id, f"{p.label}: {e}"))
+            return None
+
+    def blatt(
+        self, i: int, eingabe: AbbrechenEingabe | WartenEingabe | BestaetigungEingabe | KommentarEingabe
+    ) -> Knoten:
+        if isinstance(eingabe, AbbrechenEingabe):
+            if self.versuche:
+                self.fehler.append(
+                    Feldfehler(
+                        i,
+                        None,
+                        "„Abbrechen“ geht nicht innerhalb von „Versuche“ – dort würde nur der Versuch "
+                        "beendet. Bitte dahinter setzen oder „Wenn …“ verwenden.",
+                    )
+                )
+            meldung = self._wert(i, _MELDUNG, eingabe.meldung)
+            code = self._wert(i, _CODE, eingabe.code)
+            return Abbrechen(meldung=meldung or "", code=code if isinstance(code, int) else 1)
+        if isinstance(eingabe, WartenEingabe):
+            sek = self._wert(i, _SEKUNDEN, eingabe.sekunden)
+            return Warten(sekunden=sek if isinstance(sek, int) else 1)
+        if isinstance(eingabe, BestaetigungEingabe):
+            return Bestaetigung(meldung=self._wert(i, _MELDUNG, eingabe.meldung) or "")
+        return Kommentar(text=self._wert(i, _NOTIZ, eingabe.text) or "")
+
+    def wenn(self, i: int, eingabe: WennEingabe, tiefe: int) -> Wenn:
+        wert = self._wert(i, _VERWEIS_WERT, eingabe.wert)
+        try:
+            vergleich = Vergleich(str(eingabe.vergleich))
+        except ValueError:
+            vergleich = Vergleich.UNBEKANNT
+            self.fehler.append(
+                Feldfehler(
+                    i,
+                    "vergleich",
+                    "Bitte einen Vergleich wählen (=, ≠, <, >, ≤, ≥, ist ja, ist nein, ist unbekannt).",
+                )
+            )
+        zahl: int | None = None
+        if vergleich.mit_zahl:
+            leer = eingabe.zahl is None or (isinstance(eingabe.zahl, str) and not eingabe.zahl.strip())
+            if leer:
+                self.fehler.append(Feldfehler(i, "zahl", "Bitte eine Vergleichszahl angeben."))
+            else:
+                z = self._wert(i, _VERGLEICHSZAHL, eingabe.zahl)
+                zahl = z if isinstance(z, int) else None
+        if isinstance(wert, str):
+            try:
+                r = self.verweis_pruefen(self.anzahl_bloecke + 1, wert, None)
+                if r.typ is RueckgabeTyp.ZAHL and vergleich in (Vergleich.JA, Vergleich.NEIN):
+                    raise ValidierungsFehler(
+                        f"„{r.id}“ ist eine Zahl – „ist ja“/„ist nein“ gehen nur bei ja/nein-Werten."
+                    )
+                if r.typ is RueckgabeTyp.JA_NEIN and vergleich.mit_zahl:
+                    raise ValidierungsFehler(
+                        f"„{r.id}“ ist ja/nein – Vergleiche wie < oder = gehen nur bei Zahlen."
+                    )
+            except ValidierungsFehler as e:
+                self.fehler.append(Feldfehler(i, "wert", f"Wert: {e}"))
+        dann = self.liste(eingabe.dann, tiefe + 1)
+        sonst = self.liste(eingabe.sonst, tiefe + 1)
+        if not eingabe.dann and not eingabe.sonst:
+            self.fehler.append(
+                Feldfehler(i, None, "„Wenn“ braucht mindestens einen Schritt bei „dann“ oder „sonst“.")
+            )
+        return Wenn(
+            wert=wert if isinstance(wert, str) else "1.x",
+            vergleich=vergleich,
+            zahl=zahl,
+            dann=dann,
+            sonst=sonst,
+        )
 
     def block(self, i: int, eingabe: SchrittEingabe) -> BlockSchritt | None:
         self.anzahl_bloecke += 1
@@ -501,13 +612,14 @@ class _BaumPruefer:
                 wert = validiere_wert(p, eingabe.parameter.get(p.id))
                 pruefe_wert_fuer_ziel(wert, self.ziel)
                 if p.typ is ParamTyp.VARIABLE and isinstance(wert.wert, str):
-                    self.verweis_pruefen(nr, p, wert.wert)
+                    self.verweis_pruefen(nr, wert.wert, p.variable_typ)
                 werte[p.id] = wert
             except ValidierungsFehler as e:
                 self.fehler.append(Feldfehler(i, p.id, f"{p.label}: {e}"))
         return BlockSchritt(block_id=block.id, block_version=block.version, parameter=werte)
 
-    def verweis_pruefen(self, nr: int, p: ParameterDef, wert: str) -> None:
+    def verweis_pruefen(self, nr: int, wert: str, erwartet: RueckgabeTyp | None) -> RueckgabeDef:
+        """Löst ``"<schritt>.<id>"`` auf; ``nr`` = Nummer des Blocks, der den Wert liest."""
         quelle_nr, rid = verweis_teile(wert)
         if quelle_nr >= nr:
             raise ValidierungsFehler(
@@ -529,16 +641,17 @@ class _BaumPruefer:
             raise ValidierungsFehler(
                 f"Der Wert „{rid}“ aus Schritt {quelle_nr} ist für dieses Zielsystem nicht verfügbar."
             )
-        if p.variable_typ is not None and r.typ is not p.variable_typ:
+        if erwartet is not None and r.typ is not erwartet:
             raise ValidierungsFehler(
-                f"„{rid}“ aus Schritt {quelle_nr} ist {r.typ.anzeige}, hier wird {p.variable_typ.anzeige} "
-                "gebraucht."
+                f"„{rid}“ aus Schritt {quelle_nr} ist {r.typ.anzeige}, "
+                f"hier wird {erwartet.anzeige} gebraucht."
             )
         if tuple(self.versuche[: len(kette)]) != kette:
             raise ValidierungsFehler(
                 f"Der Wert aus Schritt {quelle_nr} entsteht in einem „Versuche“-Block und ist außerhalb "
                 "davon nicht verfügbar."
             )
+        return r
 
 
 def validiere_request(
@@ -617,6 +730,23 @@ def ir_zu_request(ir: ScriptIR, ziel: Ziel) -> ScriptRequest:
 
 
 def _knoten_zu_eingabe(k: Knoten) -> EingabeKnoten:
+    if isinstance(k, Wenn):
+        return WennEingabe(
+            art="wenn",
+            wert=k.wert,
+            vergleich=k.vergleich.value,
+            zahl=k.zahl,
+            dann=[_knoten_zu_eingabe(x) for x in k.dann],
+            sonst=[_knoten_zu_eingabe(x) for x in k.sonst],
+        )
+    if isinstance(k, Abbrechen):
+        return AbbrechenEingabe(art="abbrechen", meldung=k.meldung, code=k.code)
+    if isinstance(k, Warten):
+        return WartenEingabe(art="warten", sekunden=k.sekunden)
+    if isinstance(k, Bestaetigung):
+        return BestaetigungEingabe(art="bestaetigung", meldung=k.meldung)
+    if isinstance(k, Kommentar):
+        return KommentarEingabe(art="kommentar", text=k.text)
     if isinstance(k, WennFehler):
         return WennFehlerEingabe(
             art="wenn_fehler",

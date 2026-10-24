@@ -19,8 +19,30 @@ from urllib.parse import quote
 from app import escaping
 from app.escaping import Escaped, UnsicherError, Ziel
 from app.export import exportiere, text_fuer
-from app.ir import BlockSchritt, Knoten, ScriptIR, WennFehler, Wiederhole
-from app.models.block import RUECKGABE_PRAEFIX, WINDOWS, BlockDef, ParamTyp, Recht, Risiko, RueckgabeDef
+from app.ir import (
+    Abbrechen,
+    Bestaetigung,
+    BlockSchritt,
+    Knoten,
+    Kommentar,
+    ScriptIR,
+    Vergleich,
+    Warten,
+    Wenn,
+    WennFehler,
+    Wiederhole,
+    alle_knoten,
+)
+from app.models.block import (
+    RUECKGABE_PRAEFIX,
+    WINDOWS,
+    BlockDef,
+    ParamTyp,
+    Recht,
+    Risiko,
+    RueckgabeDef,
+    RueckgabeTyp,
+)
 from app.registry import Registry
 from app.validation import ValidierungsFehler, pruefe_wert_fuer_ziel, verweis_teile
 
@@ -122,7 +144,10 @@ class Generator(ABC):
         self._nr = 0  # laufende Schrittnummer (Pre-Order über Blöcke)
         self._id = 0  # eindeutige Nummer je Kontrollknoten (Labels, Variablen)
         self._versuche: list[int] = []  # offene "Versuche"-Blöcke (innerster zuletzt)
-        self.mit_kontrolle = ir.hat_kontrolle()
+        self._defs = defs  # Block-Definitionen in Schrittnummer-Reihenfolge (für Verweise)
+        # Ohne Verzweigung (Kommentar, Warten …) bleibt es bei „X von Y Schritten“.
+        self.mit_kontrolle = ir.hat_verzweigung()
+        self.hat_abbrechen = any(isinstance(k, Abbrechen) for k in alle_knoten(ir.schritte))
 
         zeilen: list[str] = []
         zeilen += self.kopf(ir, defs)
@@ -201,6 +226,36 @@ class Generator(ABC):
         self._id += 1
         nr = self._id
         return self.wiederhole(nr, knoten.anzahl, self.emit_liste(knoten.rumpf))
+
+    def emit_wenn(self, knoten: Wenn) -> list[str]:
+        self._id += 1
+        nr = self._id
+        quelle_nr, rid = verweis_teile(knoten.wert)
+        r = self._defs[quelle_nr - 1].rueckgabe_def(rid)
+        if r is None:
+            raise GenerierungsFehler(f"Schritt {quelle_nr} liefert keinen Wert „{rid}“.")
+        name = escaping.variablen_name(self.ziel, quelle_nr, rid)
+        text = bedingung_text(knoten)
+        dann = self.emit_liste(knoten.dann)
+        sonst = self.emit_liste(knoten.sonst)
+        return self.wenn(nr, name, r.typ, knoten.vergleich, knoten.zahl, text, dann, sonst)
+
+    def emit_abbrechen(self, knoten: Abbrechen) -> list[str]:
+        return self.abbrechen(knoten.meldung, knoten.code)
+
+    def emit_warten(self, knoten: Warten) -> list[str]:
+        text = f"Warte {sekunden_text(knoten.sekunden)} …"
+        if self._ir.optionen.dry_run:
+            return [self.echo(SIMULATION_PREFIX + text)]
+        return self.warten(knoten.sekunden, text)
+
+    def emit_bestaetigung(self, knoten: Bestaetigung) -> list[str]:
+        if self._ir.optionen.dry_run:
+            return [self.echo(SIMULATION_PREFIX + "Rückfrage: " + knoten.meldung)]
+        return self.bestaetigung(knoten.meldung)
+
+    def emit_kommentar(self, knoten: Kommentar) -> list[str]:
+        return [self.kommentar(escaping.kommentar_text(self.ziel, knoten.text))]
 
     def meldung_ausweichen(self, mit_sonst: bool) -> str:
         if mit_sonst:
@@ -335,6 +390,20 @@ class Generator(ABC):
                 elif isinstance(kn, Wiederhole):
                     zeilen.append(" " * einzug + f"Wiederhole {kn.anzahl}-mal:")
                     liste(kn.rumpf, einzug + 3)
+                elif isinstance(kn, Wenn):
+                    zeilen.append(" " * einzug + f"Wenn {k(bedingung_text(kn))}:")
+                    liste(kn.dann, einzug + 3)
+                    if kn.sonst:
+                        zeilen.append(" " * einzug + "Sonst:")
+                        liste(kn.sonst, einzug + 3)
+                elif isinstance(kn, Abbrechen):
+                    zeilen.append(" " * einzug + f"Beenden (Exit-Code {kn.code}): {k(kn.meldung)}")
+                elif isinstance(kn, Warten):
+                    zeilen.append(" " * einzug + f"Warte {sekunden_text(kn.sekunden)}")
+                elif isinstance(kn, Bestaetigung):
+                    zeilen.append(" " * einzug + f"Bestätigung: {k(kn.meldung)}")
+                elif isinstance(kn, Kommentar):
+                    zeilen.append(" " * einzug + f"Notiz: {k(kn.text)}")
                 else:
                     b = self.registry.bloecke[kn.block_id]
                     admin = f", {self.rechte_name}" if b.braucht_admin(self.ziel) else ""
@@ -397,12 +466,52 @@ class Generator(ABC):
     def ist_kommentar(self, zeile: str) -> bool: ...
 
     @abstractmethod
+    def wenn(
+        self,
+        nr: int,
+        name: str,
+        typ: RueckgabeTyp,
+        vergleich: Vergleich,
+        zahl: int | None,
+        text: str,
+        dann: list[str],
+        sonst: list[str],
+    ) -> list[str]:
+        """``name`` = Variablenname (ohne ``$``/``%``); unbekannt → alle Vergleiche falsch."""
+
+    @abstractmethod
+    def abbrechen(self, meldung: str, code: int) -> list[str]: ...
+
+    @abstractmethod
+    def warten(self, sekunden: int, text: str) -> list[str]: ...
+
+    @abstractmethod
+    def bestaetigung(self, meldung: str) -> list[str]: ...
+
+    @abstractmethod
+    def kommentar(self, text: str) -> str: ...
+
+    @abstractmethod
     def rueckgaben_vorbelegen(self, rueckgaben: list[tuple[Escaped, RueckgabeDef]]) -> list[str]:
         """Alle Rückgabevariablen vor dem ersten Schritt auf „unbekannt“ setzen."""
 
     @abstractmethod
     def rueckgabe_normalisieren(self, name: Escaped, r: RueckgabeDef) -> list[str]:
         """Zahl → nur Ziffern (sonst unbekannt), ja/nein → fester Wahrheitswert."""
+
+
+def sekunden_text(n: int) -> str:
+    return "1 Sekunde" if n == 1 else f"{n} Sekunden"
+
+
+def bedingung_text(k: Wenn) -> str:
+    """``frei_prozent aus Schritt 3 < 10`` bzw. ``erreichbar aus Schritt 1 ist ja``."""
+    nr, rid = verweis_teile(k.wert)
+    zahl = f" {k.zahl}" if k.vergleich.mit_zahl else ""
+    return f"{rid} aus Schritt {nr} {k.vergleich.text}{zahl}"
+
+
+PLANMAESSIG = " Planmäßig beendet: "
 
 
 def einruecken(zeilen: list[str], tiefe: int) -> list[str]:

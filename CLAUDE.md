@@ -34,7 +34,7 @@ UI-Formular / JSON ──► ScriptRequest ──► validation.py ──► Scr
 |---|---|
 | `app/escaping.py` | **Sicherheitskritisch.** Literal pro Zielsprache, `Escaped`-Markertyp, echo-/Kommentar-Escaping |
 | `app/validation.py` | Parametertypen (Whitelist) → `ParamValue`; ganzer Request → `ScriptIR` |
-| `app/ir.py` | Zielunabhängige IR. Schritte = Baum über Diskriminator `art`: `block`, `wenn_fehler`, `wiederhole` |
+| `app/ir.py` | Zielunabhängige IR. Schritte = Baum über Diskriminator `art`: `block`, `wenn_fehler`, `wiederhole`, `wenn`, `abbrechen`, `warten`, `bestaetigung`, `kommentar` |
 | `app/codeenv.py` | Jinja-Umgebung für Code: `finalize` lässt **nur** `Escaped` durch |
 | `app/registry.py` | Lädt/prüft `blocks/**/*.yaml` und `recipes/*.yaml` beim Start, bricht bei Fehlern ab |
 | `app/generators/base.py` | Fester Script-Aufbau (Kopf → Präambel → Schritte → Abschluss), Dry-Run-Logik |
@@ -112,6 +112,13 @@ sonst wird `tests/test_browser.py` übersprungen.
   `OKM_VERSUCH` (in der Subshell nur diese beenden). Roter Abbruch im Versuch = Exit 112.
 - CMD: niemals Schritte in `for`/`( … )`-Blöcke packen – nur Sprungmarken.
 - Flache Scripte müssen byte-gleich bleiben (Golden-Files).
+- `ir.hat_kontrolle()` = irgendein Nicht-Block-Knoten (nur in Blockly öffenbar);
+  `ir.hat_verzweigung()` = Versuche/Wiederhole/Wenn → Generator zählt ohne feste Gesamtzahl.
+- `wenn`: Vergleich auf einen Rückgabewert (`"<schritt>.<id>"`); unbekannter Wert → alle
+  Vergleiche falsch außer `unbekannt`. `abbrechen` (Status `beendet`, Exit-Code 0–99) ist in
+  „Versuche“ verboten (bash-Subshell); `bestaetigung` nutzt den Mechanismus der roten Abfrage.
+- Blockly: `VerweisFeld` speichert `Block-ID|wert` (stabil beim Umsortieren), `serialisieren()`
+  macht daraus `"<schritt>.<wert>"`; beim Laden bekommen Bausteine die IDs `okm-s<n>`.
 
 ## Script-Editor (alle Modi)
 

@@ -9,8 +9,8 @@ from __future__ import annotations
 from typing import ClassVar
 
 from app.escaping import Escaped, Ziel, powershell_literal
-from app.generators.base import EINZUG, LINIE, Generator, SchrittInfo, einruecken
-from app.ir import ScriptIR
+from app.generators.base import EINZUG, LINIE, PLANMAESSIG, Generator, SchrittInfo, einruecken
+from app.ir import ScriptIR, Vergleich
 from app.models.block import BlockDef, RueckgabeDef, RueckgabeTyp
 
 
@@ -72,6 +72,16 @@ class PowerShellGenerator(Generator):
             "-ForegroundColor Yellow",
             "        }",
             "        'neustart' { Write-Host ' Läuft im neuen Fenster mit Administratorrechten weiter.' }",
+            *(
+                [
+                    "        'beendet' {",
+                    f"            Write-Host ({_lit(PLANMAESSIG)} + $script:OkmGrund)",
+                    f"            Write-Host {bisher}",
+                    "        }",
+                ]
+                if self.hat_abbrechen
+                else []
+            ),
             "        'rechte' {",
             "            Write-Host ' Abgebrochen: fehlende Administratorrechte.' -ForegroundColor Red",
             "        }",
@@ -269,3 +279,71 @@ class PowerShellGenerator(Generator):
                 f"else {{ {name} = $null }}"
             ]
         return [f"if ($null -ne {name}) {{ {name} = @('1', 'true', 'ja') -contains \"$({name})\" }}"]
+
+    _OPERATOR: ClassVar[dict[Vergleich, str]] = {
+        Vergleich.GLEICH: "-eq",
+        Vergleich.UNGLEICH: "-ne",
+        Vergleich.KLEINER: "-lt",
+        Vergleich.GROESSER: "-gt",
+        Vergleich.KLEINER_GLEICH: "-le",
+        Vergleich.GROESSER_GLEICH: "-ge",
+    }
+
+    def wenn(
+        self,
+        nr: int,
+        name: str,
+        typ: RueckgabeTyp,
+        vergleich: Vergleich,
+        zahl: int | None,
+        text: str,
+        dann: list[str],
+        sonst: list[str],
+    ) -> list[str]:
+        v = f"$script:{name}"
+        if vergleich is Vergleich.UNBEKANNT:
+            bedingung = f"$null -eq {v}"
+        elif vergleich is Vergleich.JA:
+            bedingung = f"{v} -eq $true"
+        elif vergleich is Vergleich.NEIN:
+            bedingung = f"{v} -eq $false"
+        else:
+            bedingung = f"($null -ne {v}) -and ({v} {self._OPERATOR[vergleich]} {int(zahl or 0)})"
+        return [
+            f"# ===== Wenn {text} (Block {nr}) =====",
+            f"if ({bedingung}) {{",
+            f"    Write-OkmInfo {_lit('Bedingung erfüllt: ' + text)}",
+            *einruecken(dann, 4),
+            "} else {",
+            f"    Write-OkmInfo {_lit('Bedingung nicht erfüllt: ' + text)}",
+            *einruecken(sonst, 4),
+            "}",
+            f"# ===== Ende Wenn (Block {nr}) =====",
+            "",
+        ]
+
+    def abbrechen(self, meldung: str, code: int) -> list[str]:
+        return [
+            f"# ===== Beenden (Exit-Code {code}) =====",
+            f"$script:OkmGrund = {_lit(meldung)}",
+            "$OkmStatus = 'beendet'",
+            f"Exit-OkmScript {int(code)}",
+            "",
+        ]
+
+    def warten(self, sekunden: int, text: str) -> list[str]:
+        return [f"Write-OkmInfo {_lit(text)}", f"Start-Sleep -Seconds {int(sekunden)}", ""]
+
+    def bestaetigung(self, meldung: str) -> list[str]:
+        return [
+            f"Write-OkmWarnung {_lit(meldung)}",
+            "$OkmAntwort = Read-Host 'Zum Fortfahren JA eingeben (alles andere bricht ab)'",
+            "if ($OkmAntwort -cne 'JA') {",
+            "    $OkmStatus = 'abbruch'",
+            "    Exit-OkmScript 2",
+            "}",
+            "",
+        ]
+
+    def kommentar(self, text: str) -> str:
+        return f"# Notiz: {text}"
