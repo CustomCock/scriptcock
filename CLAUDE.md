@@ -151,6 +151,8 @@ sonst wird `tests/test_browser.py` übersprungen.
 - „＋“ im Listen-Modus ruft `GET /baukasten/schritt?block=paket_installieren&p.paket=…&p.paketmanager=…`
   auf; im Blockly-Modus setzt es die ID im ausgewählten Paket-Block oder legt einen an.
   Paketmanager-Werte = Katalogfelder (`winget`, `brew`, `brew_cask`, `apt`, `flatpak`).
+- Im Rezept füllt „＋“ das Feld `data-typ=paketname`; gibt es ein Listenfeld `data-listen-typ=paketname`,
+  hängen „＋“ und Mehrfachauswahl Tags an (Ereignis `okm:tags` am Quellfeld des Tag-Felds).
 - Daten nur über Textknoten ins DOM (kein `innerHTML`), JSON per `tojson` eingebettet.
 
 ## Rechte

@@ -1,0 +1,22 @@
+id: vor_aenderung_absichern
+name: Vor riskanter Änderung absichern
+kategorie: Datensicherung
+beschreibung: Legt einen Windows-Wiederherstellungspunkt an und sichert einen Registry-Schlüssel – bevor Treiber, Registry oder Software geändert werden.
+hilfe: |
+  Zurück: Systemwiederherstellung (rstrui.exe) bzw. Doppelklick auf die gesicherte .reg-Datei.
+  Windows legt höchstens einen Wiederherstellungspunkt pro 24 Stunden an – das meldet das Script.
+schlagworte: [absichern, sicherung, wiederherstellungspunkt, backup, registry, vorher, rückgängig]
+felder:
+  - id: beschreibung
+    label: Wofür? (Beschreibung des Wiederherstellungspunkts)
+    typ: text_kurz
+    standard: Vor Änderung durch okm-Script
+  - id: schluessel
+    label: Registry-Schlüssel, der gesichert wird
+    typ: registry_pfad
+    beispiel: HKCU:\Software\Microsoft\Office
+schritte:
+  - block: wiederherstellungspunkt
+    parameter: {beschreibung: $beschreibung, aktivieren: false}
+  - block: registry_backup
+    parameter: {schluessel: $schluessel}

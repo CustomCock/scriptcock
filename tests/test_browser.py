@@ -271,6 +271,24 @@ def test_software_katalog_im_browser(server: str, browser) -> None:
     seite.locator(".katalog-eintrag").first.locator(".knopf-uebernehmen").first.click()
     assert seite.input_value("input[name='f.paket']") == "firefox@esr"
     assert seite.input_value("select[name='f.paketmanager']") == "brew_cask"
+
+    # Rezept mit Listenfeld: „＋“ und Mehrfachauswahl hängen Tags an
+    seite.goto(f"{server}/rezepte/standardsoftware_installieren?ziel=bash")
+    seite.keyboard.press("/")
+    seite.locator("#software-katalog[open]").wait_for()
+    seite.fill("#katalog-suche", "gimp")
+    seite.locator(".katalog-eintrag:first-child .katalog-name", has_text="GIMP").wait_for()
+    seite.locator(".katalog-auswahl").first.check()
+    seite.fill("#katalog-suche", "7zip")
+    seite.locator(".katalog-eintrag:first-child .katalog-name", has_text="7-Zip").wait_for()
+    seite.locator(".katalog-auswahl").first.check()
+    seite.locator("[data-katalog-auswahl]", has_text="(2)").click()
+    seite.locator(".tagfeld .tag-text", has_text="7zip").wait_for()
+    seite.fill("#katalog-suche", "vlc")
+    seite.locator(".katalog-eintrag:first-child .katalog-name", has_text="VLC").wait_for()
+    seite.locator(".katalog-eintrag").first.locator(".knopf-uebernehmen").first.click()
+    assert seite.input_value("input[name='f.pakete']") == "gimp, 7zip, vlc"
+    assert seite.locator(".tagfeld .tag-text").all_text_contents() == ["gimp", "7zip", "vlc"]
     assert js_fehler == []
     kontext.close()
 

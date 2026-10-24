@@ -1,0 +1,49 @@
+id: office_schnellreparatur
+version: 1
+name: Office-Schnellreparatur
+kategorie: Office
+beschreibung: Startet die Schnellreparatur von Microsoft 365 / Office (Klick-und-Los). Repariert beschädigte Programmdateien ohne Internet; Einstellungen und Daten bleiben erhalten.
+hilfe: |
+  Office-Programme müssen dafür geschlossen sein. Mit „Office-Programme schließen“ beendet der Baustein
+  Outlook, Word, Excel usw. selbst – nicht gespeicherte Dokumente gehen dann verloren.
+  Hilft die Schnellreparatur nicht: in den Einstellungen → Apps → Microsoft 365 → Ändern die
+  „Onlinereparatur“ wählen (dauert länger, lädt Office neu herunter).
+  Nur für Klick-und-Los-Installationen (Microsoft 365, Office 2019/2021/2024), nicht für MSI-Office.
+risiko: gelb
+interaktiv: true
+fortschritt: Office-Schnellreparatur läuft (dauert einige Minuten)
+tipp: Läuft noch ein Office-Programm (auch im Hintergrund, z. B. Teams-Add-In)? Ist Office eine Klick-und-Los-Installation?
+rechte:
+  powershell: admin
+parameter:
+  - id: apps_schliessen
+    label: Office-Programme schließen (nicht Gespeichertes geht verloren)
+    typ: ja_nein
+    pflicht: false
+    standard: false
+ziele:
+  powershell: |
+    $okmC2r = Join-Path -Path $env:CommonProgramFiles -ChildPath 'Microsoft Shared\ClickToRun\OfficeClickToRun.exe'
+    $okmKonfig = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration' -ErrorAction SilentlyContinue
+    if (-not (Test-Path -LiteralPath $okmC2r) -or -not $okmKonfig) { throw 'Keine Klick-und-Los-Installation von Office gefunden.' }
+    $okmApps = @(Get-Process -Name OUTLOOK, WINWORD, EXCEL, POWERPNT, ONENOTE, MSACCESS, MSPUB, lync -ErrorAction SilentlyContinue)
+    if ($okmApps.Count -gt 0) {
+    {% if apps_schliessen %}
+        Write-OkmWarnung ('Wird geschlossen: ' + (($okmApps | ForEach-Object { $_.ProcessName } | Sort-Object -Unique) -join ', '))
+        $okmApps | Stop-Process -Force
+        Start-Sleep -Seconds 3
+    {% else %}
+        throw ('Bitte zuerst schließen: ' + (($okmApps | ForEach-Object { $_.ProcessName } | Sort-Object -Unique) -join ', '))
+    {% endif %}
+    }
+    $okmPlattform = if ($okmKonfig.Platform) { $okmKonfig.Platform } else { 'x64' }
+    $okmSprache = if ($okmKonfig.ClientCulture) { $okmKonfig.ClientCulture } else { 'de-de' }
+    Write-OkmInfo ('Office ' + $okmKonfig.VersionToReport + ' (' + $okmPlattform + ', ' + $okmSprache + ')')
+    $okmProzess = Start-Process -FilePath $okmC2r -ArgumentList ('scenario=Repair platform=' + $okmPlattform + ' culture=' + $okmSprache + ' RepairType=QuickRepair forceappshutdown=True DisplayLevel=False') -Wait -PassThru
+    if ($okmProzess.ExitCode -ne 0) { throw ('Reparatur endete mit Code ' + $okmProzess.ExitCode) }
+    Write-OkmOk 'Schnellreparatur abgeschlossen. Office danach neu starten.'
+dry_run:
+  powershell: |
+    $okmKonfig = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration' -ErrorAction SilentlyContinue
+    if ($okmKonfig) { Write-OkmInfo ('[SIMULATION] Schnellreparatur für Office ' + $okmKonfig.VersionToReport + ' würde starten.') }
+    else { Write-OkmInfo '[SIMULATION] Keine Klick-und-Los-Installation von Office gefunden.' }

@@ -1,0 +1,141 @@
+id: pakete_installieren
+version: 1
+name: Mehrere Pakete installieren
+kategorie: Software
+beschreibung: Installiert mehrere Programme nacheinander über den Paketmanager (z. B. die Standardsoftware eines neuen Arbeitsplatzes). Schlägt eines fehl, geht es mit den übrigen weiter; am Ende steht, was nicht geklappt hat.
+hilfe: |
+  Die Paket-IDs stehen im Software-Katalog – dort lassen sich mehrere ankreuzen und gesammelt übernehmen.
+  Windows: winget-IDs (Mozilla.Firefox, 7zip.7zip). Linux: Paketnamen (apt/dnf) bzw. Flathub-IDs.
+  macOS: Homebrew-Namen; Formeln und Apps (--cask) bitte nicht mischen.
+  Bereits installierte Programme gelten unter Windows (PowerShell) als Erfolg.
+risiko: gelb
+fortschritt: "Pakete werden installiert: {{ pakete }}"
+tipp: Die Paket-IDs im Software-Katalog prüfen; die nicht installierten stehen in der Meldung oben.
+rechte:
+  bash: root
+  zsh: nie_root
+parameter:
+  - id: pakete
+    label: Pakete
+    typ: liste
+    listen_typ: paketname
+    max_anzahl: 30
+    beispiel: Mozilla.Firefox, 7zip.7zip
+  - id: paketmanager
+    label: Paketmanager
+    typ: auswahl
+    standard: standard
+    optionen:
+      - wert: standard
+        label: "Standard (Windows: winget, Linux: apt, macOS: brew)"
+      - wert: winget
+        label: winget (Windows)
+      - wert: apt
+        label: "apt (Linux: Debian, Ubuntu)"
+      - wert: dnf
+        label: "dnf (Linux: Fedora, RHEL, Rocky)"
+      - wert: flatpak
+        label: Flatpak (Linux, Flathub)
+      - wert: brew
+        label: brew – Formel (macOS)
+      - wert: brew_cask
+        label: brew --cask – App (macOS)
+rueckgabe:
+  - id: fehlgeschlagen
+    typ: zahl
+    beschreibung: Anzahl der Pakete, die nicht installiert werden konnten
+ziele:
+  powershell: |
+    $okmFehlt = @()
+    foreach ($okmPaket in {{ pakete }}) {
+        Write-OkmInfo ('--- ' + $okmPaket)
+        winget.exe install --id $okmPaket -e --source winget --silent --accept-package-agreements --accept-source-agreements
+        # -1978335189/-1978335135: schon installiert bzw. kein neueres Paket – kein Fehler
+        if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne -1978335189 -and $LASTEXITCODE -ne -1978335135) { $okmFehlt += $okmPaket }
+    }
+    $global:LASTEXITCODE = 0
+    {{ rueckgabe_fehlgeschlagen }} = $okmFehlt.Count
+    if ($okmFehlt.Count -gt 0) { throw ('Nicht installiert: ' + ($okmFehlt -join ', ')) }
+    Write-OkmOk 'Alle Pakete installiert.'
+  cmd: |
+    set /a OKM_FEHLT=0
+    if exist "%TEMP%\okm-pakete-fehlt.txt" del "%TEMP%\okm-pakete-fehlt.txt"
+    for %%p in ({{ pakete }}) do (
+      echo --- %%~p
+      winget install --id %%~p -e --source winget --silent --accept-package-agreements --accept-source-agreements || (set /a OKM_FEHLT+=1 & >>"%TEMP%\okm-pakete-fehlt.txt" echo %%~p)
+    )
+    set /a {{ rueckgabe_fehlgeschlagen }}=OKM_FEHLT
+    if exist "%TEMP%\okm-pakete-fehlt.txt" (
+      echo Nicht installiert:
+      type "%TEMP%\okm-pakete-fehlt.txt"
+      del "%TEMP%\okm-pakete-fehlt.txt"
+      cmd /c exit 1
+    ) else (
+      echo Alle Pakete installiert.
+    )
+  bash: |
+    okm_pakete=({{ pakete }})
+    okm_fehlt=()
+    {% if paketmanager.wert in ('winget', 'brew', 'brew_cask') %}
+    okm_fehlt=("${okm_pakete[@]}")
+    okm_fehler 'Dieser Paketmanager ist unter Linux nicht verfügbar – bitte apt, dnf oder Flatpak wählen.'
+    {% elif paketmanager.wert == 'flatpak' %}
+    if ! command -v flatpak >/dev/null 2>&1; then
+      okm_fehlt=("${okm_pakete[@]}")
+      okm_fehler 'Flatpak ist nicht installiert – bitte an die IT wenden.'
+    else
+      for okm_p in "${okm_pakete[@]}"; do
+        okm_info "--- $okm_p"
+        {{ sudo }}flatpak install -y --noninteractive flathub "$okm_p" || okm_fehlt+=("$okm_p")
+      done
+    fi
+    {% elif paketmanager.wert == 'dnf' %}
+    for okm_p in "${okm_pakete[@]}"; do
+      okm_info "--- $okm_p"
+      {{ sudo }}dnf install -y "$okm_p" || okm_fehlt+=("$okm_p")
+    done
+    {% else %}
+    {{ sudo }}apt-get update || okm_warn 'Paketlisten konnten nicht aktualisiert werden.'
+    for okm_p in "${okm_pakete[@]}"; do
+      okm_info "--- $okm_p"
+      {{ sudo }}apt-get install -y "$okm_p" || okm_fehlt+=("$okm_p")
+    done
+    {% endif %}
+    # Anzahl über $# (die Schreibweise mit Raute-Klammer kollidiert mit Jinja-Kommentaren)
+    set -- "${okm_fehlt[@]}"
+    {{ rueckgabe_fehlgeschlagen }}=$#
+    if [ $# -gt 0 ]; then
+      okm_fehler "Nicht installiert: ${okm_fehlt[*]}"
+      false
+    else
+      okm_ok 'Alle Pakete installiert.'
+    fi
+  zsh: |
+    okm_pakete=({{ pakete }})
+    okm_fehlt=()
+    {% if paketmanager.wert in ('winget', 'apt', 'dnf', 'flatpak') %}
+    okm_fehlt=("${okm_pakete[@]}")
+    okm_fehler 'Dieser Paketmanager ist unter macOS nicht verfügbar – bitte brew oder brew --cask wählen.'
+    {% else %}
+    if ! command -v brew >/dev/null 2>&1; then
+      okm_fehlt=("${okm_pakete[@]}")
+      okm_fehler 'Homebrew ist nicht installiert (siehe https://brew.sh) – bitte an die IT wenden.'
+    else
+      for okm_p in "${okm_pakete[@]}"; do
+        okm_info "--- $okm_p"
+        brew install{% if paketmanager.wert == 'brew_cask' %} --cask{% endif %} "$okm_p" || okm_fehlt+=("$okm_p")
+      done
+    fi
+    {% endif %}
+    set -- "${okm_fehlt[@]}"
+    {{ rueckgabe_fehlgeschlagen }}=$#
+    if [[ $# -gt 0 ]]; then
+      okm_fehler "Nicht installiert: ${okm_fehlt[*]}"
+      false
+    else
+      okm_ok 'Alle Pakete installiert.'
+    fi
+hinweise:
+  powershell: Benötigt winget (App-Installer, ab Windows 10 1809 enthalten).
+  cmd: Benötigt winget (App-Installer, ab Windows 10 1809 enthalten).
+  zsh: Benötigt Homebrew. Das Script NICHT mit sudo starten – Homebrew verweigert root.

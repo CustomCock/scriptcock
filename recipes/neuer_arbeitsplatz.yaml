@@ -1,0 +1,27 @@
+id: neuer_arbeitsplatz
+name: Neuer Arbeitsplatz einrichten
+kategorie: Software
+beschreibung: Gibt einem neuen Rechner seinen Namen, stellt die Uhrzeit richtig und installiert die Standardsoftware. Danach einmal neu starten.
+hilfe: |
+  Rechner in einer Domäne bitte von der IT umbenennen lassen.
+  Die Programme lassen sich im Software-Katalog unten ankreuzen und gesammelt übernehmen.
+schlagworte: [neuer pc, neuer rechner, einrichten, arbeitsplatz, onboarding, umbenennen, standardsoftware]
+felder:
+  - id: rechnername
+    label: Neuer Rechnername
+    typ: rechnername
+    beispiel: PC-EMPFANG-01
+  - id: pakete
+    label: Programme (Paket-IDs)
+    typ: liste
+    listen_typ: paketname
+    max_anzahl: 30
+    beispiel: Mozilla.Firefox, 7zip.7zip
+schritte:
+  - block: rechner_umbenennen
+    parameter: {neuer_name: $rechnername}
+  - block: zeit_sync
+  - block: pakete_installieren
+    parameter: {pakete: $pakete, paketmanager: standard}
+  - block: meldung
+    parameter: {text: "Fertig. Bitte den Rechner jetzt neu starten, damit der neue Name gilt.", pause: false}

@@ -65,6 +65,10 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 | `verknuepfung_erstellen` | alle | Windows (`WScript.Shell`) nur Syntax geprüft. GNOME: Desktop-Verknüpfungen brauchen „Start erlauben“ (`gio set … metadata::trusted` wird versucht). macOS-Anmeldeobjekt per AppleScript braucht ggf. die Automation-Freigabe für „System Events“. |
 | `bericht_html` | powershell/cmd | PowerShell liest das noch offene Transcript (FileShare ReadWrite), CMD das Protokoll per `Get-Content -Encoding UTF8` – beides auf Win 11 prüfen. Die Zusammenfassung am Scriptende fehlt im Bericht. |
 | `ordner_oeffnen`, `datei_oeffnen` | bash | Braucht eine grafische Sitzung (`xdg-open`); in SSH-Sitzungen schlägt der Schritt fehl. |
+| `pakete_installieren` | powershell/cmd | winget-Codes für „schon installiert“ (-1978335189, -1978335135) auf Win 11 bestätigen; CMD zählt diese Fälle als Fehler. Paketmanager-Auswahl gilt unter Windows nicht (immer winget). macOS: Formeln und Apps (--cask) lassen sich in einem Schritt nicht mischen. |
+| `netzwerkadapter_neustarten` | alle | Nur mit Attrappen getestet. Linux braucht NetworkManager (`nmcli`); `networking off` trennt **alle** Verbindungen. macOS: `ifconfig down/up` – bei WLAN ggf. erneute Anmeldung nötig. |
+| `office_schnellreparatur` | powershell | Nur Klick-und-Los-Office; Aufruf von `OfficeClickToRun.exe` (Parameter, Exit-Codes) auf Win 11 mit Microsoft 365 prüfen. Für CMD gibt es den Baustein nicht. |
+| Rezept „Neuer Arbeitsplatz“ | zsh | Mischt einen root-Baustein (Umbenennen über sudo) mit Homebrew (nie root) – auf echtem macOS durchspielen. |
 | alle Datei-Bausteine aus Paket 1 | powershell/cmd | Unter Linux nur Syntax/Lint geprüft (Windows-Pfade), auf Win 11 ausführen. |
 | alle | powershell/cmd | Ausführen-Checkliste (`docs/test-vms.md`, Abschnitt 4): alle Windows-Zellen (Doppelklick/„Mit PowerShell ausführen“, UAC angefordert/abgelehnt, Konsole UTF-8, Fenster bleibt offen) sind noch **nicht** auf Win 11 geprüft. |
 | alle | bash/zsh | Checkliste bisher nur im Linux-Container mit Attrappen (`ping`, `sudo`); auf Debian 12 und echtem macOS (Terminal.app, echtes sudo) wiederholen. |

@@ -1,0 +1,31 @@
+id: standardsoftware_installieren
+name: Standardsoftware installieren
+kategorie: Software
+beschreibung: Installiert mehrere Programme auf einmal – z. B. die übliche Ausstattung eines Arbeitsplatzes. Fehlgeschlagene Pakete werden am Ende aufgelistet.
+hilfe: Im Software-Katalog unten die gewünschten Programme ankreuzen und „Ausgewählte übernehmen“ – sie landen dann im Feld „Programme“.
+schlagworte: [standardsoftware, mehrere programme, installieren, software, winget, apt, brew, ausstattung]
+felder:
+  - id: pakete
+    label: Programme (Paket-IDs)
+    typ: liste
+    listen_typ: paketname
+    max_anzahl: 30
+    beispiel: Mozilla.Firefox, 7zip.7zip, VideoLAN.VLC
+  - id: paketmanager
+    label: Paketmanager
+    typ: auswahl
+    standard: standard
+    optionen:
+      - wert: standard
+        label: "Standard (Windows: winget, Linux: apt, macOS: brew)"
+      - wert: apt
+        label: "apt (Linux: Debian, Ubuntu)"
+      - wert: dnf
+        label: "dnf (Linux: Fedora, RHEL, Rocky)"
+      - wert: flatpak
+        label: Flatpak (Linux, Flathub)
+      - wert: brew_cask
+        label: brew --cask – Apps (macOS)
+schritte:
+  - block: pakete_installieren
+    parameter: {pakete: $pakete, paketmanager: $paketmanager}

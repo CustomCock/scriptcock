@@ -1,0 +1,68 @@
+id: netzwerkadapter_neustarten
+version: 1
+name: Netzwerkadapter neu starten
+kategorie: Netzwerk
+beschreibung: Schaltet einen Netzwerkadapter (oder alle aktiven) kurz aus und wieder ein – hilft oft, wenn das Netzwerk „hängt“.
+hilfe: |
+  Die Verbindung ist dabei einige Sekunden unterbrochen – nicht über eine Fernwartung ausführen, die über
+  genau diese Verbindung läuft!
+  Ohne Adapternamen: Windows alle aktiven physischen Adapter, Linux die Netzwerkverwaltung
+  (NetworkManager) komplett, macOS en0.
+  Adapternamen: Windows „Get-NetAdapter“ (z. B. Ethernet, WLAN), Linux „nmcli device“ (z. B. enp3s0),
+  macOS „networksetup -listallhardwareports“ (z. B. en0).
+risiko: gelb
+fortschritt: "Netzwerkadapter {% if adapter %}{{ adapter }}{% else %}(alle aktiven){% endif %} wird neu gestartet"
+tipp: Stimmt der Adaptername? Bei WLAN danach ggf. kurz warten, bis die Verbindung wieder steht.
+rechte:
+  powershell: admin
+  cmd: admin
+  bash: root
+  zsh: root
+parameter:
+  - id: adapter
+    label: Adapter (leer = alle aktiven)
+    typ: text_kurz
+    pflicht: false
+    beispiel: Ethernet
+ziele:
+  powershell: |
+    {% if adapter %}
+    $okmAdapter = @(Get-NetAdapter -Name {{ adapter }} -ErrorAction Stop)
+    {% else %}
+    $okmAdapter = @(Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' })
+    if ($okmAdapter.Count -eq 0) { throw 'Kein aktiver Netzwerkadapter gefunden.' }
+    {% endif %}
+    foreach ($okmA in $okmAdapter) {
+        Write-OkmInfo ('Neustart: ' + $okmA.Name + ' (' + $okmA.InterfaceDescription + ')')
+        Restart-NetAdapter -InputObject $okmA -Confirm:$false
+    }
+    Start-Sleep -Seconds 5
+    Get-NetAdapter -Name ($okmAdapter | ForEach-Object { $_.Name }) | Format-Table Name, Status, LinkSpeed -AutoSize
+  cmd: |
+    set OKM_ADAPTER={{ adapter }}
+    powershell -NoProfile -Command "$n = ([string]$env:OKM_ADAPTER).Trim([char]34); if ($n) { $a = @(Get-NetAdapter -Name $n -ErrorAction Stop) } else { $a = @(Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' }) }; if ($a.Count -eq 0) { throw 'Kein aktiver Netzwerkadapter gefunden.' }; $a | ForEach-Object { 'Neustart: ' + $_.Name; Restart-NetAdapter -InputObject $_ -Confirm:$false }; Start-Sleep -Seconds 5; Get-NetAdapter -Name ($a | ForEach-Object { $_.Name }) | Format-Table Name, Status, LinkSpeed -AutoSize"
+  bash: |
+    if ! command -v nmcli >/dev/null 2>&1; then
+      okm_fehler 'nmcli (NetworkManager) fehlt – den Adapter bitte über die Netzwerkverwaltung des Systems neu starten.'
+      false
+    else
+    {% if adapter %}
+      {{ sudo }}nmcli device disconnect {{ adapter }} || okm_warn 'Adapter war nicht verbunden.'
+      sleep 2
+      {{ sudo }}nmcli device connect {{ adapter }}
+    {% else %}
+      {{ sudo }}nmcli networking off
+      sleep 2
+      {{ sudo }}nmcli networking on
+    {% endif %}
+      sleep 5
+      nmcli device status
+    fi
+  zsh: |
+    okm_adapter={% if adapter %}{{ adapter }}{% else %}en0{% endif %}
+
+    {{ sudo }}ifconfig "$okm_adapter" down
+    sleep 2
+    {{ sudo }}ifconfig "$okm_adapter" up
+    sleep 5
+    ipconfig getifaddr "$okm_adapter" || okm_warn 'Noch keine IP-Adresse – ggf. kurz warten.'

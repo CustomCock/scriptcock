@@ -291,6 +291,8 @@
       }
     });
     eingabe.addEventListener("paste", function () { window.setTimeout(uebernehmen, 0); });
+    // Von außen (Software-Katalog): quelle.dispatchEvent(new CustomEvent("okm:tags", {detail: ["a", "b"]}))
+    quelle.addEventListener("okm:tags", function (ev) { (ev.detail || []).forEach(tag); speichern(); });
     eingabe.addEventListener("blur", uebernehmen);
     rahmen.addEventListener("click", function (ev) { if (ev.target === rahmen || ev.target === liste) { eingabe.focus(); } });
   }

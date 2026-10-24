@@ -285,6 +285,9 @@ def test_panel_im_baukasten_und_rezept(client: TestClient) -> None:
     r = client.get("/rezepte/software_installieren?ziel=bash")
     assert 'data-modus="rezept"' in r.text and "data-katalog-auswahl" not in r.text
     assert 'data-typ="paketname"' in r.text
+    # Rezept mit Paket-Listenfeld → Mehrfachauswahl
+    r = client.get("/rezepte/standardsoftware_installieren?ziel=bash")
+    assert "data-katalog-auswahl" in r.text and 'data-listen-typ="paketname"' in r.text
 
 
 def test_eingebettetes_json_kann_script_nicht_verlassen(registry: Registry, tmp_path: Path) -> None:

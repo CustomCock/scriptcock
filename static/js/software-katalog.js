@@ -76,7 +76,8 @@
     var anzahl = $("#katalog-anzahl");
     var leer = $(".katalog-leer");
     var meldung = $("#katalog-meldung");
-    var auswahlKnopf = $("[data-katalog-auswahl]");
+    var auswahlKnopf = optionen.onMehrfach ? $("[data-katalog-auswahl]") : null;
+    if (auswahlKnopf) { auswahlKnopf.hidden = false; }
     var filterZeile = $(".katalog-filter");
     var zustand = { plattform: "alle", kategorien: [], treffer: [], aktiv: -1, auswahl: {}, gezeigt: false };
 
@@ -429,16 +430,33 @@
 
     rezept: function (wurzel, daten) {
       var feldImFormular = function () { return document.querySelector("form input[data-typ='paketname']"); };
+      // Listenfeld (z. B. „Standardsoftware installieren“): Einträge als Tags anhängen
+      var listeImFormular = function () {
+        return document.querySelector("form input[data-typ='liste'][data-listen-typ='paketname']");
+      };
       var paketfeld = null;
-      var katalog = mount(wurzel, {
+      var katalog = null;
+      function inListe(eintraege) {
+        var liste = listeImFormular();
+        liste.dispatchEvent(new CustomEvent("okm:tags", { detail: eintraege.map(function (e) { return e.id; }) }));
+        var auswahl = liste.form && liste.form.querySelector("select[name$='paketmanager']");
+        var feld = eintraege.length ? eintraege[0].feld : "";
+        if (auswahl && feld && auswahl.querySelector("option[value='" + feld + "']")) { auswahl.value = feld; }
+        katalog.melden(eintraege.length === 1 ? eintraege[0].id + " übernommen."
+          : eintraege.length + " Pakete übernommen.");
+      }
+      var optionen = {
         daten: daten,
         zielPlattform: function () { return window.OkmKatalogSuche.ZIEL_PLATTFORM[wurzel.dataset.ziel] || ""; },
-        kannUebernehmen: function () { return !!feldImFormular(); },
+        kannUebernehmen: function () { return !!(feldImFormular() || listeImFormular()); },
         onUebernehmen: function (eintrag) {
           var feld = (paketfeld && paketfeld()) || feldImFormular();
           if (feld) { feldBefuellen(feld, eintrag); katalog.melden(eintrag.id + " eingetragen."); }
+          else if (listeImFormular()) { inListe([eintrag]); }
         }
-      });
+      };
+      if (listeImFormular()) { optionen.onMehrfach = inListe; }
+      katalog = mount(wurzel, optionen);
       paketfeld = paketfeldVerfolgen(wurzel, katalog);
       return katalog;
     },

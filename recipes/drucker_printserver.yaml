@@ -1,0 +1,21 @@
+id: drucker_printserver
+name: Drucker vom Printserver verbinden
+kategorie: Drucker
+beschreibung: Verbindet einen freigegebenen Drucker vom Druckserver für den angemeldeten Benutzer und zeigt danach alle Drucker an.
+hilfe: Den Freigabenamen bekommst du von der IT (Form \\printserver\Druckername). Nur für Windows.
+schlagworte: [drucker, printserver, druckserver, freigabe, verbinden, netzwerkdrucker]
+felder:
+  - id: freigabe
+    label: Druckerfreigabe
+    typ: unc_pfad
+    beispiel: \\printserver\Empfang-Farbe
+  - id: standard
+    label: Als Standarddrucker festlegen
+    typ: ja_nein
+    pflicht: false
+    standard: true
+schritte:
+  - block: drucker_server_verbinden
+    parameter: {freigabe: $freigabe, standard: $standard}
+  - block: drucker_liste
+    nur_fuer: [powershell, cmd]

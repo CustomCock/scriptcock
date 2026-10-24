@@ -24,6 +24,9 @@
     <span id="katalog-anzahl" aria-live="polite"></span>
     {% if katalog_modus == "baukasten" %}
     <button type="button" class="knopf" data-katalog-auswahl disabled>{{ i.icon("plus") }} <span>Ausgewählte installieren (<span data-anzahl>0</span>)</span></button>
+    {% elif katalog_modus == "rezept" and katalog_mehrfach %}
+    {# Rezept mit Listenfeld für Pakete (z. B. Standardsoftware) #}
+    <button type="button" class="knopf" data-katalog-auswahl disabled hidden>{{ i.icon("plus") }} <span>Ausgewählte übernehmen (<span data-anzahl>0</span>)</span></button>
     {% endif %}
   </div>
   <div class="katalog-filter" aria-live="polite" hidden></div>

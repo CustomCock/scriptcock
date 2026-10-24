@@ -1,0 +1,24 @@
+id: netzwerk_reparieren
+name: Netzwerk reparieren
+kategorie: Netzwerk
+beschreibung: Die üblichen Handgriffe bei Netzwerkproblemen – DNS-Cache leeren, Netzwerkadapter neu starten, IP-Adresse neu holen – und danach prüfen, ob Internet und Namensauflösung wieder gehen.
+hilfe: |
+  Die Verbindung ist zwischendurch kurz weg – nicht über eine Fernwartung ausführen!
+  Nur diagnostizieren, ohne etwas zu ändern: Rezept „Netzwerkproblem diagnostizieren“.
+schlagworte: [netzwerk, internet, reparieren, geht nicht, keine verbindung, dns, adapter, wlan, lan, dhcp]
+felder:
+  - id: adapter
+    label: Adapter (leer = alle aktiven; macOS en0)
+    typ: text_kurz
+    pflicht: false
+    beispiel: Ethernet
+schritte:
+  - block: dns_cache_leeren
+  - block: netzwerkadapter_neustarten
+    parameter: {adapter: $adapter}
+  - block: ip_erneuern
+    nur_fuer: [powershell, cmd]
+  - block: ping
+    parameter: {ziel: 1.1.1.1, anzahl: 4}
+  - block: dns_test
+    parameter: {name: www.microsoft.com}

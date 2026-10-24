@@ -1,0 +1,213 @@
+#!/bin/zsh
+# ======================================================================
+# Titel:             Neuer Arbeitsplatz einrichten
+# Beschreibung:      Gibt einem neuen Rechner seinen Namen, stellt die Uhrzeit richtig und installiert die Standardsoftware. Danach einmal neu starten.
+# Erstellt von:      pytest
+# Erstellt am:       15.01.2026 09:30:00
+# Baukasten-Version: 0.1.0
+# Zielsystem:        macOS (zsh)
+# Benötigte Rechte:  sudo (Schritt 1, 2); nicht als root starten (Schritt 3)
+# Enthaltene Schritte:
+#    1. Rechner umbenennen [Risiko: gelb, sudo]
+#    2. Uhrzeit synchronisieren [Risiko: gelb, sudo]
+#    3. Mehrere Pakete installieren [Risiko: gelb]
+#    4. Meldung/Pause für den Benutzer [Risiko: gruen]
+#
+# Generiert mit dem okm Script-Baukasten
+# ======================================================================
+
+setopt ERR_EXIT PIPE_FAIL
+
+# --nopause: am Ende nicht auf Enter warten (Fernwartung/RMM)
+OKM_KEINE_PAUSE=0
+for okm_arg in "$@"; do
+  if [ "$okm_arg" = --nopause ]; then OKM_KEINE_PAUSE=1; fi
+done
+OKM_LOG="${TMPDIR:-/tmp}/okm-script-$(date +%Y%m%d-%H%M%S).log"
+OKM_GESAMT=4
+OKM_OK=0
+OKM_NR=0
+OKM_SCHRITT='-'
+OKM_STATUS=laeuft
+OKM_TIPP=''
+OKM_SUDO_PID=''
+
+# Meldungen: Werte immer als Argumente übergeben, nie in den Formatstring einsetzen.
+# Keine Farben – die Ausgabe geht auch ins Protokoll.
+okm_info() { printf '%s\n' "$*"; }
+# shellcheck disable=SC2120  # Text ist optional (Blöcke dürfen okm_ok "…" nutzen)
+okm_ok() { if [ $# -gt 0 ]; then printf '      OK  %s\n' "$*"; else printf '%s\n' '      OK'; fi; }
+okm_warn() { printf '      WARNUNG  %s\n' "$*"; }
+okm_fehler() { printf '      FEHLER  %s\n' "$*"; }
+OKM_SUDO=(sudo --)
+if [ "$(id -u)" -eq 0 ]; then OKM_SUDO=(); fi
+alias okm_sudo='"${OKM_SUDO[@]}"'
+okm_zusammenfassung() {
+  okm_info '----------------------------------------------'
+  case "$OKM_STATUS" in
+    fertig) printf ' Fertig: %s von %s Schritten erfolgreich.\n' "$OKM_OK" "$OKM_GESAMT" ;;
+    abbruch) okm_info ' Abgebrochen durch Benutzer. Es wurde nichts weiter ausgeführt.' ;;
+    rechte) okm_info ' Abgebrochen: fehlende Rechte.' ;;
+    *) printf ' Abgebrochen bei Schritt %s von %s.\n' "$OKM_NR" "$OKM_GESAMT"; printf ' Erfolgreich bis dahin: %s von %s Schritten.\n' "$OKM_OK" "$OKM_GESAMT" ;;
+  esac
+  printf ' Protokoll: %s\n' "$OKM_LOG"
+  okm_info '----------------------------------------------'
+}
+# Fenster/Terminal offen halten – nur wenn ein Mensch davor sitzt
+okm_pause() {
+  if [ "$OKM_KEINE_PAUSE" = 1 ] || [ ! -t 0 ]; then return 0; fi
+  read -r 'okm_weiter?Drücke Enter zum Schließen …' || true
+}
+okm_bei_fehler() {
+  local okm_rc=$1 okm_zeile=$2
+  okm_fehler "Schritt $OKM_SCHRITT: Befehl endete mit Exit-Code $okm_rc."
+  okm_info "      Zeile $okm_zeile"
+  if [ -n "$OKM_TIPP" ]; then okm_info "      Tipp: $OKM_TIPP"; fi
+  OKM_STATUS=fehler
+  exit "$okm_rc"
+}
+trap 'okm_bei_fehler $? $LINENO' ZERR
+
+# Zusammenfassung bei JEDEM Ende – auch bei Fehlern, die kein ERR auslösen
+# (z. B. nicht gesetzte Variable) oder einem Abbruch ohne Meldung.
+okm_ende() {
+  local okm_rc=$?
+  if [ "$OKM_STATUS" = laeuft ]; then
+    if [ "$okm_rc" -eq 0 ]; then
+      OKM_STATUS=fertig
+    else
+      okm_fehler "Script unerwartet beendet in Schritt $OKM_SCHRITT (Exit-Code $okm_rc)."
+      OKM_STATUS=fehler
+    fi
+  fi
+  okm_zusammenfassung
+  if [ -n "$OKM_SUDO_PID" ]; then kill "$OKM_SUDO_PID" 2>/dev/null || true; fi
+  okm_pause
+  # Ausgabe schließen und kurz auf tee warten, sonst fehlen beim Schließen des Fensters
+  # die letzten Zeilen (höchstens 2 s – ein Hintergrundprozess darf nichts aufhalten)
+  exec 1>&- 2>&-
+  okm_i=0
+  while [ "$okm_i" -lt 20 ] && kill -0 "${OKM_TEE:-0}" 2>/dev/null; do
+    sleep 0.1
+    okm_i=$((okm_i + 1))
+  done
+  exit "$okm_rc"
+}
+trap okm_ende EXIT
+
+# Ausgabe zusätzlich ins Protokoll – über eine FIFO statt >(tee), damit das Script am Ende
+# auf tee warten kann (zsh verliert sonst die komplette Ausgabe, wenn das Fenster zugeht).
+OKM_TMPDIR="$(mktemp -d)"
+mkfifo -m 600 "$OKM_TMPDIR/ausgabe"
+tee -a "$OKM_LOG" < "$OKM_TMPDIR/ausgabe" &
+OKM_TEE=$!
+exec > "$OKM_TMPDIR/ausgabe" 2>&1
+rm -rf "$OKM_TMPDIR"
+
+okm_info '=============================================='
+okm_info ' okm Script-Baukasten · Neuer Arbeitsplatz einrichten'
+okm_info ' Erstellt: 15.01.2026 09:30 · von pytest'
+okm_info '=============================================='
+
+# Schritte, die NICHT als root laufen dürfen (z. B. Homebrew verweigert root)
+if [ "$(id -u)" -eq 0 ]; then
+  okm_fehler 'Dieses Script darf nicht als root (mit sudo) gestartet werden: Schritt 3 (Mehrere Pakete installieren).'
+  okm_info '      Bitte ohne sudo starten – das Script fragt selbst, wenn es sudo braucht.'
+  OKM_STATUS=rechte
+  exit 1
+fi
+# Rechte: sudo für Schritt 1 (Rechner umbenennen), Schritt 2 (Uhrzeit synchronisieren)
+okm_info 'Für diese Schritte werden Administratorrechte (sudo) gebraucht:'
+okm_info '      Schritt 1 (Rechner umbenennen)'
+okm_info '      Schritt 2 (Uhrzeit synchronisieren)'
+if [ "$(id -u)" -eq 0 ]; then
+  okm_info 'Rechte: als root gestartet'
+else
+  if ! command -v sudo >/dev/null 2>&1; then
+    okm_fehler 'sudo ist nicht installiert – bitte die IT fragen.'
+    OKM_STATUS=rechte
+    exit 1
+  fi
+  okm_info 'sudo fragt jetzt einmal nach deinem Passwort (die Eingabe bleibt unsichtbar).'
+  if ! sudo -v; then
+    okm_fehler 'sudo wurde abgelehnt oder das Passwort war falsch.'
+    OKM_STATUS=rechte
+    exit 1
+  fi
+  okm_info 'Rechte: sudo erfolgreich'
+  # sudo-Zeitstempel frisch halten, damit lange Scripte nicht noch einmal fragen
+  while true; do sudo -n true; sleep 50; kill -0 "$$" || exit; done >/dev/null 2>&1 &
+  OKM_SUDO_PID=$!
+fi
+
+# Rückgabewerte der Schritte (Namen vergibt der Baukasten; leer = unbekannt)
+okm_s3_fehlgeschlagen=''
+
+# --------------------------------------------------------------------
+# Schritt 1/4: Rechner umbenennen (Risiko: gelb)
+# --------------------------------------------------------------------
+OKM_NR=1
+OKM_SCHRITT='1/4 (Rechner umbenennen)'
+OKM_TIPP='Ist der Rechner Mitglied einer Domäne? Dann muss die IT ihn umbenennen.'
+okm_info '[1/4] Rechner wird in PC-EMPFANG-01 umbenannt ...'
+okm_sudo scutil --set ComputerName 'PC-EMPFANG-01'
+okm_sudo scutil --set LocalHostName 'PC-EMPFANG-01'
+okm_sudo scutil --set HostName 'PC-EMPFANG-01'
+printf 'Neuer Name: %s\n' "$(scutil --get ComputerName)"
+OKM_OK=$((OKM_OK + 1))
+okm_ok
+
+# --------------------------------------------------------------------
+# Schritt 2/4: Uhrzeit synchronisieren (Risiko: gelb)
+# --------------------------------------------------------------------
+OKM_NR=2
+OKM_SCHRITT='2/4 (Uhrzeit synchronisieren)'
+OKM_TIPP='Ist der Zeitserver erreichbar (Firewall, UDP-Port 123)? In Domänen gibt der Domänencontroller die Zeit vor.'
+okm_info '[2/4] Uhrzeit wird mit dem Zeitserver abgeglichen ...'
+okm_sudo sntp -sS time.apple.com
+date
+OKM_OK=$((OKM_OK + 1))
+okm_ok
+
+# --------------------------------------------------------------------
+# Schritt 3/4: Mehrere Pakete installieren (Risiko: gelb)
+# --------------------------------------------------------------------
+OKM_NR=3
+OKM_SCHRITT='3/4 (Mehrere Pakete installieren)'
+OKM_TIPP='Die Paket-IDs im Software-Katalog prüfen; die nicht installierten stehen in der Meldung oben.'
+okm_info '[3/4] Pakete werden installiert: Mozilla.Firefox, 7zip.7zip ...'
+okm_pakete=('Mozilla.Firefox' '7zip.7zip')
+okm_fehlt=()
+if ! command -v brew >/dev/null 2>&1; then
+  okm_fehlt=("${okm_pakete[@]}")
+  okm_fehler 'Homebrew ist nicht installiert (siehe https://brew.sh) – bitte an die IT wenden.'
+else
+  for okm_p in "${okm_pakete[@]}"; do
+    okm_info "--- $okm_p"
+    brew install "$okm_p" || okm_fehlt+=("$okm_p")
+  done
+fi
+set -- "${okm_fehlt[@]}"
+okm_s3_fehlgeschlagen=$#
+if [[ $# -gt 0 ]]; then
+  okm_fehler "Nicht installiert: ${okm_fehlt[*]}"
+  false
+else
+  okm_ok 'Alle Pakete installiert.'
+fi
+[[ $okm_s3_fehlgeschlagen =~ ^-?[0-9]+$ ]] || okm_s3_fehlgeschlagen=''
+OKM_OK=$((OKM_OK + 1))
+okm_ok
+
+# --------------------------------------------------------------------
+# Schritt 4/4: Meldung/Pause für den Benutzer (Risiko: gruen)
+# --------------------------------------------------------------------
+OKM_NR=4
+OKM_SCHRITT='4/4 (Meldung/Pause für den Benutzer)'
+OKM_TIPP=''
+okm_info '[4/4] Hinweis für den Benutzer ...'
+printf '%s\n' 'Fertig. Bitte den Rechner jetzt neu starten, damit der neue Name gilt.'
+OKM_OK=$((OKM_OK + 1))
+okm_ok
+
+OKM_STATUS=fertig

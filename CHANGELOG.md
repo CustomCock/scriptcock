@@ -2,6 +2,25 @@
 
 ## Backlog P1
 
+### Rezepte
+
+- Sechs neue Rezepte: **Standardsoftware installieren**, **Neuer Arbeitsplatz einrichten** (Rechnername,
+  Zeit, Standardsoftware), **Drucker vom Printserver verbinden**, **Netzwerk reparieren** (DNS-Cache,
+  Adapter-Neustart, DHCP, danach Ping/DNS-Test), **Outlook reparieren** (Version, Anmeldestatus,
+  Office-Schnellreparatur, abgesicherter Modus), **Vor riskanter Änderung absichern**
+  (Wiederherstellungspunkt + Registry-Sicherung). Drucker, Outlook und Absichern gibt es nur für Windows.
+- Neue Bausteine dafür: `pakete_installieren` (Liste von Paket-IDs; Fehler einzelner Pakete brechen nicht
+  sofort ab, am Ende Liste der fehlgeschlagenen, Rückgabe `fehlgeschlagen`; winget „schon installiert“ =
+  Erfolg), `netzwerkadapter_neustarten` (Windows alle aktiven oder einer, Linux NetworkManager, macOS
+  ifconfig), `office_schnellreparatur` (Klick-und-Los QuickRepair; laufende Office-Programme → Abbruch,
+  außer „Office-Programme schließen“ ist angehakt).
+- Software-Katalog im Rezept: Hat das Formular ein Listenfeld für Paket-IDs, hängen „＋“ und die
+  Mehrfachauswahl („Ausgewählte übernehmen“) die IDs als Einträge an. Das Tag-Feld nimmt dafür das
+  Ereignis `okm:tags` entgegen.
+- Tests: `tests/test_rezepte_p1.py` (apt/brew/nmcli/ifconfig als Attrappen, winget-Attrappe unter pwsh,
+  Formular → Script, Option-Injection in der Paketliste abgelehnt), Browser-Test für die
+  Katalog-Übernahme ins Listenfeld, Golden-Files für alle neuen Rezepte.
+
 ### Paket 4: Neustart, Verknüpfung, Reparatur und Ausgabe
 
 - **System:** `neustart_herunterfahren` (rot, ohne Vorwarnung an den Benutzer, kurze Wartezeit 0–600 s,

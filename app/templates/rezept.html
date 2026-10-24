@@ -72,7 +72,7 @@
         <div>{{ i.icon("terminal") }}<br>Hier erscheint die Vorschau,<br>sobald du auf „Script erzeugen“ klickst.</div>
       </div>
     </div>
-    {% with katalog_modus="rezept", katalog_ziel=ziel %}{% include "_katalog.html" %}{% endwith %}
+    {% with katalog_modus="rezept", katalog_ziel=ziel, katalog_mehrfach=(felder | selectattr("listen_typ", "equalto", "paketname") | list | length > 0) %}{% include "_katalog.html" %}{% endwith %}
   </div>
 </div>
 {% endblock %}

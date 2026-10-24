@@ -1,0 +1,22 @@
+id: outlook_reparieren
+name: Outlook reparieren
+kategorie: Office
+beschreibung: Zeigt Office-Version und Anmeldestatus und führt die Office-Schnellreparatur aus. Danach Outlook testweise ohne Add-Ins starten.
+hilfe: |
+  Outlook, Word, Excel usw. vorher schließen – oder „Office-Programme schließen“ anhaken (nicht
+  Gespeichertes geht verloren). Nur für Microsoft 365 / Klick-und-Los-Office unter Windows.
+  Läuft Outlook danach im abgesicherten Modus stabil, ist meist ein Add-In schuld.
+schlagworte: [outlook, office, reparieren, startet nicht, hängt, abgestürzt, microsoft 365, reparatur]
+felder:
+  - id: schliessen
+    label: Office-Programme schließen (nicht Gespeichertes geht verloren)
+    typ: ja_nein
+    pflicht: false
+    standard: false
+schritte:
+  - block: office_version
+  - block: dsregcmd_status
+  - block: office_schnellreparatur
+    parameter: {apps_schliessen: $schliessen}
+    nur_fuer: [powershell]
+  - block: outlook_abgesichert
