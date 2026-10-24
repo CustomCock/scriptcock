@@ -140,7 +140,7 @@
         var start = p.standard !== null ? p.standard : (p.beispiel !== null ? p.beispiel : (min !== null ? min : 1));
         return new Blockly.FieldNumber(Number(start), min === null ? undefined : min, max === null ? undefined : max, 1);
       }
-      if (p.typ === "auswahl") {
+      if (p.optionen && p.optionen.length) {  // auswahl und Typen mit festen Optionen (registry_typ, …)
         var feld = new Blockly.FieldDropdown(p.optionen.map(function (o) { return [o.label, o.wert]; }));
         if (p.standard !== null) { feld.setValue(String(p.standard)); }
         return feld;
@@ -404,6 +404,7 @@
         var wert = k.parameter[p.id];
         if (p.typ === "ja_nein") { wert = wert === "true" ? "TRUE" : "FALSE"; }
         else if (wert === SCHLEIFENWERT) { /* bleibt Text */ }
+        else if (Array.isArray(wert)) { wert = wert.join(" | "); }
         else if (p.typ === "port" || daten.zahlentypen[p.typ]) { wert = Number(wert); }
         else if (p.typ === "variable") { wert = verweisLaden(wert); }
         felder[p.id] = wert;
@@ -481,6 +482,10 @@
           if (p.typ === "ja_nein") { wert = wert === "TRUE" ? "true" : "false"; }
           else if (p.typ === "variable") { wert = verweisText(wert); }
           else if (wert === SCHLEIFENWERT) { wert = { schleifenwert: true }; }  // Backend prüft, ob in Schleife
+          else if (p.typ === "registry_daten" && b.getFieldValue(p.bezug || "typ") === "REG_MULTI_SZ") {
+            // Blockly hat kein mehrzeiliges Feld: Einträge mit | trennen
+            wert = String(wert || "").split("|").map(function (e) { return e.trim(); }).filter(Boolean);
+          }
           else if (wert !== null && wert !== undefined) { wert = String(wert); }
           parameter[p.id] = wert;
         });

@@ -193,6 +193,58 @@ def variable_lesen(ziel: Ziel, nr: int, rid: str) -> Escaped:
 # --- Ausgabe von beliebigem Text (Fortschrittsmeldungen, Simulation) ---------
 
 
+def registry_daten(ziel: Ziel, regtyp: str, wert: str | int | list[str | int]) -> Escaped:
+    """Geprüfte Registry-Daten (``validation.registry_daten``) als Argument je Ziel.
+
+    PowerShell: Zahlen als Text-Literal (``'4294967295'`` – Zahlenliterale über Int64 würde PS 5.1 als
+    Double lesen), ``Set-OkmRegistryWert`` wandelt um; MULTI_SZ als ``@('a', 'b')``; BINARY als Hex-Text.
+    CMD (``reg add … /d``): DWORD/QWORD hexadezimal, Text als ``"…"`` (``%`` verdoppelt, ein ``\\`` am
+    Ende verdoppelt), MULTI_SZ mit ``\\0`` als Trenner, BINARY als Hex-Text.
+    """
+    if ziel is Ziel.POWERSHELL:
+        if isinstance(wert, list):
+            return liste(ziel, [str(e) for e in wert])
+        return literal(ziel, str(wert))
+    if ziel is Ziel.CMD:
+        if isinstance(wert, int):
+            if regtyp not in ("REG_DWORD", "REG_QWORD"):
+                raise UnsicherError("Zahl nur bei REG_DWORD/REG_QWORD")
+            return Escaped(f"0x{wert:X}", wert)
+        if isinstance(wert, list):
+            return literal(ziel, "\\0".join(str(e) for e in wert))
+        if regtyp == "REG_BINARY":
+            if not re.fullmatch(r"[0-9a-f]*", wert):
+                raise UnsicherError("BINARY-Daten sind keine Hex-Bytes")
+            return Escaped(wert, wert) if wert else literal(ziel, "")
+        return literal(ziel, wert)
+    raise UnsicherError("Registry gibt es nur unter Windows")
+
+
+def registry_abfrage(ziel: Ziel, regtyp: str, wert: str | int | list[str | int]) -> Escaped:
+    r"""Erwartete Ausgabe von ``reg query`` („REG_DWORD    0x1“) für einen Vergleich per ``findstr /e``.
+
+    ``\`` wird unter CMD verdoppelt, weil ``findstr`` einen Backslash auch bei ``/l`` als Escape liest.
+    """
+    if isinstance(wert, list):
+        daten = "\\0".join(str(e) for e in wert)
+    elif isinstance(wert, int):
+        daten = f"0x{wert:x}"
+    elif regtyp == "REG_BINARY":
+        daten = wert.upper()
+    else:
+        daten = wert
+    text = f"{regtyp}    {daten}"
+    if ziel is Ziel.CMD:
+        text = text.replace("\\", "\\\\")
+    return literal(ziel, text)
+
+
+def registry_pfad_benutzer_cmd(rest: str) -> Escaped:
+    """CMD, Bereich „angemeldeter Benutzer“: ``HKU\\%%s\"Software\\…"`` – ``%%s`` ist die SID aus der
+    ``for /f``-Schleife (``benutzer_anfang``), der Rest ein normales CMD-Literal."""
+    return Escaped("HKU\\%%s\\" + cmd_literal(rest), rest)
+
+
 def echo_powershell(text: str) -> str:
     return "Write-Host " + powershell_literal(text)
 

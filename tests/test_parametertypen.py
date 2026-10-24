@@ -171,7 +171,7 @@ def test_liste_ausfuehrung(reg: Registry, tmp_path: Any, shell: str, ziel: Ziel)
     ]
     assert "Gruppen Domänen-Benutzer, Remote Desktop Users" in r.stdout  # Fortschritt
     if ziel is Ziel.POWERSHELL:
-        assert "OKM-PS=HKLM:\\SOFTWARE\\OKM" in r.stdout
+        assert "OKM-PS=HKLM\\SOFTWARE\\OKM" in r.stdout
 
 
 def test_cmd_liste_und_reg_form(reg: Registry) -> None:

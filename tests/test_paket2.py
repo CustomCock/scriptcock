@@ -1,8 +1,7 @@
 """Backlog P1, Paket 2: Registry- und Netzwerk-Bausteine.
 
 http_check, ports_pruefen und wake_on_lan laufen echt gegen localhost (HTTP-Server, offener/geschlossener
-Port, UDP-Empfänger) – in bash, zsh und pwsh. dns_abfrage mit dig-Attrappe. Die Registry-Bausteine gibt
-es nur für Windows: Syntax über tests/test_generators.py, hier die Reihenfolge Sicherung → Änderung.
+Port, UDP-Empfänger) – in bash, zsh und pwsh. dns_abfrage mit dig-Attrappe. Die Registry-Bausteine stehen in tests/test_windows_registry.py.
 """
 
 from __future__ import annotations
@@ -195,23 +194,3 @@ def test_dns_abfrage(reg: Registry, tmp_path: Path, shell: str, ziel: Ziel) -> N
     schritt = {"block_id": "dns_abfrage", "parameter": {"name": "_ldap._tcp.okm.local", "typ": "SRV"}}
     _, gefunden, r = werte(reg, tmp_path / "b", shell, ziel, schritt, ok="1.gefunden", attrappen={"dig": dig})
     assert gefunden == "0" and "Kein Eintrag gefunden" in r.stdout
-
-
-# --- Registry (nur Windows): Sicherung vor der Änderung -----------------------------------------------
-
-
-@pytest.mark.parametrize("ziel", [Ziel.POWERSHELL, Ziel.CMD])
-def test_registry_setzen_sichert_vorher(registry: Registry, ziel: Ziel) -> None:
-    schritt = (
-        "registry_setzen",
-        {"schluessel": "HKEY_CURRENT_USER\\Software\\OKM", "wert": "Test", "typ": "dword", "daten": "1"},
-    )
-    text = erzeuge(registry, ziel, [schritt]).text
-    sicherung = text.index("export")
-    aenderung = text.index("New-ItemProperty" if ziel is Ziel.POWERSHELL else "reg add")
-    assert sicherung < aenderung
-    if ziel is Ziel.POWERSHELL:
-        assert "HKCU:\\Software\\OKM" in text and "'HKCU\\Software\\OKM'" in text  # PS-Pfad und reg.exe-Form
-        assert "-PropertyType DWord -Value ([uint32]'1')" in text
-    else:
-        assert '/t REG_DWORD /d "1" /f' in text

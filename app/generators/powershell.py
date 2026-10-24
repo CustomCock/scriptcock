@@ -6,12 +6,17 @@ Farben nur über ``Write-Host -ForegroundColor`` – nie ANSI-Sequenzen (conhost
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import ClassVar
 
 from app.escaping import Escaped, Ziel, powershell_literal
 from app.generators.base import EINZUG, LINIE, PLANMAESSIG, Generator, SchrittInfo, einruecken
 from app.ir import ScriptIR, Vergleich
 from app.models.block import BlockDef, RueckgabeDef, RueckgabeTyp
+from app.regschutz import lade_schutz
+
+# Hilfsfunktionen für Registry-Bausteine (nur im Script, wenn ein Registry-Baustein vorkommt)
+REGISTRY_HILFEN = (Path(__file__).parent / "hilfen" / "registry.ps1").read_text(encoding="utf-8").splitlines()
 
 
 def _lit(text: str) -> str:
@@ -73,6 +78,11 @@ class PowerShellGenerator(Generator):
             "        }",
             "        'neustart' { Write-Host ' Läuft im neuen Fenster mit Administratorrechten weiter.' }",
             *(
+                ["        'bit64' { Write-Host ' Lief als 64-Bit-PowerShell (Ausgabe oben).' }"]
+                if self.mit_registry
+                else []
+            ),
+            *(
                 [
                     "        'beendet' {",
                     f"            Write-Host ({_lit(PLANMAESSIG)} + $script:OkmGrund)",
@@ -90,10 +100,15 @@ class PowerShellGenerator(Generator):
             f"            Write-Host {bisher}",
             "        }",
             "    }",
+            *(self._registry_hinweise() if self.mit_registry else []),
             "    Write-Host (' Protokoll: ' + $OkmLog)",
             f"    Write-Host {_lit(LINIE)}",
             "    try { Stop-Transcript | Out-Null } catch { $null = $_ }",
-            "    if ($script:OkmStatus -ne 'neustart') { Wait-OkmEnde }",
+            (
+                "    if ($script:OkmStatus -notin @('neustart', 'bit64')) { Wait-OkmEnde }"
+                if self.mit_registry
+                else "    if ($script:OkmStatus -ne 'neustart') { Wait-OkmEnde }"
+            ),
             "    exit $Code",
             "}",
         ]
@@ -139,8 +154,55 @@ class PowerShellGenerator(Generator):
             *[f"Write-OkmInfo {_lit(z)}" for z in self.kopf_ausgabe(ir)],
             "",
         ]
+        if self.mit_registry:
+            zeilen += self._registry_praeambel()
         zeilen += self._rechte() if braucht_admin else ["Write-OkmInfo 'Rechte: ohne erhöhte Rechte'", ""]
         return zeilen
+
+    def _registry_praeambel(self) -> list[str]:
+        gesperrt = ", ".join(_lit("\\".join(teile).upper()) for teile in lade_schutz().gesperrt)
+        neustart = (
+            "Registry: Das Script läuft als 32-Bit-PowerShell – Neustart als 64-Bit, damit HKLM\\SOFTWARE "
+            "nicht in WOW6432Node landet."
+        )
+        return [
+            "# 32-Bit-PowerShell auf 64-Bit-Windows: HKLM\\SOFTWARE würde nach WOW6432Node umgeleitet",
+            "if ([Environment]::Is64BitOperatingSystem -and -not [Environment]::Is64BitProcess "
+            "-and $PSCommandPath) {",
+            "    $OkmPs64 = Join-Path $env:SystemRoot 'Sysnative\\WindowsPowerShell\\v1.0\\powershell.exe'",
+            "    if (Test-Path -LiteralPath $OkmPs64) {",
+            f"        Write-OkmInfo {_lit(neustart)}",
+            "        $OkmArgumente = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "
+            "('\"' + $PSCommandPath + '\"'))",
+            "        if ($OkmKeinePause) { $OkmArgumente += '-NoPause' }",
+            "        $OkmProzess = Start-Process -FilePath $OkmPs64 -ArgumentList $OkmArgumente "
+            "-Wait -NoNewWindow -PassThru",
+            "        $OkmStatus = 'bit64'",
+            "        Exit-OkmScript $OkmProzess.ExitCode",
+            "    }",
+            "}",
+            "",
+            "# Gesperrte Registry-Bereiche (registry/schutz.yaml) – gilt auch für importierte .reg-Dateien",
+            f"$script:OkmRegGesperrt = @({gesperrt})",
+            *REGISTRY_HILFEN,
+            "",
+        ]
+
+    def _registry_hinweise(self) -> list[str]:
+        rueck = "' Rückgängig machen: die .reg-Dateien in ' + $script:OkmRegSicherung"
+        return [
+            "    if ($script:OkmRegSicherung) {",
+            f"        Write-Host ({rueck} + ' doppelklicken (höchste Nummer zuerst).')",
+            "    }",
+            "    if ($script:OkmWirkung -gt 0) {",
+            "        Write-Host (' Damit die Änderungen wirken: ' + "
+            "$script:OkmWirkungText[$script:OkmWirkung]) -ForegroundColor Yellow",
+            "    }",
+            "    if ($script:OkmWirkungUnbekannt) {",
+            "        Write-Host ' Ob alle Änderungen sofort wirken, ist nicht bekannt – im Zweifel "
+            "neu anmelden.'",
+            "    }",
+        ]
 
     def _rechte(self) -> list[str]:
         """Fehlen Administratorrechte, startet sich das Script per UAC selbst neu."""
@@ -190,11 +252,18 @@ class PowerShellGenerator(Generator):
         b = info.block
         zeilen = [
             "# " + "-" * 68,
-            f"# Schritt {info.bezeichnung}: {b.name} (Risiko: {b.risiko.value})",
+            f"# Schritt {info.bezeichnung}: {b.name} (Risiko: {info.risiko.value})",
             "# " + "-" * 68,
             f"$OkmNr = {info.nr}",
             f"Write-OkmInfo {_lit(self.schritt_titel(info))}",
         ]
+        if info.vorschau:
+            zeilen += [
+                "# Vorschau (vor der Bestätigung)",
+                ". {",
+                *einruecken(info.vorschau, 4),
+                "} | Out-Host",
+            ]
         if info.bestaetigen:
             warnung = _lit(f"ACHTUNG: Dieser Schritt ist destruktiv: {b.name}")
             zeilen += [

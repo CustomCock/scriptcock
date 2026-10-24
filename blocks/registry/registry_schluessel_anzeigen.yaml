@@ -1,0 +1,42 @@
+id: registry_schluessel_anzeigen
+version: 1
+name: Registry-Schlüssel anzeigen
+kategorie: Registry
+beschreibung: Listet alle Werte (Name, Typ, Daten) und die direkten Unterschlüssel eines Schlüssels auf.
+risiko: gruen
+registry: lesen
+fortschritt: 'Registry: {{ pfad }} wird angezeigt'
+tipp: Stimmt der Pfad (Schreibweise, 32/64-Bit-Ansicht)?
+rechte:
+  powershell: admin
+  cmd: admin
+parameter:
+- id: bereich
+  label: Wessen Registry?
+  typ: registry_bereich
+  standard: computer
+  hilfe: 'Computer = HKLM. Für Benutzer-Einstellungen nie HKCU direkt: nach dem Admin-Neustart wäre das das Profil
+    des Admin-Kontos. Darum hier den Benutzer wählen.'
+- id: pfad
+  label: Schlüssel
+  typ: registry_pfad
+  bezug: bereich
+  beispiel: HKLM\SOFTWARE\Firma\App
+  hilfe: 'Computer: HKLM\…. Benutzer-Bereiche: Software\… (ohne Wurzel) oder HKCU\…. Schreibweisen wie HKLM:\… oder
+    HKEY_LOCAL_MACHINE\… gehen auch.'
+- id: ansicht
+  label: Registry-Ansicht
+  typ: auswahl
+  standard: '64'
+  optionen:
+  - wert: '64'
+    label: 64-Bit (Standard)
+  - wert: '32'
+    label: 32-Bit (WOW6432Node, für 32-Bit-Programme)
+ziele:
+  powershell: |
+    Show-OkmRegistrySchluessel -Bereich {{ bereich }} -Pfad {{ pfad }} -Ansicht {{ ansicht }}
+  cmd: |
+    {{ benutzer_anfang }}
+      reg query {{ pfad_reg }} {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %}
+    {{ benutzer_ende }}

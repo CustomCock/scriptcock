@@ -154,7 +154,11 @@ Weitere Regeln, die beim Start geprüft werden:
 | `cidr` | IPv4-Netz, Präfix 8–32, muss die Netzadresse sein | `192.168.1.0/24` |
 | `mac` | wird zu `AA:BB:CC:DD:EE:FF` (Eingabe auch mit `-`, `.` oder ohne Trenner) | `00:1A:2B:3C:4D:5E` |
 | `domain` | DNS-Domain mit mindestens einem Punkt, wird kleingeschrieben | `okm.local` |
-| `registry_pfad` | wird zu `HKLM:\…` (HKLM, HKCU, HKCR, HKU, HKCC; Langform erlaubt) | `HKLM:\SOFTWARE\Firma` |
+| `registry_pfad` | wird zu `HKLM\…` (HKLM, HKCU, HKCR, HKU, HKCC; auch `HKLM:\`, `HKEY_…\`, `Registry::`); ohne Wurzel = relativ (Benutzer-Bereich, siehe unten); Teil ≤ 255, gesamt ≤ 512, kein `"` | `HKLM\SOFTWARE\Firma` |
+| `registry_wertname` | ≤ 255 Zeichen, kein `"`; leer oder `(Standard)` = Standardwert | `InstallPath` |
+| `registry_typ` | feste Auswahl `REG_SZ`, `REG_EXPAND_SZ`, `REG_DWORD`, `REG_QWORD`, `REG_MULTI_SZ`, `REG_BINARY` | `REG_DWORD` |
+| `registry_daten` | je nach Typ (Parameter `bezug`, Standard `typ`): DWORD/QWORD 0 … 2³²−1 bzw. 2⁶⁴−1 (auch `0x…`), Text ≤ 4096, MULTI_SZ eine Zeile pro Eintrag (kein `\0`), BINARY Hex-Bytes | `1` |
+| `registry_bereich` | feste Auswahl: `computer`, `angemeldeter_benutzer`, `alle_benutzer`, `standardprofil`, `alle_benutzer_und_standardprofil` | `computer` |
 | `dateiname` | ein Name ohne Ordner; nicht `.`/`..`, kein Punkt am Ende, keine Windows-Gerätenamen (`CON`, `nul.txt`) | `Bericht 2026.docx` |
 | `rechnername` | 1–15 Zeichen, Buchstaben/Ziffern/`-`, nicht nur Ziffern; wird großgeschrieben | `PC-EMPFANG-01` |
 | `dnsname` | Name für DNS-Abfragen; ein Teil darf mit `_` beginnen (SRV), wird kleingeschrieben | `_ldap._tcp.okm.local` |
@@ -192,7 +196,31 @@ Kein Wert darf mit `-` beginnen, Zeilenumbrüche und Steuerzeichen sind nie erla
 
 Für `unc_pfad`-Parameter gibt es zusätzlich `{{ <id>_smb }}` – die Freigabe als
 `smb://server/freigabe`-Adresse (für macOS). Für `registry_pfad` gibt es `{{ <id>_reg }}` in der
-Schreibweise von `reg.exe` (`HKLM\SOFTWARE\Firma`, ohne Doppelpunkt).
+Schreibweise von `reg.exe` (`HKLM\SOFTWARE\Firma`) und `{{ <id>_ps }}` für den PowerShell-Provider
+(`Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Firma`).
+
+### Registry-Bausteine (`registry:`)
+
+Registry-Bausteine setzen `registry: lesen | schreiben | wert_loeschen | schluessel_loeschen | import`.
+Das schaltet ein:
+
+- **Bereich:** Hat der Block einen `registry_bereich`-Parameter, verweist der Pfad mit `bezug: bereich`
+  darauf. `computer` verlangt `HKLM\…` (lesend auch HKCR/HKCC/HKU); die Benutzer-Bereiche verlangen
+  einen Pfad ohne Wurzel (`HKCU\…` wird umgeschrieben). **HKCU wird im Script nie benutzt** – nach dem
+  UAC-Neustart mit einem anderen Admin-Konto wäre das dessen Profil. CMD kennt nur `computer` und
+  `angemeldeter_benutzer`.
+- **Schutzliste** `registry/schutz.yaml`: gesperrte Pfade (Fehler), rote Pfade (der Schritt wird rot),
+  Mindesttiefe beim Löschen von Schlüsseln.
+- **PowerShell-Hilfen** (`app/generators/hilfen/registry.ps1`, nur im Script, wenn ein Registry-Baustein
+  vorkommt): `Set-OkmRegistryWert`, `Get-OkmRegistryWert`, `Remove-OkmRegistryWert`, … – sie lösen den
+  Bereich auf (HKU\<SID>, geladene NTUSER.DAT), sichern vor Änderungen und lesen zurück. Templates
+  rufen nur diese Funktionen auf. Dazu der Neustart als 64-Bit-PowerShell.
+- **CMD:** `{{ benutzer_anfang }}` … `{{ benutzer_ende }}` umschließen die `reg`-Befehle (bei
+  „angemeldeter Benutzer“ eine `for /f`-Schleife über die SID, sonst eine Klammer), der Pfad heißt dann
+  `{{ <id>_reg }}`. Errorlevel 9 = Benutzer nicht ermittelbar. `{{ wirkung_rang }}` (Parameter
+  `wirkung`), `{{ regschutz_cmd }}` (findstr-Muster der gesperrten Pfade) und `{{ <daten>_abfrage }}`
+  (erwartete `reg query`-Ausgabe) erzeugt der Generator.
+- `vorschau:` (je Ziel) läuft bei roten Schritten **vor** der JA-Abfrage und darf nichts ändern.
 
 ### Listen (`typ: liste`)
 

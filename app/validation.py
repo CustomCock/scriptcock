@@ -34,6 +34,8 @@ from app.ir import (
     Wiederhole,
 )
 from app.models.block import (
+    REGISTRY_BEREICHE,
+    REGISTRY_TYPEN,
     ZAHLENTYPEN,
     BlockDef,
     ParameterDef,
@@ -55,6 +57,7 @@ from app.models.request import (
     WennFehlerEingabe,
     WiederholeEingabe,
 )
+from app.regschutz import lade_schutz
 
 if TYPE_CHECKING:
     from app.registry import Registry
@@ -449,24 +452,152 @@ _HIVES = {
     "HKCC": "HKCC",
     "HKEY_CURRENT_CONFIG": "HKCC",
 }
-_REG_TEIL = re.compile(r"^[\w .\-(){}+]{1,255}$")
+# Langformen für den PowerShell-Provider (Registry::HKEY_…)
+REGISTRY_LANGFORM = {
+    "HKLM": "HKEY_LOCAL_MACHINE",
+    "HKCU": "HKEY_CURRENT_USER",
+    "HKCR": "HKEY_CLASSES_ROOT",
+    "HKU": "HKEY_USERS",
+    "HKCC": "HKEY_CURRENT_CONFIG",
+}
+
+
+def registry_teile(pfad: str) -> tuple[str | None, str]:
+    """``HKLM\\SOFTWARE\\x`` → (``HKLM``, ``SOFTWARE\\x``); ohne Wurzel → (None, Pfad)."""
+    kopf, _, rest = pfad.partition("\\")
+    if kopf in REGISTRY_LANGFORM:
+        return kopf, rest
+    return None, pfad
+
+
+def registry_ps_form(pfad: str) -> str:
+    """Normalisierter Pfad → ``Registry::HKEY_LOCAL_MACHINE\\…`` (ohne Wurzel unverändert)."""
+    wurzel, rest = registry_teile(pfad)
+    return f"Registry::{REGISTRY_LANGFORM[wurzel]}\\{rest}" if wurzel else pfad
 
 
 def _registry_pfad(text: str, p: ParameterDef) -> str:
-    fehler = ValidierungsFehler(
-        "Bitte einen Registry-Schlüssel wie HKLM:\\SOFTWARE\\Firma angeben (HKLM, HKCU, HKCR, HKU oder "
-        "HKCC; erlaubt sind Buchstaben, Ziffern, Leerzeichen und _ . - ( ) { } +)."
-    )
-    m = re.fullmatch(r"([A-Za-z_]+):?\\(.+)", text)
-    if not m or m[1].upper() not in _HIVES:
-        raise fehler
-    teile = m[2].rstrip("\\").split("\\")
-    if not all(_REG_TEIL.match(t) for t in teile):
-        raise fehler
-    pfad = _HIVES[m[1].upper()] + ":\\" + "\\".join(teile)
+    """Normalisiert auf ``HKLM\\SOFTWARE\\…``. Ohne Wurzel (``Software\\…``) bleibt der Pfad relativ –
+    das ist nur für Benutzer-Bereiche erlaubt (Prüfung zusammen mit ``bereich``)."""
+    roh = text
+    if roh.lower().startswith("registry::"):
+        roh = roh[len("registry::") :]
+    m = re.fullmatch(r"([A-Za-z_]+):?(?:\\(.*))?", roh, re.S)
+    wurzel: str | None = None
+    rest = roh
+    if m and m[1].upper() in _HIVES:
+        wurzel = _HIVES[m[1].upper()]
+        rest = m[2] or ""
+    rest = rest.rstrip("\\")
+    if not rest:
+        raise ValidierungsFehler(
+            "Bitte einen Schlüssel angeben, z. B. HKLM\\SOFTWARE\\Firma (nicht nur die Wurzel)."
+        )
+    teile = rest.split("\\")
+    for teil in teile:
+        if not teil:
+            raise ValidierungsFehler("Der Registry-Pfad enthält einen leeren Teil (\\\\).")
+        if len(teil) > 255:
+            raise ValidierungsFehler("Ein Teil des Registry-Pfads ist zu lang (höchstens 255 Zeichen).")
+        if '"' in teil:
+            raise ValidierungsFehler('Anführungszeichen (") sind in Registry-Pfaden nicht erlaubt.')
+    pfad = f"{wurzel}\\{rest}" if wurzel else rest
     if len(pfad) > 512:
         raise ValidierungsFehler("Der Registry-Pfad ist zu lang (höchstens 512 Zeichen).")
     return pfad
+
+
+def _registry_wertname(text: str, p: ParameterDef) -> str:
+    """Leer bzw. „(Standard)“ = Standardwert des Schlüssels (Rückgabe "")."""
+    if text.lower() in ("(standard)", "(default)", "@"):
+        return ""
+    _kein_minus(text)
+    if len(text) > 255:
+        raise ValidierungsFehler("Der Wertname ist zu lang (höchstens 255 Zeichen).")
+    if '"' in text:
+        raise ValidierungsFehler('Anführungszeichen (") sind in Wertnamen nicht erlaubt.')
+    return text
+
+
+def _registry_typ(text: str, p: ParameterDef) -> str:
+    typ = text.upper()
+    if not typ.startswith("REG_"):
+        typ = "REG_" + typ
+    if typ not in REGISTRY_TYPEN:
+        raise ValidierungsFehler("Bitte einen Typ wählen: " + ", ".join(REGISTRY_TYPEN) + ".")
+    return typ
+
+
+def _registry_bereich(text: str, p: ParameterDef) -> str:
+    if text not in REGISTRY_BEREICHE:
+        raise ValidierungsFehler("Bitte einen Bereich wählen: " + ", ".join(REGISTRY_BEREICHE) + ".")
+    return text
+
+
+MAX_REGISTRY_TEXT = 4096
+MAX_REGISTRY_BINAER = 4096
+
+
+def registry_daten(roh: Any, regtyp: str) -> str | int | list[str | int]:
+    """Prüft Registry-Daten passend zum Typ.
+
+    DWORD/QWORD → int (dezimal oder 0x…), SZ/EXPAND_SZ → Text, MULTI_SZ → Liste (eine Zeile bzw.
+    ein Listeneintrag pro Wert), BINARY → Hex-Bytes klein ohne Trenner (``0a1bff``).
+    """
+    if regtyp == "REG_MULTI_SZ":
+        if isinstance(roh, list):
+            teile: list[Any] = roh
+        elif isinstance(roh, str):
+            teile = roh.replace("\r\n", "\n").split("\n")
+        else:
+            raise ValidierungsFehler("Bitte einen Eintrag pro Zeile angeben.")
+        eintraege: list[str | int] = []
+        for n, teil in enumerate(teile, 1):
+            if isinstance(teil, bool) or not isinstance(teil, str | int):
+                raise ValidierungsFehler(f"Eintrag {n} ist kein Text.")
+            eintrag = str(teil)
+            if not eintrag.strip():
+                continue
+            try:
+                pruefe_zeichen(eintrag)
+            except UnsicherError as e:
+                raise ValidierungsFehler(f"Eintrag {n}: {e}") from None
+            if "\\0" in eintrag:
+                raise ValidierungsFehler(f"Eintrag {n}: „\\0“ ist nicht erlaubt (Trenner von reg.exe).")
+            if len(eintrag) > MAX_REGISTRY_TEXT:
+                raise ValidierungsFehler(f"Eintrag {n} ist zu lang (höchstens {MAX_REGISTRY_TEXT} Zeichen).")
+            eintraege.append(eintrag)
+        if sum(len(str(e)) + 1 for e in eintraege) > 4 * MAX_REGISTRY_TEXT:
+            raise ValidierungsFehler("Zu viele Daten (höchstens 16384 Zeichen insgesamt).")
+        return eintraege
+    if isinstance(roh, bool) or not isinstance(roh, str | int):
+        raise ValidierungsFehler("Bitte einen Wert eingeben.")
+    text = _text(roh)
+    if regtyp in ("REG_DWORD", "REG_QWORD"):
+        grenze = 0xFFFFFFFF if regtyp == "REG_DWORD" else 0xFFFFFFFFFFFFFFFF
+        try:
+            zahl = int(text[2:], 16) if text.lower().startswith("0x") else int(text, 10)
+        except ValueError:
+            raise ValidierungsFehler(
+                "Bitte eine ganze Zahl angeben (dezimal oder hexadezimal mit 0x)."
+            ) from None
+        if not 0 <= zahl <= grenze:
+            raise ValidierungsFehler(f"Bei {regtyp} sind Werte von 0 bis {grenze} erlaubt.")
+        return zahl
+    if regtyp == "REG_BINARY":
+        hexa = re.sub(r"[\s,]", "", text.lower().removeprefix("hex:"))
+        if not re.fullmatch(r"(?:[0-9a-f]{2})*", hexa):
+            raise ValidierungsFehler(
+                "Bitte Hex-Bytes angeben, z. B. 0a 1b ff (Leerzeichen oder Komma erlaubt)."
+            )
+        if len(hexa) // 2 > MAX_REGISTRY_BINAER:
+            raise ValidierungsFehler(f"Zu viele Bytes (höchstens {MAX_REGISTRY_BINAER}).")
+        return hexa
+    if regtyp in ("REG_SZ", "REG_EXPAND_SZ"):
+        if len(text) > MAX_REGISTRY_TEXT:
+            raise ValidierungsFehler(f"Der Text ist zu lang (höchstens {MAX_REGISTRY_TEXT} Zeichen).")
+        return text
+    raise ValidierungsFehler("Unbekannter Registry-Typ.")
 
 
 _DATEINAME = re.compile(r"^\w[\w .\-()+]{0,254}$")
@@ -542,11 +673,6 @@ def _msi_eigenschaft(text: str, p: ParameterDef) -> str:
             "Leerzeichen und Anführungszeichen (erlaubt: Buchstaben, Ziffern, _ . - : \\ { })."
         )
     return text
-
-
-def registry_reg_form(pfad: str) -> str:
-    """``HKLM:\\SOFTWARE\\x`` → ``HKLM\\SOFTWARE\\x`` (Schreibweise von reg.exe)."""
-    return pfad.replace(":\\", "\\", 1)
 
 
 # Typen, deren Werte Leerzeichen enthalten dürfen – Listen davon trennt nur , oder ;
@@ -670,6 +796,9 @@ _TEXT_PRUEFER: dict[ParamTyp, Any] = {
     ParamTyp.MAC: _mac,
     ParamTyp.DOMAIN: _domain,
     ParamTyp.REGISTRY_PFAD: _registry_pfad,
+    ParamTyp.REGISTRY_WERTNAME: _registry_wertname,
+    ParamTyp.REGISTRY_TYP: _registry_typ,
+    ParamTyp.REGISTRY_BEREICH: _registry_bereich,
     ParamTyp.DATEINAME: _dateiname,
     ParamTyp.RECHNERNAME: _rechnername,
     ParamTyp.DNSNAME: _dnsname,
@@ -680,10 +809,12 @@ _TEXT_PRUEFER: dict[ParamTyp, Any] = {
 }
 
 
-def validiere_wert(p: ParameterDef, roh: Any) -> ParamValue:
+def validiere_wert(p: ParameterDef, roh: Any, regtyp: str | None = None) -> ParamValue:
     """Prüft einen Rohwert gegen die Parameterdefinition.
 
     Leere Werte: Pflichtfeld → Fehler; sonst ``standard`` bzw. ``None``.
+    ``regtyp``: bei ``registry_daten`` der gewählte Registry-Typ desselben Schritts (ohne ihn – z. B.
+    bei der Live-Prüfung eines einzelnen Felds – wird als Text bzw. mehrzeilig als Liste geprüft).
     """
     leer = roh is None or (isinstance(roh, str) and roh.strip() == "")
     if leer and p.typ is not ParamTyp.JA_NEIN:
@@ -697,6 +828,16 @@ def validiere_wert(p: ParameterDef, roh: Any) -> ParamValue:
         roh = p.standard
 
     wert: str | int | bool | list[str | int]
+    if p.typ is ParamTyp.REGISTRY_DATEN:
+        if regtyp is None:
+            regtyp = (
+                "REG_MULTI_SZ"
+                if isinstance(roh, list) or (isinstance(roh, str) and "\n" in roh)
+                else "REG_SZ"
+            )
+        if regtyp == "REG_MULTI_SZ" and leer:
+            return ParamValue(typ=p.typ, wert=[])
+        return ParamValue(typ=p.typ, wert=registry_daten(roh, regtyp))
     if p.typ is ParamTyp.LISTE:
         return ParamValue(typ=p.typ, wert=_liste(roh, p), listen_typ=p.listen_typ)
     if p.typ.value in ZAHLENTYPEN:
@@ -708,6 +849,8 @@ def validiere_wert(p: ParameterDef, roh: Any) -> ParamValue:
     else:
         text = _text(roh)
         wert = _TEXT_PRUEFER[p.typ](text, p)
+        if p.typ is ParamTyp.REGISTRY_WERTNAME and wert == "":
+            return ParamValue(typ=p.typ, wert=None)  # Standardwert „(Standard)“
     return ParamValue(typ=p.typ, wert=wert)
 
 
@@ -728,6 +871,9 @@ def pruefe_wert_fuer_ziel(wert: ParamValue, ziel: Ziel) -> None:
             raise ValidierungsFehler("Für Windows bitte einen Windows-Pfad angeben, z. B. C:\\Daten")
         if not windows and pfad_ist_windows(wert.wert):
             raise ValidierungsFehler("Für Linux/macOS bitte einen Pfad wie /home/max/Daten angeben.")
+    if ziel is Ziel.CMD and wert.typ is ParamTyp.REGISTRY_DATEN and isinstance(wert.wert, str):
+        if wert.wert.startswith(("-", "/")):
+            raise ValidierungsFehler("Unter CMD dürfen Registry-Daten nicht mit - oder / beginnen.")
     if ziel is Ziel.CMD and isinstance(wert.wert, str) and '"' in wert.wert:
         raise ValidierungsFehler('Anführungszeichen (") sind in Windows-CMD-Scripten nicht erlaubt.')
 
@@ -756,7 +902,18 @@ _ANZAHL = ParameterDef(
 MAX_SCHLEIFENWERTE = 50
 SCHLEIFENWERT = "schleifenwert"  # Parameterwert {"schleifenwert": true} = aktueller Wert der Schleife
 # Typen, die den Schleifenwert nicht aufnehmen können (Listen, Verweise, Haken)
-_OHNE_SCHLEIFENWERT = frozenset({ParamTyp.LISTE, ParamTyp.VARIABLE, ParamTyp.JA_NEIN, ParamTyp.AUSWAHL})
+_OHNE_SCHLEIFENWERT = frozenset(
+    {
+        ParamTyp.LISTE,
+        ParamTyp.VARIABLE,
+        ParamTyp.JA_NEIN,
+        ParamTyp.AUSWAHL,
+        ParamTyp.REGISTRY_PFAD,
+        ParamTyp.REGISTRY_TYP,
+        ParamTyp.REGISTRY_DATEN,
+        ParamTyp.REGISTRY_BEREICH,
+    }
+)
 MAX_WARTEN = 3600
 _SEKUNDEN = ParameterDef(id="sekunden", label="Sekunden", typ=ParamTyp.ZAHL, min=1, max=MAX_WARTEN)
 _CODE = ParameterDef(id="code", label="Exit-Code", typ=ParamTyp.ZAHL, min=0, max=99)
@@ -959,7 +1116,9 @@ class _BaumPruefer:
             self.fehler.append(Feldfehler(i, name, f"Unbekannter Parameter „{name}“."))
         werte: dict[str, ParamValue] = {}
         genutzt = self.registry.benutzte_parameter(block, self.ziel)
-        for p in block.parameter:
+        # registry_daten zuletzt: braucht den gewählten Registry-Typ desselben Schritts
+        reihenfolge = sorted(block.parameter, key=lambda q: q.typ is ParamTyp.REGISTRY_DATEN)
+        for p in reihenfolge:
             if p.id not in genutzt and eingabe.parameter.get(p.id) in (None, ""):
                 # Für dieses Zielsystem nicht verwendet – daher auch keine Pflicht.
                 continue
@@ -968,14 +1127,73 @@ class _BaumPruefer:
                 if ist_schleifenwert(roh):
                     werte[p.id] = self.schleifenwert(p)
                     continue
-                wert = validiere_wert(p, roh)
+                regtyp: str | None = None
+                if p.typ is ParamTyp.REGISTRY_DATEN:
+                    typwert = werte.get(p.bezug or "typ")
+                    if typwert is None or not isinstance(typwert.wert, str):
+                        continue  # Fehler steht schon beim Typ
+                    regtyp = typwert.wert
+                wert = validiere_wert(p, roh, regtyp)
                 pruefe_wert_fuer_ziel(wert, self.ziel)
                 if p.typ is ParamTyp.VARIABLE and isinstance(wert.wert, str):
                     self.verweis_pruefen(nr, wert.wert, p.variable_typ)
                 werte[p.id] = wert
             except ValidierungsFehler as e:
                 self.fehler.append(Feldfehler(i, p.id, f"{p.label}: {e}"))
-        return BlockSchritt(block_id=block.id, block_version=block.version, parameter=werte)
+        risiko: Risiko | None = None
+        if block.registry is not None:
+            risiko = self.registry_pruefen(i, block, werte)
+            if risiko is Risiko.ROT:
+                self.hat_rot = True
+        return BlockSchritt(block_id=block.id, block_version=block.version, parameter=werte, risiko=risiko)
+
+    def registry_pruefen(self, i: int, block: BlockDef, werte: dict[str, ParamValue]) -> Risiko | None:
+        """Registry-Bausteine: Pfad passend zum Bereich, Schutzliste, Risiko je Pfad.
+
+        Gibt ``Risiko.ROT`` zurück, wenn ein geschützter Pfad den Schritt rot macht.
+        """
+        schutz = lade_schutz()
+        risiko: Risiko | None = None
+        for p in block.parameter:
+            if p.typ is not ParamTyp.REGISTRY_PFAD:
+                continue
+            wert = werte.get(p.id)
+            if wert is None or not isinstance(wert.wert, str):
+                continue
+            bereich_def = block.param(p.bezug or "bereich")
+            bereich_wert = werte.get(bereich_def.id) if bereich_def is not None else None
+            bereich = bereich_wert.wert if bereich_wert is not None else None
+            try:
+                pfad = registry_pfad_fuer_bereich(
+                    wert.wert, bereich if isinstance(bereich, str) else None, block.registry == "lesen"
+                )
+                if self.ziel is Ziel.CMD and bereich not in (None, "computer", "angemeldeter_benutzer"):
+                    raise ValidierungsFehler(
+                        "Mehrere Benutzerprofile und das Standardprofil gehen nur mit PowerShell."
+                    )
+            except ValidierungsFehler as e:
+                self.fehler.append(Feldfehler(i, p.id, f"{p.label}: {e}"))
+                continue
+            werte[p.id] = ParamValue(typ=wert.typ, wert=pfad)
+            if block.registry == "lesen":
+                continue
+            voll = pfad if registry_teile(pfad)[0] else "HKCU\\" + pfad
+            if schutz.gesperrt_fuer(voll):
+                self.fehler.append(
+                    Feldfehler(i, p.id, f"{p.label}: Dieser Bereich der Registry ist gesperrt ({voll}).")
+                )
+            elif block.registry == "schluessel_loeschen" and schutz.zu_flach_zum_loeschen(voll):
+                self.fehler.append(
+                    Feldfehler(
+                        i,
+                        p.id,
+                        f"{p.label}: So weit oben wird nicht gelöscht – mindestens "
+                        f"{schutz.loeschen_min_ebenen} Ebenen unter der Wurzel angeben.",
+                    )
+                )
+            elif schutz.rot_fuer(voll) and block.risiko is not Risiko.ROT:
+                risiko = Risiko.ROT
+        return risiko
 
     def verweis_pruefen(self, nr: int, wert: str, erwartet: RueckgabeTyp | None) -> RueckgabeDef:
         """Löst ``"<schritt>.<id>"`` auf; ``nr`` = Nummer des Blocks, der den Wert liest."""
@@ -1011,6 +1229,32 @@ class _BaumPruefer:
                 "davon nicht verfügbar."
             )
         return r
+
+
+def registry_pfad_fuer_bereich(pfad: str, bereich: str | None, nur_lesen: bool) -> str:
+    """Prüft einen normalisierten Registry-Pfad gegen den Bereich und liefert die Form fürs Script.
+
+    ``computer``: HKLM (lesend auch HKCR/HKCC/HKU). Benutzer-Bereiche: Pfad ohne Wurzel; ``HKCU\\…``
+    wird umgeschrieben (``HKCU`` selbst nutzt das Script nie – nach dem UAC-Neustart wäre das das
+    Profil des Admin-Kontos). Ohne Bereich: Pfad mit Wurzel, aber nie HKCU.
+    """
+    wurzel, rest = registry_teile(pfad)
+    if bereich is None or bereich == "computer":
+        erlaubt = ("HKLM", "HKCR", "HKCC", "HKU") if nur_lesen else ("HKLM",)
+        if wurzel == "HKCU" or (wurzel is None and bereich is not None):
+            raise ValidierungsFehler(
+                "Für „Computer“ bitte einen Pfad unter HKLM angeben. Benutzer-Einstellungen über den "
+                "Bereich „Angemeldeter Benutzer“ bzw. „Alle Benutzerprofile“."
+            )
+        if wurzel not in erlaubt:
+            raise ValidierungsFehler("Bitte einen Pfad unter " + " / ".join(erlaubt) + " angeben.")
+        return pfad
+    if wurzel in (None, "HKCU"):
+        return rest
+    raise ValidierungsFehler(
+        "Für Benutzer-Bereiche den Pfad ohne Wurzel (Software\\…) oder mit HKCU\\ angeben – "
+        "das Script schreibt dann in das richtige Benutzerprofil."
+    )
 
 
 def ist_schleifenwert(roh: Any) -> bool:

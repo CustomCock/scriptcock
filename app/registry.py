@@ -133,7 +133,7 @@ def cmd_klammern_ok(quelle: str) -> bool:
 class Registry:
     bloecke: dict[str, BlockDef] = field(default_factory=dict)
     rezepte: dict[str, RezeptDef] = field(default_factory=dict)
-    # (block_id, art, ziel) -> kompiliertes Template; art in {"ziele", "pruefung", "dry_run"}
+    # (block_id, art, ziel) -> kompiliertes Template; art in {"ziele", "pruefung", "dry_run", "vorschau"}
     vorlagen: dict[tuple[str, str, Ziel], Template] = field(default_factory=dict)
     variablen: dict[tuple[str, str, Ziel], frozenset[str]] = field(default_factory=dict)
     fortschritt: dict[str, Template] = field(default_factory=dict)
@@ -146,7 +146,7 @@ class Registry:
         if not block.verfuegbar(ziel):
             return set()
         variablen: set[str] = set()
-        for art in ("ziele", "pruefung", "dry_run"):
+        for art in ("ziele", "pruefung", "dry_run", "vorschau"):
             variablen |= self.variablen.get((block.id, art, ziel), frozenset())
         abgeleitet = block.abgeleitete_variablen()
         return {abgeleitet.get(v, v) for v in variablen}
@@ -227,7 +227,7 @@ def _pruefe_block(block: BlockDef, reg: Registry, fehler: list[str]) -> None:
             except ValidierungsFehler as e:
                 fehler.append(f"{rel}: parameter.{p.id}.{name}: {e}")
 
-    for art in ("ziele", "pruefung", "dry_run"):
+    for art in ("ziele", "pruefung", "dry_run", "vorschau"):
         quellen: dict[Ziel, str] = getattr(block, art)
         for ziel, quelle in quellen.items():
             ort = f"{rel}: {art}.{ziel.value}"

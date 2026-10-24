@@ -1,0 +1,23 @@
+# Schutzliste für die Registry-Bausteine (geprüft in app/regschutz.py beim Validieren).
+# Pfade in Kurzform (HKLM\…, HKCU\…), Vergleich ohne Groß-/Kleinschreibung, Teil für Teil.
+# Benutzer-Bereiche (Pfad ohne Wurzel) werden als HKCU\… geprüft.
+
+# Schreiben und Löschen nie erlaubt – auch nicht für Admins (Systemdatenbanken, Boot-Konfiguration)
+gesperrt:
+  - HKLM\SAM
+  - HKLM\SECURITY
+  - HKLM\BCD00000000
+
+# Schreiben/Löschen nur als roter Schritt (Bestätigung „JA“)
+rot:
+  - HKLM\SYSTEM
+  - HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon
+
+# Wie „rot“, wenn dieser Teil irgendwo im Pfad vorkommt (…\Policies\…, …\Control\Lsa)
+rot_teile:
+  - Policies
+  - Lsa
+
+# Schlüssel löschen erst ab so vielen Ebenen unter der Wurzel
+# (HKLM\SOFTWARE = 1, HKCU\Software\Microsoft = 2 → gesperrt)
+loeschen_min_ebenen: 3

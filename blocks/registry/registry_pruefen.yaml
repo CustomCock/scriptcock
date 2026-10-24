@@ -1,0 +1,83 @@
+id: registry_pruefen
+version: 1
+name: Registry-Wert prüfen (Soll/Ist)
+kategorie: Registry
+beschreibung: Vergleicht einen Registry-Wert mit dem erwarteten Typ und Inhalt und meldet OK oder ABWEICHUNG. Ändert
+  nichts.
+risiko: gruen
+registry: lesen
+fortschritt: 'Registry: {{ pfad }} {{ wertname }} wird geprüft'
+tipp: Stimmt der Pfad, und ist der erwartete Typ richtig (z. B. REG_DWORD statt REG_SZ)?
+rechte:
+  powershell: admin
+  cmd: admin
+parameter:
+- id: bereich
+  label: Wessen Registry?
+  typ: registry_bereich
+  standard: computer
+  hilfe: 'Computer = HKLM. Für Benutzer-Einstellungen nie HKCU direkt: nach dem Admin-Neustart wäre das das Profil
+    des Admin-Kontos. Darum hier den Benutzer wählen.'
+- id: pfad
+  label: Schlüssel
+  typ: registry_pfad
+  bezug: bereich
+  beispiel: HKLM\SOFTWARE\Firma\App
+  hilfe: 'Computer: HKLM\…. Benutzer-Bereiche: Software\… (ohne Wurzel) oder HKCU\…. Schreibweisen wie HKLM:\… oder
+    HKEY_LOCAL_MACHINE\… gehen auch.'
+- id: wertname
+  label: Wertname (leer = Standardwert)
+  typ: registry_wertname
+  pflicht: false
+- id: typ
+  label: Typ
+  typ: registry_typ
+  standard: REG_DWORD
+- id: daten
+  label: Daten
+  typ: registry_daten
+  beispiel: '1'
+  hilfe: 'DWORD/QWORD: Zahl (dezimal oder 0x…). MULTI_SZ: eine Zeile pro Eintrag. BINARY: Hex-Bytes, z. B. 0a 1b
+    ff. EXPAND_SZ: %Variablen% bleiben unaufgelöst.'
+- id: ansicht
+  label: Registry-Ansicht
+  typ: auswahl
+  standard: '64'
+  optionen:
+  - wert: '64'
+    label: 64-Bit (Standard)
+  - wert: '32'
+    label: 32-Bit (WOW6432Node, für 32-Bit-Programme)
+- id: abbrechen
+  label: Script abbrechen bei Abweichung
+  typ: ja_nein
+  pflicht: false
+  standard: false
+rueckgabe:
+- id: stimmt
+  typ: ja_nein
+  beschreibung: Ist-Wert entspricht dem Soll
+ziele:
+  powershell: |
+    {{ rueckgabe_stimmt }} = Test-OkmRegistryWert -Bereich {{ bereich }} -Pfad {{ pfad }} -Name {% if wertname %}{{ wertname }}{% else %}''{% endif %} -Typ {{ typ }} -Daten {{ daten }} -Ansicht {{ ansicht }}
+    {% if abbrechen %}
+    if (-not {{ rueckgabe_stimmt }}) { throw 'Der Registry-Wert entspricht nicht dem Soll.' }
+    {% endif %}
+  cmd: |
+    {{ benutzer_anfang }}
+      reg query {{ pfad_reg }} {% if wertname %}/v {{ wertname }}{% else %}/ve{% endif %} {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %} 2>nul | findstr /i /e /l /c:{{ daten_abfrage }} >nul
+    {{ benutzer_ende }}
+    if errorlevel 9 (
+      cmd /c exit 1
+    ) else if errorlevel 1 (
+      echo ABWEICHUNG - erwartet: {{ daten_abfrage }}
+      set {{ rueckgabe_stimmt }}=0
+    {% if abbrechen %}
+      cmd /c exit 1
+    {% else %}
+      cmd /c exit 0
+    {% endif %}
+    ) else (
+      echo OK
+      set {{ rueckgabe_stimmt }}=1
+    )

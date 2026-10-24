@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -12,7 +12,11 @@ from app.escaping import Ziel
 ID_MUSTER = r"^[a-z][a-z0-9_]*$"
 
 # Namen, die der Generator selbst in Code-Templates bereitstellt.
-EINGEBAUTE_VARIABLEN = frozenset({"whatif", "sudo"})
+# Vom Generator gesetzt: whatif/sudo immer; die übrigen für Registry-Bausteine (CMD: SID-Schleife für
+# den angemeldeten Benutzer, Rang der „wirkung“, findstr-Muster der gesperrten Bereiche)
+EINGEBAUTE_VARIABLEN = frozenset(
+    {"whatif", "sudo", "benutzer_anfang", "benutzer_ende", "wirkung_rang", "regschutz_cmd"}
+)
 # Platzhalter für Rückgabewerte: {{ rueckgabe_<id> }} = Variablenname, den der Generator vergibt.
 RUECKGABE_PRAEFIX = "rueckgabe_"
 
@@ -77,7 +81,11 @@ class ParamTyp(StrEnum):
     CIDR = "cidr"  # IPv4-Netz, z. B. 192.168.1.0/24 (Präfix 8–32)
     MAC = "mac"  # → AA:BB:CC:DD:EE:FF
     DOMAIN = "domain"  # DNS-Domain mit mindestens einem Punkt, klein geschrieben
-    REGISTRY_PFAD = "registry_pfad"  # → HKLM:\\SOFTWARE\\… (abgeleitet: <id>_reg ohne Doppelpunkt)
+    REGISTRY_PFAD = "registry_pfad"  # → HKLM\\SOFTWARE\\… oder ohne Wurzel (Benutzer-Bereich); <id>_ps
+    REGISTRY_WERTNAME = "registry_wertname"  # leer/„(Standard)“ = Standardwert
+    REGISTRY_TYP = "registry_typ"  # REG_SZ, REG_EXPAND_SZ, REG_DWORD, REG_QWORD, REG_MULTI_SZ, REG_BINARY
+    REGISTRY_DATEN = "registry_daten"  # je nach Typ (Parameter ``bezug``) geprüft
+    REGISTRY_BEREICH = "registry_bereich"  # wessen Registry: computer, angemeldeter_benutzer, …
     DATEINAME = "dateiname"  # ein Datei-/Ordnername ohne Pfad (kein . / .., keine reservierten Namen)
     RECHNERNAME = "rechnername"  # NetBIOS-tauglich: 1–15 Zeichen, Buchstaben/Ziffern/-, → GROSS
     DNSNAME = "dnsname"  # Name für DNS-Abfragen, Labels dürfen mit _ beginnen (_ldap._tcp.…)
@@ -97,7 +105,21 @@ ZAHLENTYPEN: dict[str, tuple[int | None, int | None]] = {
     "dauer_sek": (1, 86_400),
 }
 # Als Listeneintrag nicht erlaubt
-NICHT_IN_LISTEN = frozenset({"liste", "variable", "ja_nein"})
+NICHT_IN_LISTEN = frozenset({"liste", "variable", "ja_nein", "registry_daten"})
+
+REGISTRY_TYPEN = ("REG_SZ", "REG_EXPAND_SZ", "REG_DWORD", "REG_QWORD", "REG_MULTI_SZ", "REG_BINARY")
+REGISTRY_BEREICHE: dict[str, str] = {
+    "computer": "Computer (HKLM)",
+    "angemeldeter_benutzer": "Angemeldeter Benutzer",
+    "alle_benutzer": "Alle Benutzerprofile",
+    "standardprofil": "Standardprofil (neue Benutzer)",
+    "alle_benutzer_und_standardprofil": "Alle Benutzer + Standardprofil",
+}
+# Typen mit fester Auswahlliste (werden im Formular und in Blockly wie „auswahl“ dargestellt)
+FESTE_OPTIONEN: dict[str, list[tuple[str, str]]] = {
+    "registry_typ": [(t, t) for t in REGISTRY_TYPEN],
+    "registry_bereich": list(REGISTRY_BEREICHE.items()),
+}
 
 
 class RueckgabeTyp(StrEnum):
@@ -149,6 +171,10 @@ class ParameterDef(BaseModel):
     listen_typ: ParamTyp | None = None
     min_anzahl: int | None = Field(default=None, ge=1)
     max_anzahl: int | None = Field(default=None, ge=1, le=100)
+    # Bezug auf einen anderen Parameter desselben Blocks:
+    # registry_daten → registry_typ-Parameter (Standard "typ"),
+    # registry_pfad → registry_bereich-Parameter (falls vorhanden; Standard "bereich")
+    bezug: str | None = Field(default=None, pattern=ID_MUSTER)
 
     @field_validator("id")
     @classmethod
@@ -173,9 +199,13 @@ class ParameterDef(BaseModel):
         if self.min_anzahl is not None and self.max_anzahl is not None and self.min_anzahl > self.max_anzahl:
             raise ValueError("'min_anzahl' ist größer als 'max_anzahl'")
         typ = self.eintrag_typ
-        if typ is ParamTyp.AUSWAHL and not self.optionen:
+        if typ.value in FESTE_OPTIONEN:
+            if self.optionen:
+                raise ValueError(f"Typ '{typ.value}' hat feste Optionen – 'optionen' weglassen")
+            self.optionen = [Option(wert=w, label=lbl) for w, lbl in FESTE_OPTIONEN[typ.value]]
+        elif typ is ParamTyp.AUSWAHL and not self.optionen:
             raise ValueError("Typ 'auswahl' braucht eine Liste 'optionen'")
-        if typ is not ParamTyp.AUSWAHL and self.optionen:
+        elif typ is not ParamTyp.AUSWAHL and self.optionen:
             raise ValueError("'optionen' ist nur beim Typ 'auswahl' erlaubt")
         if (self.min is not None or self.max is not None) and typ.value not in ZAHLENTYPEN:
             raise ValueError("'min'/'max' sind nur bei 'zahl', 'tage' und 'dauer_sek' erlaubt")
@@ -216,6 +246,11 @@ class BlockDef(BaseModel):
     pruefung: dict[Ziel, str] = Field(default_factory=dict)
     dry_run: dict[Ziel, str] = Field(default_factory=dict)
     hinweise: dict[Ziel, str] = Field(default_factory=dict)
+    # Läuft vor der JA-Abfrage roter Schritte (z. B. „was würde gelöscht“). Darf nichts ändern.
+    vorschau: dict[Ziel, str] = Field(default_factory=dict)
+    # Windows-Registry: Art des Zugriffs → Schutzliste (registry/schutz.yaml), Risiko je Pfad,
+    # Registry-Hilfsfunktionen in der Präambel
+    registry: Literal["lesen", "schreiben", "wert_loeschen", "schluessel_loeschen", "import"] | None = None
 
     # Wird von der Registry gesetzt (relativer Pfad, für Fehlermeldungen).
     quelle: str = ""
@@ -239,7 +274,21 @@ class BlockDef(BaseModel):
         doppelt = {i for i in ids if ids.count(i) > 1}
         if doppelt:
             raise ValueError(f"Parameter-ID(s) doppelt: {', '.join(sorted(doppelt))}")
-        for feld in ("pruefung", "dry_run", "hinweise"):
+        for p in self.parameter:
+            if p.typ is ParamTyp.REGISTRY_DATEN:
+                ref = self.param(p.bezug or "typ")
+                if ref is None or ref.typ is not ParamTyp.REGISTRY_TYP:
+                    raise ValueError(
+                        f"Parameter '{p.id}' (registry_daten) braucht einen registry_typ-Parameter "
+                        f"'{p.bezug or 'typ'}' (Feld 'bezug')"
+                    )
+            elif p.typ is ParamTyp.REGISTRY_PFAD and p.bezug is not None:
+                ref = self.param(p.bezug)
+                if ref is None or ref.typ is not ParamTyp.REGISTRY_BEREICH:
+                    raise ValueError(f"'bezug' von '{p.id}' muss auf einen registry_bereich-Parameter zeigen")
+            elif p.bezug is not None:
+                raise ValueError(f"'bezug' gibt es nur bei registry_daten und registry_pfad ('{p.id}')")
+        for feld in ("pruefung", "dry_run", "hinweise", "vorschau"):
             zusatz: dict[Ziel, str] = getattr(self, feld)
             fremd = set(zusatz) - set(self.ziele)
             if fremd:
@@ -293,8 +342,14 @@ class BlockDef(BaseModel):
         """Zusätzliche Template-Variablen, die aus Parametern berechnet werden.
 
         ``<id>_smb``: ein ``unc_pfad`` als ``smb://``-URL (für macOS).
-        ``<id>_reg``: ein ``registry_pfad`` in reg.exe-Schreibweise (``HKLM\\SOFTWARE\\…``).
+        ``<id>_reg``: ein ``registry_pfad`` in reg.exe-Schreibweise (``HKLM\\SOFTWARE\\…``),
+        ``<id>_ps``: derselbe Pfad für den PowerShell-Provider (``Registry::HKEY_LOCAL_MACHINE\\…``).
+        ``<id>_abfrage``: ``registry_daten`` so, wie ``reg query`` „Typ    Daten“ ausgibt (CMD-Vergleich).
         Rückgabe: Variablenname -> Parameter-ID.
         """
-        endung = {ParamTyp.UNC_PFAD: "_smb", ParamTyp.REGISTRY_PFAD: "_reg"}
-        return {f"{p.id}{endung[p.typ]}": p.id for p in self.parameter if p.typ in endung}
+        endungen = {
+            ParamTyp.UNC_PFAD: ("_smb",),
+            ParamTyp.REGISTRY_PFAD: ("_reg", "_ps"),
+            ParamTyp.REGISTRY_DATEN: ("_abfrage",),
+        }
+        return {f"{p.id}{e}": p.id for p in self.parameter if p.typ in endungen for e in endungen[p.typ]}

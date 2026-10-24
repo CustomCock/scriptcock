@@ -11,12 +11,17 @@ felder:
     label: Wofür? (Beschreibung des Wiederherstellungspunkts)
     typ: text_kurz
     standard: Vor Änderung durch okm-Script
+  - id: bereich
+    label: Wessen Registry?
+    typ: registry_bereich
+    standard: computer
   - id: schluessel
     label: Registry-Schlüssel, der gesichert wird
     typ: registry_pfad
-    beispiel: HKCU:\Software\Microsoft\Office
+    beispiel: HKLM\SOFTWARE\Microsoft\Office
+    hilfe: Computer = HKLM\…; bei einem Benutzer-Bereich den Pfad ohne Wurzel (Software\…) angeben.
 schritte:
   - block: wiederherstellungspunkt
     parameter: {beschreibung: $beschreibung, aktivieren: false}
-  - block: registry_backup
-    parameter: {schluessel: $schluessel}
+  - block: registry_export
+    parameter: {bereich: $bereich, pfad: $schluessel}

@@ -1,5 +1,46 @@
 # Changelog
 
+## Registry, Richtlinien-Katalog und Palette
+
+### Teil A: Registry-Bausteine
+
+- **Neue Parametertypen:** `registry_pfad` (neu normalisiert auf `HKLM\…`; akzeptiert `HKLM:\`,
+  `HKEY_…\`, `Registry::`; ohne Wurzel für Benutzer-Bereiche), `registry_wertname` (leer/„(Standard)“
+  = Standardwert), `registry_typ`, `registry_daten` (je nach gewähltem Typ geprüft: DWORD/QWORD bis
+  2³²−1/2⁶⁴−1 auch hexadezimal, MULTI_SZ zeilenweise, BINARY als Hex-Bytes), `registry_bereich`.
+- **Zehn Bausteine** (Kategorie „Registry“): `registry_wert_lesen` (Rückgaben `vorhanden`, `wert`),
+  `registry_schluessel_anzeigen`, `registry_pruefen` (Soll/Ist, Rückgabe `stimmt`),
+  `registry_wert_setzen` (Rückgabe `geaendert`), `registry_schluessel_anlegen`, `registry_wert_loeschen`,
+  `registry_schluessel_loeschen` (Vorschau der Unterschlüssel vor der Bestätigung), `registry_export`,
+  `registry_import` (lehnt HKCU und gesperrte Bereiche ab, sichert betroffene Schlüssel),
+  `registry_rechte_anzeigen` (nur PowerShell), dazu `explorer_neustarten` (Folgebaustein für
+  Explorer-Einstellungen). Die alten `registry_lesen`, `registry_backup` und
+  `registry_setzen` sind entfernt; „Vor riskanter Änderung absichern“ nutzt jetzt `registry_export`.
+- **Wessen Registry (`bereich`):** HKCU wird nie benutzt – nach dem UAC-Neustart mit einem
+  Techniker-Konto wäre das dessen Profil. „Angemeldeter Benutzer“ ermittelt den Besitzer von explorer.exe
+  und schreibt nach `HKU\<SID>` (kein/mehrere Benutzer → klarer Abbruch); „Alle Benutzerprofile“ und
+  „Standardprofil“ laden nicht geladene `NTUSER.DAT` und entladen sie immer wieder (nur PowerShell).
+- **`registry_wert_setzen`:** fehlende Schlüssel anlegen (über `RegistryKey.CreateSubKey` – ein vorhandener
+  Schlüssel bleibt mit allen Werten unangetastet), alten Wert ins Protokoll, `wenn_vorhanden`
+  (überschreiben / nur wenn fehlt / abbrechen / nachfragen), gleicher Inhalt → nichts schreiben, anderer
+  Typ → löschen und neu anlegen („Typ geändert“), danach zurücklesen. DWORD/QWORD über Int32/Int64
+  umgerechnet (Werte ab 0x80000000), EXPAND_SZ unaufgelöst, Standardwert, 32/64-Bit-Ansicht; 32-Bit-
+  PowerShell startet sich als 64-Bit neu (`Sysnative`).
+- **Rückgängig:** vor der ersten Änderung je Schlüssel `reg export` (neue Schlüssel: .reg, die sie
+  wieder löscht) nach `%TEMP%\okm-registry-backup-<Zeit>`; der Ordner steht in der Zusammenfassung.
+  „Damit die Änderungen wirken: …“ sammelt die höchste `wirkung` aller Schritte.
+- **Schutz** (`registry/schutz.yaml`): HKLM\SAM, \SECURITY, \BCD00000000 gesperrt; Schreiben unter
+  HKLM\SYSTEM, Winlogon, `…\Policies\…`, `…\Lsa` macht den Schritt rot (Risiko pro Schritt, neu in der
+  IR); Schlüssel erst ab 3 Ebenen unter der Wurzel löschbar; „Zugriff verweigert“ → verständliche
+  Meldung, keine Besitzübernahme.
+- Allgemein neu: `vorschau:` im Block (läuft vor der JA-Abfrage roter Schritte), Risiko pro Schritt
+  (`BlockSchritt.risiko`).
+- PSScriptAnalyzer läuft jetzt auch lokal; neue begründete Ausnahme
+  `PSUseShouldProcessForStateChangingFunctions` (Script-interne Hilfen, Simulation über den Dry-Run).
+- Tests: `tests/test_windows_registry.py` (Bereiche, Schutzliste, rote Pfade, Escaping je Ziel inkl.
+  `\` am Ende, `%SystemRoot%`, `\0`, Unicode; HKCU nie im Code; Hilfsfunktionen unter pwsh: Int32/Int64-
+  Umrechnung, UTF-16-.reg lesen, Import-Ablehnung), Grenzwerte in `tests/test_validation.py`.
+
 ## Backlog P1
 
 ### Blockly: „Für jeden Wert“

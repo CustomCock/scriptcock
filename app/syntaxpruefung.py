@@ -24,10 +24,13 @@ from app.export import _mit_chcp, _normalisiert, exportiere
 # - PSAvoidUsingWriteHost: die Scripte sind interaktive Konsolen-Scripte
 # - PSAvoidUsingComputerNameHardcoded: Rechnernamen sind Benutzereingaben
 # - PSAvoidUsingCmdletAliases: SetupDiag-Block soll laut Vorgabe exakt "cd" enthalten
+# - PSUseShouldProcessForStateChangingFunctions: Script-interne Hilfsfunktionen (Registry); die
+#   Simulation läuft über den Dry-Run des Baukastens (Schalter -Simulation), nicht über -WhatIf
 PSSA_AUSNAHMEN = [
     "PSAvoidUsingWriteHost",
     "PSAvoidUsingComputerNameHardcoded",
     "PSAvoidUsingCmdletAliases",
+    "PSUseShouldProcessForStateChangingFunctions",
 ]
 ZEITLIMIT = 60  # Sekunden je Werkzeug
 

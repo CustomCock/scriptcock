@@ -28,6 +28,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 packages = ["app", "app.models", "app.generators", "app.routes"]
 
+[tool.setuptools.package-data]
+"app.generators" = ["hilfen/*.ps1", "hilfen/*.cmd"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

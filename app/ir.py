@@ -20,7 +20,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.block import ParamTyp
+from app.models.block import ParamTyp, Risiko
 
 IR_VERSION = 4  # 2: wenn_fehler/wiederhole, 3: wenn/abbrechen/warten/bestaetigung/kommentar, 4: fuer_jeden
 
@@ -43,6 +43,8 @@ class BlockSchritt(BaseModel):
     block_id: str
     block_version: int
     parameter: dict[str, ParamValue]
+    # Höheres Risiko als im Block (z. B. Registry-Schreiben unter HKLM\SYSTEM → rot)
+    risiko: Risiko | None = None
 
 
 class WennFehler(BaseModel):

@@ -57,6 +57,17 @@ class CmdGenerator(Generator):
             "rem /nopause: am Ende nicht auf eine Taste warten (Fernwartung/RMM)",
             'if /i "%~1"=="/nopause" set "OKM_KEINE_PAUSE=1"',
             'set "OKM_TIPP="',
+            *(
+                [
+                    "rem Registry: Rückgängig-Dateien (reg export) landen hier",
+                    'set "OKM_REG_SICHERUNG=%TEMP%\\okm-registry-backup-%OKM_TS%"',
+                    "rem Registry: was nötig ist, damit Änderungen wirken (Rang, siehe Zusammenfassung)",
+                    'set "OKM_WIRKUNG=0"',
+                    'set "OKM_WIRKUNG_UNBEKANNT="',
+                ]
+                if self.mit_registry
+                else []
+            ),
             *[z for k in self.kopf_ausgabe(ir) for z in _echo_beides(k)],
             "",
         ]
@@ -99,13 +110,19 @@ class CmdGenerator(Generator):
         name = kommentar_text(Ziel.CMD, b.name)
         zeilen = [
             "rem " + "-" * 68,
-            f"rem Schritt {info.bezeichnung}: {name} (Risiko: {b.risiko.value})",
+            f"rem Schritt {info.bezeichnung}: {name} (Risiko: {info.risiko.value})",
             "rem " + "-" * 68,
             f'set "OKM_SCHRITT={info.nr}"',
             # Tipp ohne CMD-Sonderzeichen, weil er später per %OKM_TIPP% ausgegeben wird
             f'set "OKM_TIPP={kommentar_text(Ziel.CMD, b.tipp)}"' if b.tipp else 'set "OKM_TIPP="',
             *_echo_beides(self.schritt_titel(info)),
         ]
+        if info.vorschau:
+            zeilen += [
+                "rem Vorschau (vor der Bestätigung)",
+                "(call )",
+                *self._gruppe(info.vorschau, b.interaktiv),
+            ]
         if info.bestaetigen:
             zeilen += [
                 echo_cmd(f"ACHTUNG: Dieser Schritt ist destruktiv: {b.name}"),
@@ -172,6 +189,22 @@ class CmdGenerator(Generator):
         zeilen = [*_echo_beides(LINIE), *(vorher or [])]
         for text in texte:
             zeilen += self._beides(text)
+        if self.mit_registry:
+            zeilen += [
+                'if exist "%OKM_REG_SICHERUNG%\\" echo( Rückgängig machen: die .reg-Dateien in '
+                "%OKM_REG_SICHERUNG% doppelklicken.",
+                *[
+                    f'if "%OKM_WIRKUNG%"=="{rang}" echo( Damit die Änderungen wirken: {text}'
+                    for rang, text in (
+                        (1, "Explorer neu starten"),
+                        (2, "Gruppenrichtlinien aktualisieren (gpupdate)"),
+                        (3, "neu anmelden"),
+                        (4, "Rechner neu starten"),
+                    )
+                ],
+                "if defined OKM_WIRKUNG_UNBEKANNT echo( Ob alle Änderungen sofort wirken, ist offen - "
+                "im Zweifel neu anmelden.",
+            ]
         return [
             *zeilen,
             *self._beides(f" Protokoll: {LOG}"),

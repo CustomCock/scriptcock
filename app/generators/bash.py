@@ -336,13 +336,15 @@ class ShGenerator(Generator):
         b = info.block
         zeilen = [
             "# " + "-" * 68,
-            f"# Schritt {info.bezeichnung}: {b.name} (Risiko: {b.risiko.value})",
+            f"# Schritt {info.bezeichnung}: {b.name} (Risiko: {info.risiko.value})",
             "# " + "-" * 68,
             f"OKM_NR={info.nr}",
             f"OKM_SCHRITT={_lit(f'{info.bezeichnung} ({b.name})')}",
             f"OKM_TIPP={_lit(b.tipp)}",
             f"okm_info {_lit(self.schritt_titel(info))}",
         ]
+        if info.vorschau:
+            zeilen += ["# Vorschau (vor der Bestätigung)", *info.vorschau]
         if info.bestaetigen:
             zeilen += [
                 f"okm_warn {_lit(f'ACHTUNG: Dieser Schritt ist destruktiv: {b.name}')}",

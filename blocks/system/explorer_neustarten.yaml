@@ -1,0 +1,45 @@
+id: explorer_neustarten
+version: 1
+name: Explorer neu starten
+kategorie: System
+beschreibung: Startet den Windows-Explorer (Taskleiste, Desktop) neu – damit Registry-Änderungen an Explorer-Einstellungen wirken, ohne sich abzumelden.
+hilfe: |
+  Beendet explorer.exe; Windows startet ihn für jede Sitzung von selbst neu (AutoRestartShell).
+  Offene Explorer-Fenster werden geschlossen. Auf Terminalservern betrifft das alle Sitzungen.
+  Startet der Explorer nicht von selbst, hilft Ab- und Anmelden.
+risiko: gelb
+fortschritt: Explorer wird neu gestartet
+tipp: Startet die Taskleiste nicht wieder? Strg+Alt+Entf → Abmelden und neu anmelden.
+rechte:
+  powershell: admin
+  cmd: admin
+ziele:
+  powershell: |
+    $okmExplorer = @(Get-Process -Name explorer -ErrorAction SilentlyContinue)
+    if ($okmExplorer.Count -eq 0) {
+        Write-OkmInfo 'Der Explorer läuft nicht – nichts zu tun.'
+    } else {
+        $okmExplorer | Stop-Process -Force
+        Start-Sleep -Seconds 4
+        if (Get-Process -Name explorer -ErrorAction SilentlyContinue) {
+            Write-OkmInfo 'Explorer neu gestartet.'
+        } else {
+            Write-OkmWarnung 'Der Explorer ist nicht von selbst neu gestartet – bitte ab- und wieder anmelden.'
+        }
+    }
+  cmd: |
+    tasklist /fi "imagename eq explorer.exe" 2>nul | find /i "explorer.exe" >nul
+    if errorlevel 1 (
+      echo Der Explorer läuft nicht - nichts zu tun.
+      cmd /c exit 0
+    ) else (
+      taskkill /f /im explorer.exe >nul
+      timeout /t 4 /nobreak >nul
+      tasklist /fi "imagename eq explorer.exe" 2>nul | find /i "explorer.exe" >nul
+      if errorlevel 1 (
+        echo Der Explorer ist nicht von selbst neu gestartet - bitte ab- und wieder anmelden.
+        cmd /c exit 0
+      ) else (
+        echo Explorer neu gestartet.
+      )
+    )

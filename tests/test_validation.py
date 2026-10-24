@@ -111,18 +111,22 @@ GUELTIG: list[tuple[ParamTyp, Any, Any]] = [
     (ParamTyp.MSI_EIGENSCHAFT, "INSTALLDIR=C:\\Programme\\Tool", "INSTALLDIR=C:\\Programme\\Tool"),
     (ParamTyp.MSI_EIGENSCHAFT, "PRODUCTKEY={ABC-123}", "PRODUCTKEY={ABC-123}"),
     (ParamTyp.DNSNAME, "mail.example.de.", "mail.example.de"),
-    (ParamTyp.REGISTRY_PFAD, "HKLM:\\SOFTWARE\\Microsoft\\Windows", "HKLM:\\SOFTWARE\\Microsoft\\Windows"),
-    (ParamTyp.REGISTRY_PFAD, "HKEY_CURRENT_USER\\Software\\OKM\\", "HKCU:\\Software\\OKM"),
+    (ParamTyp.REGISTRY_PFAD, "HKLM:\\SOFTWARE\\Microsoft\\Windows", "HKLM\\SOFTWARE\\Microsoft\\Windows"),
+    (ParamTyp.REGISTRY_PFAD, "HKEY_CURRENT_USER\\Software\\OKM\\", "HKCU\\Software\\OKM"),
     (
         ParamTyp.REGISTRY_PFAD,
         "hklm\\SYSTEM\\CurrentControlSet\\Control\\Session Manager",
-        "HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager",
+        "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager",
     ),
     (
         ParamTyp.REGISTRY_PFAD,
         "HKLM:\\SOFTWARE\\Classes\\{0002DF01-0000-0000-C000-000000000046}",
-        "HKLM:\\SOFTWARE\\Classes\\{0002DF01-0000-0000-C000-000000000046}",
+        "HKLM\\SOFTWARE\\Classes\\{0002DF01-0000-0000-C000-000000000046}",
     ),
+    # Registry-Schlüssel dürfen fast alle Zeichen enthalten (Escaping übernimmt escaping.py); ohne
+    # Wurzel bleibt der Pfad relativ – ob das passt, prüft der Bereich des Bausteins
+    (ParamTyp.REGISTRY_PFAD, "HKLM:\\SOFTWARE\\a&b %PATH%", "HKLM\\SOFTWARE\\a&b %PATH%"),
+    (ParamTyp.REGISTRY_PFAD, "SOFTWARE\\Microsoft", "SOFTWARE\\Microsoft"),
 ]
 
 UNGUELTIG: list[tuple[ParamTyp, Any]] = [
@@ -244,10 +248,7 @@ UNGUELTIG: list[tuple[ParamTyp, Any]] = [
     (ParamTyp.DNSNAME, "__x.de"),
     (ParamTyp.DNSNAME, "x_.de"),
     (ParamTyp.DNSNAME, "$(id).de"),
-    (ParamTyp.REGISTRY_PFAD, "HKXY:\\Software"),
-    (ParamTyp.REGISTRY_PFAD, "SOFTWARE\\Microsoft"),
-    (ParamTyp.REGISTRY_PFAD, "HKLM:\\SOFTWARE\\%PATH%"),
-    (ParamTyp.REGISTRY_PFAD, "HKLM:\\SOFTWARE\\a&b"),
+    (ParamTyp.REGISTRY_PFAD, "HKLM:\\"),
     (ParamTyp.REGISTRY_PFAD, "HKLM:\\SOFTWARE\\\\Doppelt"),
     (ParamTyp.REGISTRY_PFAD, 'HKLM:\\SOFTWARE\\"x"'),
 ]
@@ -355,3 +356,103 @@ def test_ir_rueckweg(registry) -> None:
     ir = validiere_request(req, registry, autor="t", jetzt=FESTE_ZEIT)
     ir2 = validiere_request(ir_zu_request(ir, Ziel.ZSH), registry, autor="t", jetzt=FESTE_ZEIT)
     assert ir2.schritte == ir.schritte
+
+
+# --- Registry-Typen (Teil A) -----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("regtyp", "roh", "erwartet"),
+    [
+        ("REG_DWORD", "0", 0),
+        ("REG_DWORD", "2147483647", 2147483647),
+        ("REG_DWORD", "2147483648", 2147483648),
+        ("REG_DWORD", "4294967295", 4294967295),
+        ("REG_DWORD", "0xFFFFFFFF", 4294967295),
+        ("REG_DWORD", " 0x1f ", 31),
+        ("REG_QWORD", "18446744073709551615", 18446744073709551615),
+        ("REG_QWORD", "0x8000000000000000", 9223372036854775808),
+        ("REG_SZ", "C:\\Pfad\\", "C:\\Pfad\\"),
+        ("REG_EXPAND_SZ", "%SystemRoot%\\System32", "%SystemRoot%\\System32"),
+        ("REG_MULTI_SZ", "eins\r\nzwei\n\n", ["eins", "zwei"]),
+        ("REG_MULTI_SZ", ["a b", "c"], ["a b", "c"]),
+        ("REG_BINARY", "0A 1B, ff", "0a1bff"),
+        ("REG_BINARY", "hex:00,01", "0001"),
+    ],
+)
+def test_registry_daten_gueltig(regtyp: str, roh: Any, erwartet: Any) -> None:
+    from app.validation import registry_daten
+
+    assert registry_daten(roh, regtyp) == erwartet
+
+
+@pytest.mark.parametrize(
+    ("regtyp", "roh"),
+    [
+        ("REG_DWORD", "4294967296"),
+        ("REG_DWORD", "-1"),
+        ("REG_DWORD", "1.5"),
+        ("REG_DWORD", "0x"),
+        ("REG_QWORD", "18446744073709551616"),
+        ("REG_SZ", "x" * 4097),
+        ("REG_SZ", "a\u202eb"),
+        ("REG_MULTI_SZ", "a\\0b"),
+        ("REG_MULTI_SZ", "ok\na\x00b"),
+        ("REG_BINARY", "0a1"),
+        ("REG_BINARY", "zz"),
+        ("REG_BINARY", "00" * 4097),
+        ("REG_DWORD", True),
+    ],
+)
+def test_registry_daten_ungueltig(regtyp: str, roh: Any) -> None:
+    from app.validation import registry_daten
+
+    with pytest.raises(ValidierungsFehler):
+        registry_daten(roh, regtyp)
+
+
+@pytest.mark.parametrize(
+    ("typ", "roh", "erwartet"),
+    [
+        (ParamTyp.REGISTRY_PFAD, "HKEY_LOCAL_MACHINE\\SOFTWARE\\Firma\\", "HKLM\\SOFTWARE\\Firma"),
+        (ParamTyp.REGISTRY_PFAD, "hklm:\\Software\\Firma", "HKLM\\Software\\Firma"),
+        (ParamTyp.REGISTRY_PFAD, "Registry::HKEY_USERS\\.DEFAULT\\x", "HKU\\.DEFAULT\\x"),
+        (ParamTyp.REGISTRY_PFAD, "HKCC\\System", "HKCC\\System"),
+        (ParamTyp.REGISTRY_PFAD, "Software\\Firma (x86)\\a/b", "Software\\Firma (x86)\\a/b"),
+        (ParamTyp.REGISTRY_WERTNAME, "Pfad\\mit\\Backslash", "Pfad\\mit\\Backslash"),
+        (ParamTyp.REGISTRY_WERTNAME, "(Standard)", None),
+        (ParamTyp.REGISTRY_TYP, "dword", "REG_DWORD"),
+        (ParamTyp.REGISTRY_TYP, "reg_multi_sz", "REG_MULTI_SZ"),
+        (ParamTyp.REGISTRY_BEREICH, "alle_benutzer", "alle_benutzer"),
+    ],
+)
+def test_registry_typen_gueltig(typ: ParamTyp, roh: str, erwartet: Any) -> None:
+    p = ParameterDef(id="x", label="X", typ=typ, pflicht=False)
+    assert validiere_wert(p, roh).wert == erwartet
+
+
+@pytest.mark.parametrize(
+    ("typ", "roh"),
+    [
+        (ParamTyp.REGISTRY_PFAD, "HKLM"),
+        (ParamTyp.REGISTRY_PFAD, "HKLM\\a\\\\b"),
+        (ParamTyp.REGISTRY_PFAD, 'HKLM\\"x"'),
+        (ParamTyp.REGISTRY_PFAD, "HKLM\\" + "a" * 256),
+        (ParamTyp.REGISTRY_PFAD, "HKLM\\a\nb"),
+        (ParamTyp.REGISTRY_WERTNAME, 'a"b'),
+        (ParamTyp.REGISTRY_WERTNAME, "-x"),
+        (ParamTyp.REGISTRY_WERTNAME, "x" * 256),
+        (ParamTyp.REGISTRY_TYP, "REG_LINK"),
+        (ParamTyp.REGISTRY_BEREICH, "hkcu"),
+    ],
+)
+def test_registry_typen_ungueltig(typ: ParamTyp, roh: str) -> None:
+    with pytest.raises(ValidierungsFehler):
+        validiere_wert(ParameterDef(id="x", label="X", typ=typ), roh)
+
+
+def test_registry_feste_optionen() -> None:
+    p = ParameterDef(id="x", label="X", typ=ParamTyp.REGISTRY_TYP)
+    assert [o.wert for o in p.optionen][:3] == ["REG_SZ", "REG_EXPAND_SZ", "REG_DWORD"]
+    with pytest.raises(ValueError, match="feste Optionen"):
+        ParameterDef(id="x", label="X", typ=ParamTyp.REGISTRY_BEREICH, optionen=[Option(wert="a", label="a")])

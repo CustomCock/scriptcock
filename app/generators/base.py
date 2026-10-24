@@ -13,6 +13,7 @@ import unicodedata
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import ClassVar
 from urllib.parse import quote
 
@@ -46,7 +47,8 @@ from app.models.block import (
     RueckgabeTyp,
 )
 from app.registry import Registry
-from app.validation import ValidierungsFehler, pruefe_wert_fuer_ziel, registry_reg_form, verweis_teile
+from app.regschutz import lade_schutz
+from app.validation import ValidierungsFehler, pruefe_wert_fuer_ziel, registry_ps_form, verweis_teile
 
 
 class GenerierungsFehler(ValueError):
@@ -72,6 +74,9 @@ class SchrittInfo:
     koerper: list[str]
     pruefung: list[str]
     bestaetigen: bool  # rote Bestätigung im Script
+    risiko: Risiko  # Risiko des Schritts (kann höher sein als das des Blocks)
+    # Läuft vor der JA-Abfrage (nur bei bestaetigen; darf nichts ändern)
+    vorschau: list[str] = field(default_factory=list)
     # Nach erfolgreichem Schritt: Rückgabewerte normalisieren (außerhalb jeder Umleitung/Gruppe)
     nachher: list[str] = field(default_factory=list)
 
@@ -88,6 +93,21 @@ ZIEL_ANZEIGE = {
 }
 
 SIMULATION_PREFIX = "[SIMULATION] würde ausführen: "
+
+# Registry „wirkung“: je höher, desto mehr ist nötig, damit Änderungen greifen („unbekannt“ extra)
+WIRKUNG_RANG = {
+    "sofort": 0,
+    "explorer_neustart": 1,
+    "gpupdate": 2,
+    "abmelden": 3,
+    "neustart": 4,
+}
+# CMD, Bereich „angemeldeter Benutzer“: SID des einen angemeldeten Benutzers (Besitzer von explorer.exe)
+# zur Laufzeit ermitteln (hilfen/registry_benutzer.cmd). Kein/mehrere Benutzer oder keine Ausgabe →
+# Errorlevel 9 – Templates unterscheiden so „Benutzer nicht ermittelbar“ von „Wert fehlt“ (1).
+CMD_BENUTZER_ANFANG = (
+    (Path(__file__).parent / "hilfen" / "registry_benutzer.cmd").read_text(encoding="utf-8").rstrip("\n")
+)
 
 # Einheitliches Ausgabeformat aller Ziele (siehe docs/sicherheit.md bzw. CHANGELOG)
 LINIE_DOPPELT = "=" * 46
@@ -151,6 +171,8 @@ class Generator(ABC):
         # Ohne Verzweigung (Kommentar, Warten …) bleibt es bei „X von Y Schritten“.
         self.mit_kontrolle = ir.hat_verzweigung()
         self.hat_abbrechen = any(isinstance(k, Abbrechen) for k in alle_knoten(ir.schritte))
+        # Registry-Bausteine: Hilfsfunktionen, 64-Bit-Neustart und Hinweise in der Zusammenfassung
+        self.mit_registry = any(b.registry is not None for b in defs)
 
         zeilen: list[str] = []
         zeilen += self.kopf(ir, defs)
@@ -196,8 +218,12 @@ class Generator(ABC):
         self._nr += 1
         block = self.registry.bloecke[schritt.block_id]
         dry = self._ir.optionen.dry_run
+        risiko = schritt.risiko or block.risiko
         kontext = self.kontext(block, schritt, dry)
-        koerper = self.koerper(block, kontext, dry)
+        koerper = self.koerper(block, kontext, dry, risiko)
+        vorschau: list[str] = []
+        if risiko is Risiko.ROT and not dry and (block.id, "vorschau", self.ziel) in self.registry.vorlagen:
+            vorschau = self.rendere(block, "vorschau", kontext)
         pruefung: list[str] = []
         if not dry and (block.id, "pruefung", self.ziel) in self.registry.vorlagen:
             pruefung = self.rendere(block, "pruefung", kontext)
@@ -208,7 +234,9 @@ class Generator(ABC):
             fortschritt=self.fortschrittstext(block, schritt),
             koerper=koerper,
             pruefung=pruefung,
-            bestaetigen=block.risiko is Risiko.ROT and not dry,
+            bestaetigen=risiko is Risiko.ROT and not dry,
+            risiko=risiko,
+            vorschau=vorschau,
             nachher=[
                 z
                 for r in block.rueckgaben(self.ziel)
@@ -338,7 +366,12 @@ class Generator(ABC):
                     kontext[p.id] = escaping.leer()
                     continue
                 pruefe_wert_fuer_ziel(wert, self.ziel)
-                if p.typ is ParamTyp.VARIABLE and isinstance(wert.wert, str):
+                if p.typ is ParamTyp.REGISTRY_DATEN:
+                    regtyp = schritt.parameter.get(p.bezug or "typ")
+                    if regtyp is None or not isinstance(regtyp.wert, str):
+                        raise GenerierungsFehler(f"{block.name}: Registry-Typ fehlt.")
+                    kontext[p.id] = escaping.registry_daten(self.ziel, regtyp.wert, wert.wert)
+                elif p.typ is ParamTyp.VARIABLE and isinstance(wert.wert, str):
                     kontext[p.id] = escaping.variable_lesen(self.ziel, *verweis_teile(wert.wert))
                 elif isinstance(wert.wert, list):
                     kontext[p.id] = escaping.liste(self.ziel, wert.wert)
@@ -350,32 +383,85 @@ class Generator(ABC):
                     kontext[p.id] = escaping.literal(self.ziel, wert.wert)
             except (UnsicherError, ValidierungsFehler) as e:
                 raise GenerierungsFehler(f"{block.name} – {p.label}: {e}") from None
+        bereich = self._registry_bereich(block, schritt)
         for name, pid in block.abgeleitete_variablen().items():
             quelle = schritt.parameter.get(pid)
-            if quelle is None or not isinstance(quelle.wert, str):
+            if name.endswith("_abfrage"):
+                kontext[name] = self._registry_abfrage(block, schritt, pid)
+            elif quelle is None or not isinstance(quelle.wert, str):
                 kontext[name] = escaping.leer()
+            elif name.endswith("_reg") and self.ziel is Ziel.CMD and bereich == "angemeldeter_benutzer":
+                kontext[name] = escaping.registry_pfad_benutzer_cmd(quelle.wert)
             elif name.endswith("_reg"):
-                kontext[name] = escaping.literal(self.ziel, registry_reg_form(quelle.wert))
+                kontext[name] = escaping.literal(self.ziel, quelle.wert)
+            elif name.endswith("_ps"):
+                kontext[name] = escaping.literal(self.ziel, registry_ps_form(quelle.wert))
             else:
                 kontext[name] = escaping.literal(self.ziel, unc_zu_smb_url(quelle.wert))
         for r in block.rueckgaben(self.ziel):
             kontext[RUECKGABE_PRAEFIX + r.id] = escaping.variable_setzen(self.ziel, self._nr, r.id)
+        kontext.update(self._registry_kontext(block, schritt, bereich))
         kontext["whatif"] = escaping.vertraut(" -WhatIf" if dry and self.ziel is Ziel.POWERSHELL else "")
         # Linux/macOS: privilegierte Befehle laufen über okm_sudo (root: direkt, sonst sudo)
         kontext["sudo"] = escaping.vertraut("okm_sudo " if block.recht(self.ziel) is Recht.ROOT else "")
         return kontext
+
+    @staticmethod
+    def _registry_bereich(block: BlockDef, schritt: BlockSchritt) -> str | None:
+        for p in block.parameter:
+            if p.typ is ParamTyp.REGISTRY_BEREICH:
+                wert = schritt.parameter.get(p.id)
+                return wert.wert if wert is not None and isinstance(wert.wert, str) else None
+        return None
+
+    def _registry_abfrage(self, block: BlockDef, schritt: BlockSchritt, pid: str) -> Escaped:
+        quelle = schritt.parameter.get(pid)
+        param = block.param(pid)
+        regtyp = schritt.parameter.get(param.bezug or "typ") if param is not None else None
+        if quelle is None or quelle.wert is None or isinstance(quelle.wert, bool):
+            return escaping.leer()
+        if regtyp is None or not isinstance(regtyp.wert, str):
+            return escaping.leer()
+        return escaping.registry_abfrage(self.ziel, regtyp.wert, quelle.wert)
+
+    def _registry_kontext(
+        self, block: BlockDef, schritt: BlockSchritt, bereich: str | None
+    ) -> dict[str, Escaped]:
+        """Eingebaute Variablen für Registry-Bausteine (nur vom Generator erzeugter Code)."""
+        anfang, ende = escaping.leer(), escaping.leer()
+        if self.ziel is Ziel.CMD and block.registry is not None:
+            if bereich == "angemeldeter_benutzer":
+                anfang, ende = escaping.vertraut(CMD_BENUTZER_ANFANG), escaping.vertraut(")")
+            else:
+                anfang, ende = escaping.vertraut("("), escaping.vertraut(")")
+        wirkung = schritt.parameter.get("wirkung")
+        name = wirkung.wert if wirkung is not None and isinstance(wirkung.wert, str) else ""
+        # findstr /l liest "\" als Escape → verdoppeln; Schlüssel selbst ("…]") und alles darunter ("…\")
+        muster = " ".join(
+            f'/c:"HKEY_LOCAL_MACHINE\\\\{rest}{ende}"'
+            for teile in lade_schutz().gesperrt
+            if teile and teile[0] == "hklm"
+            for rest in ["\\\\".join(x.upper() for x in teile[1:])]
+            for ende in ("]", "\\\\")
+        )
+        return {
+            "benutzer_anfang": anfang,
+            "benutzer_ende": ende,
+            "wirkung_rang": escaping.zahl(WIRKUNG_RANG.get(name, 0)),
+            "regschutz_cmd": escaping.vertraut(muster) if self.ziel is Ziel.CMD else escaping.leer(),
+        }
 
     def rendere(self, block: BlockDef, art: str, kontext: dict[str, Escaped]) -> list[str]:
         vorlage = self.registry.vorlagen[(block.id, art, self.ziel)]
         code = vorlage.render(**kontext)
         return [z.rstrip() for z in code.strip("\n").splitlines()]
 
-    def koerper(self, block: BlockDef, kontext: dict[str, Escaped], dry: bool) -> list[str]:
+    def koerper(self, block: BlockDef, kontext: dict[str, Escaped], dry: bool, risiko: Risiko) -> list[str]:
         if not dry:
             return self.rendere(block, "ziele", kontext)
         if (block.id, "dry_run", self.ziel) in self.registry.vorlagen:
             return self.rendere(block, "dry_run", kontext)
-        if block.risiko is Risiko.GRUEN:
+        if risiko is Risiko.GRUEN:
             return self.rendere(block, "ziele", kontext)
         if "whatif" in self.registry.variablen[(block.id, "ziele", self.ziel)]:
             return self.rendere(block, "ziele", kontext)
@@ -456,7 +542,8 @@ class Generator(ABC):
                     b = self.registry.bloecke[kn.block_id]
                     admin = f", {self.rechte_name}" if b.braucht_admin(self.ziel) else ""
                     zeilen.append(
-                        " " * einzug + f"{next(zaehler):>2}. {k(b.name)} [Risiko: {b.risiko.value}{admin}]"
+                        " " * einzug
+                        + f"{next(zaehler):>2}. {k(b.name)} [Risiko: {(kn.risiko or b.risiko).value}{admin}]"
                     )
 
         liste(ir.schritte, 2)

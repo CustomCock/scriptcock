@@ -1,0 +1,126 @@
+id: registry_wert_setzen
+version: 1
+name: Registry-Wert setzen
+kategorie: Registry
+beschreibung: 'Setzt einen Registry-Wert: legt fehlende Schlüssel an, protokolliert den alten Wert, sichert vorher
+  (Rückgängig-Datei) und prüft danach durch Zurücklesen.'
+hilfe: 'Gleicher Inhalt → es wird nichts geschrieben. Anderer Typ → der Wert wird gelöscht und neu angelegt (steht
+  im Protokoll). Unter HKLM\SYSTEM und …\Policies\… ist der Schritt rot.
+
+  CMD: nur Bereiche Computer und Angemeldeter Benutzer, ohne „nachfragen“; die Rückgängig-Datei gibt es dort nur
+  für schon vorhandene Schlüssel.'
+risiko: gelb
+registry: schreiben
+fortschritt: 'Registry: {{ pfad }} {{ wertname }} wird gesetzt'
+tipp: Zugriff verweigert? Manche Schlüssel gehören TrustedInstaller – die werden bewusst nicht angefasst. Stimmt
+  der Bereich (Computer oder Benutzer)?
+rechte:
+  powershell: admin
+  cmd: admin
+parameter:
+- id: bereich
+  label: Wessen Registry?
+  typ: registry_bereich
+  standard: computer
+  hilfe: 'Computer = HKLM. Für Benutzer-Einstellungen nie HKCU direkt: nach dem Admin-Neustart wäre das das Profil
+    des Admin-Kontos. Darum hier den Benutzer wählen.'
+- id: pfad
+  label: Schlüssel
+  typ: registry_pfad
+  bezug: bereich
+  beispiel: HKLM\SOFTWARE\Firma\App
+  hilfe: 'Computer: HKLM\…. Benutzer-Bereiche: Software\… (ohne Wurzel) oder HKCU\…. Schreibweisen wie HKLM:\… oder
+    HKEY_LOCAL_MACHINE\… gehen auch.'
+- id: wertname
+  label: Wertname (leer = Standardwert)
+  typ: registry_wertname
+  pflicht: false
+- id: typ
+  label: Typ
+  typ: registry_typ
+  standard: REG_DWORD
+- id: daten
+  label: Daten
+  typ: registry_daten
+  beispiel: '1'
+  hilfe: 'DWORD/QWORD: Zahl (dezimal oder 0x…). MULTI_SZ: eine Zeile pro Eintrag. BINARY: Hex-Bytes, z. B. 0a 1b
+    ff. EXPAND_SZ: %Variablen% bleiben unaufgelöst.'
+- id: wenn_vorhanden
+  label: Wenn der Wert schon da ist
+  typ: auswahl
+  standard: ueberschreiben
+  optionen:
+  - wert: ueberschreiben
+    label: überschreiben
+  - wert: nur_wenn_fehlt
+    label: nicht anfassen (nur setzen, wenn er fehlt)
+  - wert: abbrechen
+    label: Schritt abbrechen
+  - wert: nachfragen
+    label: nachfragen (nur PowerShell)
+- id: ansicht
+  label: Registry-Ansicht
+  typ: auswahl
+  standard: '64'
+  optionen:
+  - wert: '64'
+    label: 64-Bit (Standard)
+  - wert: '32'
+    label: 32-Bit (WOW6432Node, für 32-Bit-Programme)
+- id: wirkung
+  label: Wann wirkt die Änderung?
+  typ: auswahl
+  standard: sofort
+  optionen:
+  - wert: sofort
+    label: sofort
+  - wert: explorer_neustart
+    label: nach Neustart des Explorers
+  - wert: abmelden
+    label: nach Ab- und Anmelden
+  - wert: neustart
+    label: nach Neustart des Rechners
+  - wert: gpupdate
+    label: nach gpupdate
+  - wert: unbekannt
+    label: unbekannt
+rueckgabe:
+- id: geaendert
+  typ: ja_nein
+  beschreibung: Mindestens ein Wert wurde tatsächlich geändert
+  ziele:
+  - powershell
+ziele:
+  powershell: |
+    {{ rueckgabe_geaendert }} = Set-OkmRegistryWert -Bereich {{ bereich }} -Pfad {{ pfad }} -Name {% if wertname %}{{ wertname }}{% else %}''{% endif %} -Typ {{ typ }} -Daten {{ daten }} -WennVorhanden {{ wenn_vorhanden }} -Ansicht {{ ansicht }}
+    if ({{ rueckgabe_geaendert }}) { Add-OkmWirkung {{ wirkung }} }
+  cmd: |
+    {% if wenn_vorhanden.wert == 'nachfragen' %}
+    echo „Nachfragen“ gibt es nur in PowerShell - bitte eine andere Einstellung wählen.
+    cmd /c exit 1
+    {% else %}
+    if not exist "%OKM_REG_SICHERUNG%\" mkdir "%OKM_REG_SICHERUNG%"
+    {{ benutzer_anfang }}
+      reg query {{ pfad_reg }} {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %} >nul 2>&1 && reg export {{ pfad_reg }} "%OKM_REG_SICHERUNG%\%RANDOM%.reg" /y {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %} >nul
+      reg query {{ pfad_reg }} {% if wertname %}/v {{ wertname }}{% else %}/ve{% endif %} {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %} >nul 2>&1
+      if errorlevel 1 (
+        echo vorher: nicht vorhanden
+        reg add {{ pfad_reg }} {% if wertname %}/v {{ wertname }}{% else %}/ve{% endif %} /t {{ typ }} /d {{ daten }} /f {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %}
+      ) else (
+        echo vorher:
+        reg query {{ pfad_reg }} {% if wertname %}/v {{ wertname }}{% else %}/ve{% endif %} {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %}
+    {% if wenn_vorhanden.wert == 'nur_wenn_fehlt' %}
+        echo Bereits vorhanden, nicht geändert.
+    {% elif wenn_vorhanden.wert == 'abbrechen' %}
+        echo Bereits vorhanden - laut Einstellung wird abgebrochen.
+        cmd /c exit 1
+    {% else %}
+        reg add {{ pfad_reg }} {% if wertname %}/v {{ wertname }}{% else %}/ve{% endif %} /t {{ typ }} /d {{ daten }} /f {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %}
+    {% endif %}
+      )
+    {{ benutzer_ende }}
+    {% if wirkung.wert == 'unbekannt' %}if not errorlevel 1 set OKM_WIRKUNG_UNBEKANNT=1{% else %}if not errorlevel 1 if {{ wirkung_rang }} GTR %OKM_WIRKUNG% set OKM_WIRKUNG={{ wirkung_rang }}{% endif %}
+    {% endif %}
+dry_run:
+  powershell: |
+    $null = Set-OkmRegistryWert -Bereich {{ bereich }} -Pfad {{ pfad }} -Name {% if wertname %}{{ wertname }}{% else %}''{% endif %} -Typ {{ typ }} -Daten {{ daten }} -WennVorhanden {{ wenn_vorhanden }} -Ansicht {{ ansicht }} -Simulation

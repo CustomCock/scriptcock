@@ -21,12 +21,14 @@ from app.ir import (
     FuerJeden,
     Knoten,
     Kommentar,
+    ParamValue,
     ScriptIR,
     Warten,
     Wenn,
     WennFehler,
     Wiederhole,
 )
+from app.models.block import ParamTyp
 from app.registry import Registry
 from app.service import Benutzer
 from app.validation import FehlerSammlung, Feldfehler, ValidierungsFehler
@@ -256,14 +258,21 @@ class Wiederherstellung:
     hinweise: list[str]
 
 
-def _als_text(wert: str | int | bool | list[str | int] | None) -> str | None:
+def _als_text(wert: str | int | bool | list[str | int] | None, trenner: str = ", ") -> str | None:
     if wert is None:
         return None
     if isinstance(wert, bool):
         return "true" if wert else "false"
     if isinstance(wert, list):
-        return ", ".join(str(w) for w in wert)
+        return trenner.join(str(w) for w in wert)
     return str(wert)
+
+
+def _trenner(pv: ParamValue, blockly: bool) -> str:
+    """REG_MULTI_SZ: im Formular eine Zeile pro Eintrag, in Blockly (einzeilig) mit „ | “."""
+    if pv.typ is ParamTyp.REGISTRY_DATEN:
+        return " | " if blockly else "\n"
+    return ", "
 
 
 def wiederherstellen(registry: Registry, eintrag: GespeichertesScript) -> Wiederherstellung:
@@ -301,7 +310,7 @@ def wiederherstellen(registry: Registry, eintrag: GespeichertesScript) -> Wieder
             if block.param(pid) is None:
                 hinweise.append(f"Schritt {nr}: Den Parameter „{pid}“ gibt es bei „{block.name}“ nicht mehr.")
                 continue
-            text = _als_text(pv.wert)
+            text = _als_text(pv.wert, _trenner(pv, blockly=False))
             if text is not None:
                 werte[pid] = text
         schritte.append((block.id, werte))
@@ -381,7 +390,8 @@ def baum_wiederherstellen(
         werte = {
             pid: SCHLEIFENWERT_BLOCKLY if pv.schleife else text
             for pid, pv in k.parameter.items()
-            if block.param(pid) is not None and (text := _als_text(pv.wert)) is not None
+            if block.param(pid) is not None
+            and (text := _als_text(pv.wert, _trenner(pv, blockly=True))) is not None
         }
         return {"art": "block", "block_id": block.id, "parameter": werte}
 

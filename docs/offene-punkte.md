@@ -46,8 +46,6 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 | `rechner_umbenennen` | powershell/cmd | In einer Domäne braucht `Rename-Computer` Domänen-Anmeldedaten – dann schlägt der Schritt mit Meldung fehl. |
 | `zeit_sync` | bash | Nutzt `chronyc makestep`, sonst `timedatectl set-ntp` + Neustart von `systemd-timesyncd`; andere NTP-Dienste (ntpd) nicht abgedeckt. |
 | `zeit_sync`, `zeitzone_setzen`, `rechner_umbenennen` | zsh | `sntp`, `systemsetup`, `scutil` nur mit Attrappen getestet. |
-| `registry_lesen`, `registry_backup`, `registry_setzen` | powershell/cmd | Nur unter Windows sinnvoll, unter Linux nur Syntax/Lint geprüft. 32-/64-Bit-Ansicht (WOW6432Node) wird nicht gesondert behandelt. CMD legt die Sicherung als `okm-registry-<Zufallszahl>.reg` im TEMP-Ordner ab. |
-| `registry_setzen` | powershell/cmd | Fehlende Schlüssel werden ohne Sicherung angelegt (es gibt nichts zu sichern); wer sie wieder loswerden will, muss sie von Hand löschen. |
 | `dns_abfrage` | powershell/cmd | `Resolve-DnsName` gibt es unter Linux nicht – nur Syntax geprüft. CMD (`nslookup`) liefert keinen Rückgabewert. |
 | `http_check` | cmd | Nutzt `curl.exe` (ab Windows 10 1803); kein Statuscode als Rückgabe, nur „erreichbar“. Proxy-Einstellungen des Systems werden nicht übernommen. |
 | `ports_pruefen` | cmd | Gibt es für CMD nicht (kein Bordmittel). |
@@ -69,6 +67,10 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 | `netzwerkadapter_neustarten` | alle | Nur mit Attrappen getestet. Linux braucht NetworkManager (`nmcli`); `networking off` trennt **alle** Verbindungen. macOS: `ifconfig down/up` – bei WLAN ggf. erneute Anmeldung nötig. |
 | `office_schnellreparatur` | powershell | Nur Klick-und-Los-Office; Aufruf von `OfficeClickToRun.exe` (Parameter, Exit-Codes) auf Win 11 mit Microsoft 365 prüfen. Für CMD gibt es den Baustein nicht. |
 | Rezept „Neuer Arbeitsplatz“ | zsh | Mischt einen root-Baustein (Umbenennen über sudo) mit Homebrew (nie root) – auf echtem macOS durchspielen. |
+| Registry-Bausteine | powershell/cmd | Unter Linux nur Text/Syntax/PSSA und die reinen Hilfsfunktionen geprüft – echte Registry-Zugriffe laufen erst im Windows-CI-Job (Teil F). |
+| Registry, Bereich „angemeldeter Benutzer“ | powershell/cmd | Mit UAC und **fremdem** Admin-Konto auf echter VM prüfen (Ziel: HKU\<SID> des Benutzers, nicht das Admin-Profil). RDP mit mehreren Sitzungen → Abbruch. `Software\Classes` des Benutzers liegt in `UsrClass.dat` (`HKU\<SID>_Classes`) und wird nicht abgedeckt. |
+| Registry, „Alle Benutzerprofile“/„Standardprofil“ | powershell | Laden/Entladen nicht angemeldeter `NTUSER.DAT` nur auf echter VM prüfbar; Rückgängig-Dateien dieser Profile verweisen auf `HKU\OkmTemp_…` und gehen nur, wenn das Profil wieder so geladen ist. |
+| Registry, CMD | cmd | Rückgängig-Datei nur für schon vorhandene Schlüssel (neu angelegte Schlüssel werden nicht vermerkt). `registry_pruefen` vergleicht per `findstr` – bei Daten mit Sonderzeichen/Umlauten unzuverlässiger als PowerShell. `registry_import` sichert Schlüssel mit Umlauten im Namen ggf. nicht (Umweg über `type`/`findstr`). „Nachfragen“ gibt es nur in PowerShell. |
 | alle Datei-Bausteine aus Paket 1 | powershell/cmd | Unter Linux nur Syntax/Lint geprüft (Windows-Pfade), auf Win 11 ausführen. |
 | alle | powershell/cmd | Ausführen-Checkliste (`docs/test-vms.md`, Abschnitt 4): alle Windows-Zellen (Doppelklick/„Mit PowerShell ausführen“, UAC angefordert/abgelehnt, Konsole UTF-8, Fenster bleibt offen) sind noch **nicht** auf Win 11 geprüft. |
 | alle | bash/zsh | Checkliste bisher nur im Linux-Container mit Attrappen (`ping`, `sudo`); auf Debian 12 und echtem macOS (Terminal.app, echtes sudo) wiederholen. |

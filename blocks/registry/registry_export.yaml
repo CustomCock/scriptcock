@@ -1,0 +1,53 @@
+id: registry_export
+version: 1
+name: Registry-Schlüssel exportieren
+kategorie: Registry
+beschreibung: Sichert einen Schlüssel samt Unterschlüsseln als .reg-Datei (reg export). Zurück per Doppelklick auf
+  die Datei.
+hilfe: Ohne Zieldatei landet die Sicherung im TEMP-Ordner. Bei mehreren Profilen bekommt jede Datei eine Nummer.
+risiko: gruen
+registry: lesen
+fortschritt: 'Registry: {{ pfad }} wird exportiert'
+tipp: Gibt es den Schlüssel, und darf in den Zielordner geschrieben werden?
+rechte:
+  powershell: admin
+  cmd: admin
+parameter:
+- id: bereich
+  label: Wessen Registry?
+  typ: registry_bereich
+  standard: computer
+  hilfe: 'Computer = HKLM. Für Benutzer-Einstellungen nie HKCU direkt: nach dem Admin-Neustart wäre das das Profil
+    des Admin-Kontos. Darum hier den Benutzer wählen.'
+- id: pfad
+  label: Schlüssel
+  typ: registry_pfad
+  bezug: bereich
+  beispiel: HKLM\SOFTWARE\Firma\App
+  hilfe: 'Computer: HKLM\…. Benutzer-Bereiche: Software\… (ohne Wurzel) oder HKCU\…. Schreibweisen wie HKLM:\… oder
+    HKEY_LOCAL_MACHINE\… gehen auch.'
+- id: datei
+  label: Zieldatei .reg (optional)
+  typ: pfad
+  pflicht: false
+- id: ansicht
+  label: Registry-Ansicht
+  typ: auswahl
+  standard: '64'
+  optionen:
+  - wert: '64'
+    label: 64-Bit (Standard)
+  - wert: '32'
+    label: 32-Bit (WOW6432Node, für 32-Bit-Programme)
+ziele:
+  powershell: |
+    Export-OkmRegistrySchluessel -Bereich {{ bereich }} -Pfad {{ pfad }} -Datei {% if datei %}{{ datei }}{% else %}''{% endif %} -Ansicht {{ ansicht }}
+  cmd: |
+    {{ benutzer_anfang }}
+      reg export {{ pfad_reg }} {% if datei %}{{ datei }}{% else %}"%TEMP%\okm-registry-%OKM_TS%.reg"{% endif %} /y {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %}
+    {{ benutzer_ende }}
+    {% if datei %}
+    if not errorlevel 1 echo Gesichert nach {{ datei }}
+    {% else %}
+    if not errorlevel 1 echo Gesichert nach %TEMP%\okm-registry-%OKM_TS%.reg
+    {% endif %}

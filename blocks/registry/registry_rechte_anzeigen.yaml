@@ -1,0 +1,38 @@
+id: registry_rechte_anzeigen
+version: 1
+name: Registry-Rechte anzeigen
+kategorie: Registry
+beschreibung: Zeigt Besitzer und Zugriffsrechte (ACL) eines Registry-Schlüssels – z. B. wenn ein Schreibversuch
+  mit „Zugriff verweigert“ scheitert.
+risiko: gruen
+registry: lesen
+fortschritt: 'Registry: Rechte von {{ pfad }}'
+tipp: Stimmt der Pfad?
+rechte:
+  powershell: admin
+parameter:
+- id: bereich
+  label: Wessen Registry?
+  typ: registry_bereich
+  standard: computer
+  hilfe: 'Computer = HKLM. Für Benutzer-Einstellungen nie HKCU direkt: nach dem Admin-Neustart wäre das das Profil
+    des Admin-Kontos. Darum hier den Benutzer wählen.'
+- id: pfad
+  label: Schlüssel
+  typ: registry_pfad
+  bezug: bereich
+  beispiel: HKLM\SOFTWARE\Firma\App
+  hilfe: 'Computer: HKLM\…. Benutzer-Bereiche: Software\… (ohne Wurzel) oder HKCU\…. Schreibweisen wie HKLM:\… oder
+    HKEY_LOCAL_MACHINE\… gehen auch.'
+- id: ansicht
+  label: Registry-Ansicht
+  typ: auswahl
+  standard: '64'
+  optionen:
+  - wert: '64'
+    label: 64-Bit (Standard)
+  - wert: '32'
+    label: 32-Bit (WOW6432Node, für 32-Bit-Programme)
+ziele:
+  powershell: |
+    Show-OkmRegistryRechte -Bereich {{ bereich }} -Pfad {{ pfad }} -Ansicht {{ ansicht }}

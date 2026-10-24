@@ -1,0 +1,87 @@
+id: registry_wert_loeschen
+version: 1
+name: Registry-Wert löschen
+kategorie: Registry
+beschreibung: Löscht einen einzelnen Registry-Wert. Vorher wird der Schlüssel gesichert (Rückgängig-Datei). Fehlt
+  der Wert, gibt es nichts zu tun.
+risiko: rot
+registry: wert_loeschen
+fortschritt: 'Registry: {{ pfad }} {{ wertname }} wird gelöscht'
+tipp: Zugriff verweigert? Manche Schlüssel gehören TrustedInstaller und werden bewusst nicht angefasst.
+rechte:
+  powershell: admin
+  cmd: admin
+parameter:
+- id: bereich
+  label: Wessen Registry?
+  typ: registry_bereich
+  standard: computer
+  hilfe: 'Computer = HKLM. Für Benutzer-Einstellungen nie HKCU direkt: nach dem Admin-Neustart wäre das das Profil
+    des Admin-Kontos. Darum hier den Benutzer wählen.'
+- id: pfad
+  label: Schlüssel
+  typ: registry_pfad
+  bezug: bereich
+  beispiel: HKLM\SOFTWARE\Firma\App
+  hilfe: 'Computer: HKLM\…. Benutzer-Bereiche: Software\… (ohne Wurzel) oder HKCU\…. Schreibweisen wie HKLM:\… oder
+    HKEY_LOCAL_MACHINE\… gehen auch.'
+- id: wertname
+  label: Wertname (leer = Standardwert)
+  typ: registry_wertname
+  pflicht: false
+- id: ansicht
+  label: Registry-Ansicht
+  typ: auswahl
+  standard: '64'
+  optionen:
+  - wert: '64'
+    label: 64-Bit (Standard)
+  - wert: '32'
+    label: 32-Bit (WOW6432Node, für 32-Bit-Programme)
+- id: wirkung
+  label: Wann wirkt die Änderung?
+  typ: auswahl
+  standard: sofort
+  optionen:
+  - wert: sofort
+    label: sofort
+  - wert: explorer_neustart
+    label: nach Neustart des Explorers
+  - wert: abmelden
+    label: nach Ab- und Anmelden
+  - wert: neustart
+    label: nach Neustart des Rechners
+  - wert: gpupdate
+    label: nach gpupdate
+  - wert: unbekannt
+    label: unbekannt
+vorschau:
+  powershell: |
+    $null = Get-OkmRegistryWert -Bereich {{ bereich }} -Pfad {{ pfad }} -Name {% if wertname %}{{ wertname }}{% else %}''{% endif %} -Ansicht {{ ansicht }}
+  cmd: |
+    {{ benutzer_anfang }}
+      reg query {{ pfad_reg }} {% if wertname %}/v {{ wertname }}{% else %}/ve{% endif %} {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %}
+    {{ benutzer_ende }}
+    if errorlevel 9 (
+      cmd /c exit 1
+    ) else cmd /c exit 0
+ziele:
+  powershell: |
+    Remove-OkmRegistryWert -Bereich {{ bereich }} -Pfad {{ pfad }} -Name {% if wertname %}{{ wertname }}{% else %}''{% endif %} -Ansicht {{ ansicht }}
+    Add-OkmWirkung {{ wirkung }}
+  cmd: |
+    if not exist "%OKM_REG_SICHERUNG%\" mkdir "%OKM_REG_SICHERUNG%"
+    {{ benutzer_anfang }}
+      reg query {{ pfad_reg }} {% if wertname %}/v {{ wertname }}{% else %}/ve{% endif %} {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %} >nul 2>&1
+      if errorlevel 1 (
+        echo Nicht vorhanden - nichts zu tun.
+        cmd /c exit 0
+      ) else (
+        reg export {{ pfad_reg }} "%OKM_REG_SICHERUNG%\%RANDOM%.reg" /y {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %} >nul
+        reg delete {{ pfad_reg }} {% if wertname %}/v {{ wertname }}{% else %}/ve{% endif %} /f {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %}
+      )
+    {{ benutzer_ende }}
+    {% if wirkung.wert == 'unbekannt' %}if not errorlevel 1 set OKM_WIRKUNG_UNBEKANNT=1{% else %}if not errorlevel 1 if {{ wirkung_rang }} GTR %OKM_WIRKUNG% set OKM_WIRKUNG={{ wirkung_rang }}{% endif %}
+dry_run:
+  powershell: |
+    Remove-OkmRegistryWert -Bereich {{ bereich }} -Pfad {{ pfad }} -Name {% if wertname %}{{ wertname }}{% else %}''{% endif %} -Ansicht {{ ansicht }} -Simulation

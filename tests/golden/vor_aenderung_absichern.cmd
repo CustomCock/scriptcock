@@ -8,10 +8,10 @@ rem Erstellt von:      pytest
 rem Erstellt am:       15.01.2026 09:30:00
 rem Baukasten-Version: 0.1.0
 rem Zielsystem:        Windows Eingabeaufforderung (CMD)
-rem Benötigte Rechte:  Administrator (Schritt 1)
+rem Benötigte Rechte:  Administrator (Schritt 1, 2)
 rem Enthaltene Schritte:
 rem    1. Wiederherstellungspunkt anlegen [Risiko: gelb, Admin]
-rem    2. Registry-Schlüssel sichern [Risiko: gelb]
+rem    2. Registry-Schlüssel exportieren [Risiko: gruen, Admin]
 rem
 rem Generiert mit dem okm Script-Baukasten
 rem ======================================================================
@@ -28,6 +28,11 @@ set "OKM_RC=0"
 rem /nopause: am Ende nicht auf eine Taste warten (Fernwartung/RMM)
 if /i "%~1"=="/nopause" set "OKM_KEINE_PAUSE=1"
 set "OKM_TIPP="
+rem Registry: Rückgängig-Dateien (reg export) landen hier
+set "OKM_REG_SICHERUNG=%TEMP%\okm-registry-backup-%OKM_TS%"
+rem Registry: was nötig ist, damit Änderungen wirken (Rang, siehe Zusammenfassung)
+set "OKM_WIRKUNG=0"
+set "OKM_WIRKUNG_UNBEKANNT="
 echo(==============================================
 >>"%OKM_LOG%" echo(==============================================
 echo( okm Script-Baukasten · Vor riskanter Änderung absichern
@@ -37,7 +42,7 @@ echo( Erstellt: 15.01.2026 09:30 · von pytest
 echo(==============================================
 >>"%OKM_LOG%" echo(==============================================
 
-rem Rechte: Administrator für Schritt 1 (Wiederherstellungspunkt anlegen)
+rem Rechte: Administrator für Schritt 1 (Wiederherstellungspunkt anlegen), Schritt 2 (Registry-Schlüssel exportieren)
 net session >nul 2>&1
 if errorlevel 1 goto :okm_rechte_anfordern
 echo(Rechte: als Administrator gestartet
@@ -64,16 +69,17 @@ echo(      OK
 >>"%OKM_LOG%" echo(      OK
 
 rem --------------------------------------------------------------------
-rem Schritt 2/2: Registry-Schlüssel sichern (Risiko: gelb)
+rem Schritt 2/2: Registry-Schlüssel exportieren (Risiko: gruen)
 rem --------------------------------------------------------------------
 set "OKM_SCHRITT=2"
 set "OKM_TIPP=Gibt es den Schlüssel, und darf in den Zielordner geschrieben werden?"
-echo([2/2] Registry HKCU:\Software\Microsoft\Office wird gesichert ...
->>"%OKM_LOG%" echo([2/2] Registry HKCU:\Software\Microsoft\Office wird gesichert ...
+echo([2/2] Registry: HKLM\SOFTWARE\Microsoft\Office wird exportiert ...
+>>"%OKM_LOG%" echo([2/2] Registry: HKLM\SOFTWARE\Microsoft\Office wird exportiert ...
 (call )
 (
-reg export "HKCU\Software\Microsoft\Office" "%TEMP%\okm-registry-%RANDOM%.reg" /y
-if not errorlevel 1 echo Sicherung im TEMP-Ordner: okm-registry-*.reg
+(
+  reg export "HKLM\SOFTWARE\Microsoft\Office" "%TEMP%\okm-registry-%OKM_TS%.reg" /y /reg:64)
+if not errorlevel 1 echo Gesichert nach %TEMP%\okm-registry-%OKM_TS%.reg
 ) >"%OKM_TMP%" 2>&1
 set "OKM_RC=%ERRORLEVEL%"
 type "%OKM_TMP%"
@@ -87,6 +93,12 @@ echo(----------------------------------------------
 >>"%OKM_LOG%" echo(----------------------------------------------
 echo( Fertig: %OKM_OK% von %OKM_GESAMT% Schritten erfolgreich.
 >>"%OKM_LOG%" echo( Fertig: %OKM_OK% von %OKM_GESAMT% Schritten erfolgreich.
+if exist "%OKM_REG_SICHERUNG%\" echo( Rückgängig machen: die .reg-Dateien in %OKM_REG_SICHERUNG% doppelklicken.
+if "%OKM_WIRKUNG%"=="1" echo( Damit die Änderungen wirken: Explorer neu starten
+if "%OKM_WIRKUNG%"=="2" echo( Damit die Änderungen wirken: Gruppenrichtlinien aktualisieren (gpupdate)
+if "%OKM_WIRKUNG%"=="3" echo( Damit die Änderungen wirken: neu anmelden
+if "%OKM_WIRKUNG%"=="4" echo( Damit die Änderungen wirken: Rechner neu starten
+if defined OKM_WIRKUNG_UNBEKANNT echo( Ob alle Änderungen sofort wirken, ist offen - im Zweifel neu anmelden.
 echo( Protokoll: "%OKM_LOG%"
 >>"%OKM_LOG%" echo( Protokoll: "%OKM_LOG%"
 echo(----------------------------------------------
@@ -107,6 +119,12 @@ echo( Abgebrochen bei Schritt %OKM_SCHRITT% von %OKM_GESAMT%.
 >>"%OKM_LOG%" echo( Abgebrochen bei Schritt %OKM_SCHRITT% von %OKM_GESAMT%.
 echo( Erfolgreich bis dahin: %OKM_OK% von %OKM_GESAMT% Schritten.
 >>"%OKM_LOG%" echo( Erfolgreich bis dahin: %OKM_OK% von %OKM_GESAMT% Schritten.
+if exist "%OKM_REG_SICHERUNG%\" echo( Rückgängig machen: die .reg-Dateien in %OKM_REG_SICHERUNG% doppelklicken.
+if "%OKM_WIRKUNG%"=="1" echo( Damit die Änderungen wirken: Explorer neu starten
+if "%OKM_WIRKUNG%"=="2" echo( Damit die Änderungen wirken: Gruppenrichtlinien aktualisieren (gpupdate)
+if "%OKM_WIRKUNG%"=="3" echo( Damit die Änderungen wirken: neu anmelden
+if "%OKM_WIRKUNG%"=="4" echo( Damit die Änderungen wirken: Rechner neu starten
+if defined OKM_WIRKUNG_UNBEKANNT echo( Ob alle Änderungen sofort wirken, ist offen - im Zweifel neu anmelden.
 echo( Protokoll: "%OKM_LOG%"
 >>"%OKM_LOG%" echo( Protokoll: "%OKM_LOG%"
 echo(----------------------------------------------
@@ -121,6 +139,12 @@ echo(----------------------------------------------
 >>"%OKM_LOG%" echo(----------------------------------------------
 echo( Abgebrochen durch Benutzer. Es wurde nichts weiter ausgeführt.
 >>"%OKM_LOG%" echo( Abgebrochen durch Benutzer. Es wurde nichts weiter ausgeführt.
+if exist "%OKM_REG_SICHERUNG%\" echo( Rückgängig machen: die .reg-Dateien in %OKM_REG_SICHERUNG% doppelklicken.
+if "%OKM_WIRKUNG%"=="1" echo( Damit die Änderungen wirken: Explorer neu starten
+if "%OKM_WIRKUNG%"=="2" echo( Damit die Änderungen wirken: Gruppenrichtlinien aktualisieren (gpupdate)
+if "%OKM_WIRKUNG%"=="3" echo( Damit die Änderungen wirken: neu anmelden
+if "%OKM_WIRKUNG%"=="4" echo( Damit die Änderungen wirken: Rechner neu starten
+if defined OKM_WIRKUNG_UNBEKANNT echo( Ob alle Änderungen sofort wirken, ist offen - im Zweifel neu anmelden.
 echo( Protokoll: "%OKM_LOG%"
 >>"%OKM_LOG%" echo( Protokoll: "%OKM_LOG%"
 echo(----------------------------------------------
@@ -131,8 +155,8 @@ endlocal
 exit /b 2
 
 :okm_rechte_anfordern
-echo(Dieses Script braucht Administratorrechte für: Schritt 1 ^(Wiederherstellungspunkt anlegen^).
->>"%OKM_LOG%" echo(Dieses Script braucht Administratorrechte für: Schritt 1 ^(Wiederherstellungspunkt anlegen^).
+echo(Dieses Script braucht Administratorrechte für: Schritt 1 ^(Wiederherstellungspunkt anlegen^), Schritt 2 ^(Registry-Schlüssel exportieren^).
+>>"%OKM_LOG%" echo(Dieses Script braucht Administratorrechte für: Schritt 1 ^(Wiederherstellungspunkt anlegen^), Schritt 2 ^(Registry-Schlüssel exportieren^).
 echo(Es wird jetzt mit Administratorrechten neu gestartet ^(Windows fragt gleich nach^).
 >>"%OKM_LOG%" echo(Es wird jetzt mit Administratorrechten neu gestartet ^(Windows fragt gleich nach^).
 set "OKM_SELBST=%~f0"
@@ -150,6 +174,12 @@ echo(----------------------------------------------
 >>"%OKM_LOG%" echo(----------------------------------------------
 echo( Abgebrochen: fehlende Administratorrechte.
 >>"%OKM_LOG%" echo( Abgebrochen: fehlende Administratorrechte.
+if exist "%OKM_REG_SICHERUNG%\" echo( Rückgängig machen: die .reg-Dateien in %OKM_REG_SICHERUNG% doppelklicken.
+if "%OKM_WIRKUNG%"=="1" echo( Damit die Änderungen wirken: Explorer neu starten
+if "%OKM_WIRKUNG%"=="2" echo( Damit die Änderungen wirken: Gruppenrichtlinien aktualisieren (gpupdate)
+if "%OKM_WIRKUNG%"=="3" echo( Damit die Änderungen wirken: neu anmelden
+if "%OKM_WIRKUNG%"=="4" echo( Damit die Änderungen wirken: Rechner neu starten
+if defined OKM_WIRKUNG_UNBEKANNT echo( Ob alle Änderungen sofort wirken, ist offen - im Zweifel neu anmelden.
 echo( Protokoll: "%OKM_LOG%"
 >>"%OKM_LOG%" echo( Protokoll: "%OKM_LOG%"
 echo(----------------------------------------------
