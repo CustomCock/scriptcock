@@ -1,0 +1,46 @@
+id: neustart_herunterfahren
+version: 1
+name: Neustart oder Herunterfahren
+kategorie: System
+beschreibung: Startet den Rechner neu oder fährt ihn herunter – ohne Vorwarnung an den Benutzer. Offene Programme werden geschlossen, nicht gespeicherte Arbeit geht verloren.
+hilfe: |
+  Gedacht als letzter Schritt eines Scripts: Die kurze Wartezeit reicht, damit das Script seine
+  Zusammenfassung und das Protokoll noch schreibt. Linux/macOS rechnen in ganzen Minuten (aufgerundet).
+  Abbrechen: Baustein „Geplanten Neustart abbrechen“ bzw. „shutdown /a“ / „shutdown -c“.
+  Mit Vorwarnung an den Benutzer: Baustein „Neustart mit Vorwarnung“.
+risiko: rot
+fortschritt: "{% if aktion == 'herunterfahren' %}Herunterfahren{% else %}Neustart{% endif %} in {{ sekunden }} Sekunden"
+tipp: Läuft gerade ein Update oder ist schon ein Neustart geplant? Dann vorher „Geplanten Neustart abbrechen“.
+rechte:
+  bash: root
+  zsh: root
+parameter:
+  - id: aktion
+    label: Aktion
+    typ: auswahl
+    standard: neustart
+    optionen:
+      - wert: neustart
+        label: Neu starten
+      - wert: herunterfahren
+        label: Herunterfahren
+  - id: sekunden
+    label: Wartezeit (Sekunden)
+    typ: zahl
+    min: 0
+    max: 600
+    standard: 10
+ziele:
+  powershell: |
+    shutdown.exe {% if aktion.wert == 'herunterfahren' %}/s{% else %}/r{% endif %} /t {{ sekunden }} /d p:4:1
+    if ($LASTEXITCODE -ne 0) { throw ('shutdown endete mit Code ' + $LASTEXITCODE) }
+    Write-OkmInfo ('{% if aktion.wert == 'herunterfahren' %}Herunterfahren{% else %}Neustart{% endif %} in ' + {{ sekunden }} + ' Sekunden – bitte alles speichern.')
+  cmd: |
+    shutdown {% if aktion.wert == 'herunterfahren' %}/s{% else %}/r{% endif %} /t {{ sekunden }} /d p:4:1
+    if not errorlevel 1 echo {% if aktion.wert == 'herunterfahren' %}Herunterfahren{% else %}Neustart{% endif %} in {{ sekunden }} Sekunden - bitte alles speichern.
+  bash: &neustart_sh |
+    okm_minuten=$(( ({{ sekunden }} + 59) / 60 ))
+    if [ "$okm_minuten" -eq 0 ]; then okm_wann=now; else okm_wann="+$okm_minuten"; fi
+    {{ sudo }}shutdown {% if aktion.wert == 'herunterfahren' %}-h{% else %}-r{% endif %} "$okm_wann"
+    okm_info "{% if aktion.wert == 'herunterfahren' %}Herunterfahren{% else %}Neustart{% endif %} geplant ($okm_wann) – bitte alles speichern."
+  zsh: *neustart_sh

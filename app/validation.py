@@ -523,6 +523,13 @@ def _version(text: str, p: ParameterDef) -> str:
     return text
 
 
+def _kb_nummer(text: str, p: ParameterDef) -> str:
+    treffer = re.fullmatch(r"(?:KB)?\s*([0-9]{6,8})", text, re.IGNORECASE)
+    if not treffer:
+        raise ValidierungsFehler("Bitte eine Update-Nummer wie KB5034441 angeben (6 bis 8 Ziffern).")
+    return treffer.group(1)
+
+
 _MSI_EIGENSCHAFT = re.compile(r"^[A-Z][A-Z0-9_]{0,63}=[A-Za-z0-9_.\-:\\{}]{0,200}$")
 
 
@@ -666,6 +673,7 @@ _TEXT_PRUEFER: dict[ParamTyp, Any] = {
     ParamTyp.DNSNAME: _dnsname,
     ParamTyp.PFAD_ODER_UNC: _pfad_oder_unc,
     ParamTyp.VERSION: _version,
+    ParamTyp.KB_NUMMER: _kb_nummer,
     ParamTyp.MSI_EIGENSCHAFT: _msi_eigenschaft,
 }
 

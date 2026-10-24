@@ -1,0 +1,93 @@
+id: verknuepfung_erstellen
+version: 1
+name: Verknüpfung erstellen
+kategorie: Dateien
+beschreibung: Legt eine Verknüpfung zu einem Programm, einer Datei oder einem Ordner auf dem Desktop, im Startmenü oder im Autostart des angemeldeten Benutzers an. Eine gleichnamige Verknüpfung wird ersetzt.
+hilfe: |
+  Windows: .lnk-Datei im Desktop-, Startmenü- bzw. Autostart-Ordner des Benutzers.
+  Linux: .desktop-Datei (Desktop, ~/.local/share/applications bzw. ~/.config/autostart). Programme
+  werden direkt gestartet, alles andere mit dem Standardprogramm (xdg-open). Auf dem GNOME-Desktop muss
+  die Verknüpfung beim ersten Mal per Rechtsklick „Start erlauben“.
+  macOS: Desktop = symbolischer Link auf dem Schreibtisch, Startmenü = Link in ~/Programme,
+  Autostart = Anmeldeobjekt (Systemeinstellungen → Allgemein → Anmeldeobjekte).
+risiko: gelb
+fortschritt: "Verknüpfung „{{ bezeichnung }}“ wird angelegt"
+tipp: Stimmt der Zielpfad? Die Verknüpfung wird auch angelegt, wenn das Ziel (noch) fehlt.
+rechte:
+  bash: nie_root
+  zsh: nie_root
+parameter:
+  - id: ziel_pfad
+    label: Ziel (Programm, Datei oder Ordner)
+    typ: pfad
+    beispiel: C:\Programme\Firma\app.exe
+  - id: bezeichnung
+    label: Name der Verknüpfung
+    typ: dateiname
+    beispiel: Firmen-App
+  - id: ort
+    label: Wo
+    typ: auswahl
+    standard: desktop
+    optionen:
+      - wert: desktop
+        label: Desktop
+      - wert: startmenue
+        label: Startmenü / Programme
+      - wert: autostart
+        label: Autostart (bei der Anmeldung starten)
+ziele:
+  powershell: |
+    if (-not (Test-Path -LiteralPath {{ ziel_pfad }})) { Write-OkmWarnung 'Das Ziel gibt es (noch) nicht – die Verknüpfung wird trotzdem angelegt.' }
+    $okmOrdner = [Environment]::GetFolderPath({% if ort.wert == 'startmenue' %}'Programs'{% elif ort.wert == 'autostart' %}'Startup'{% else %}'Desktop'{% endif %})
+    $okmDatei = Join-Path -Path $okmOrdner -ChildPath ({{ bezeichnung }} + '.lnk')
+    $okmVerknuepfung = (New-Object -ComObject WScript.Shell).CreateShortcut($okmDatei)
+    $okmVerknuepfung.TargetPath = {{ ziel_pfad }}
+    $okmVerknuepfung.WorkingDirectory = Split-Path -Path {{ ziel_pfad }} -Parent
+    $okmVerknuepfung.Save()
+    Write-OkmOk ('Verknüpfung angelegt: ' + $okmDatei)
+  cmd: |
+    set OKM_ZIEL={{ ziel_pfad }}
+    set OKM_NAME={{ bezeichnung }}
+    powershell -NoProfile -Command "$z = $env:OKM_ZIEL.Trim([char]34); $d = Join-Path ([Environment]::GetFolderPath('{% if ort.wert == 'startmenue' %}Programs{% elif ort.wert == 'autostart' %}Startup{% else %}Desktop{% endif %}')) ($env:OKM_NAME.Trim([char]34) + '.lnk'); $v = (New-Object -ComObject WScript.Shell).CreateShortcut($d); $v.TargetPath = $z; $v.WorkingDirectory = Split-Path -Path $z -Parent; $v.Save(); 'Verknuepfung angelegt: ' + $d"
+  bash: |
+    okm_ziel={{ ziel_pfad }}
+    [ -e "$okm_ziel" ] || okm_warn 'Das Ziel gibt es (noch) nicht – die Verknüpfung wird trotzdem angelegt.'
+    {% if ort.wert == 'startmenue' %}
+    okm_ordner="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+    {% elif ort.wert == 'autostart' %}
+    okm_ordner="${XDG_CONFIG_HOME:-$HOME/.config}/autostart"
+    {% else %}
+    okm_ordner=$(xdg-user-dir DESKTOP 2>/dev/null) || okm_ordner="$HOME/Desktop"
+    [ -n "$okm_ordner" ] || okm_ordner="$HOME/Desktop"
+    {% endif %}
+    mkdir -p -- "$okm_ordner"
+    okm_datei="$okm_ordner/"{{ bezeichnung }}.desktop
+    # Exec-Feld: \ " $ Backtick im Anführungszeichen maskieren, % verdoppeln, danach \ für die Zeichenkette verdoppeln
+    okm_exec=${okm_ziel//\\/\\\\}
+    okm_exec=${okm_exec//\"/\\\"}
+    okm_exec=${okm_exec//\$/\\\$}
+    okm_exec=${okm_exec//$'\140'/\\$'\140'}
+    okm_exec=${okm_exec//%/%%}
+    okm_exec=${okm_exec//\\/\\\\}
+    if [ -f "$okm_ziel" ] && [ -x "$okm_ziel" ]; then okm_exec="\"$okm_exec\""; else okm_exec="xdg-open \"$okm_exec\""; fi
+    okm_name={{ bezeichnung }}
+    printf '%s\n' '[Desktop Entry]' 'Type=Application' "Name=${okm_name//\\/\\\\}" "Exec=$okm_exec" 'Terminal=false' > "$okm_datei"
+    chmod 755 -- "$okm_datei"
+    {% if ort.wert == 'desktop' %}
+    gio set "$okm_datei" metadata::trusted true 2>/dev/null || true
+    {% endif %}
+    okm_info "Verknüpfung angelegt: $okm_datei"
+  zsh: |
+    okm_ziel={{ ziel_pfad }}
+    [[ -e "$okm_ziel" ]] || okm_warn 'Das Ziel gibt es (noch) nicht – die Verknüpfung wird trotzdem angelegt.'
+    {% if ort.wert == 'autostart' %}
+    osascript -e 'on run argv' -e 'tell application "System Events" to make login item at end with properties {path:item 1 of argv, hidden:false}' -e 'end run' -- "$okm_ziel" >/dev/null
+    okm_info "Anmeldeobjekt angelegt: $okm_ziel"
+    {% else %}
+    okm_ordner="$HOME/{% if ort.wert == 'startmenue' %}Applications{% else %}Desktop{% endif %}"
+    mkdir -p -- "$okm_ordner"
+    okm_datei="$okm_ordner/"{{ bezeichnung }}
+    ln -sfn -- "$okm_ziel" "$okm_datei"
+    okm_info "Verknüpfung angelegt: $okm_datei"
+    {% endif %}

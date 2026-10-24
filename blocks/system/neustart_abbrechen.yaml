@@ -1,0 +1,44 @@
+id: neustart_abbrechen
+version: 1
+name: Geplanten Neustart abbrechen
+kategorie: System
+beschreibung: Bricht einen geplanten Neustart oder ein geplantes Herunterfahren ab. Ist nichts geplant, wird das nur gemeldet.
+hilfe: |
+  Windows: „shutdown /a“ – wirkt nur, solange die Wartezeit läuft. Einen Neustart, den Windows Update
+  plant, hält das nicht dauerhaft auf.
+  Linux: „shutdown -c“. macOS: beendet den wartenden shutdown-Prozess.
+risiko: gruen
+fortschritt: Geplanter Neustart wird abgebrochen
+rechte:
+  bash: root
+  zsh: root
+ziele:
+  powershell: |
+    $okmAusgabe = shutdown.exe /a 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-OkmOk 'Geplanter Neustart abgebrochen.'
+    } elseif ($LASTEXITCODE -eq 1116) {
+        Write-OkmInfo 'Es war kein Neustart geplant.'
+    } else {
+        throw ('shutdown /a endete mit Code ' + $LASTEXITCODE + ': ' + ($okmAusgabe -join ' '))
+    }
+    $global:LASTEXITCODE = 0
+  cmd: |
+    shutdown /a >nul 2>&1
+    if not errorlevel 1 echo Geplanter Neustart abgebrochen.
+    if errorlevel 1116 if not errorlevel 1117 (
+      echo Es war kein Neustart geplant.
+      cmd /c exit 0
+    )
+  bash: |
+    if {{ sudo }}shutdown -c 2>/dev/null; then
+      okm_info 'Geplanter Neustart abgebrochen (falls einer geplant war).'
+    else
+      okm_info 'Es war kein Neustart geplant.'
+    fi
+  zsh: |
+    if {{ sudo }}pkill -x shutdown; then
+      okm_info 'Geplanter Neustart abgebrochen.'
+    else
+      okm_info 'Es war kein Neustart geplant.'
+    fi

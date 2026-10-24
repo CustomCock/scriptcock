@@ -1,0 +1,104 @@
+id: bericht_html
+version: 1
+name: Bericht als HTML speichern
+kategorie: Ausgabe
+beschreibung: Speichert alles, was das Script bis hierhin ausgegeben hat, als HTML-Bericht (mit Rechner, Benutzer und Uhrzeit) – zum Weiterleiten an die IT oder zum Ablegen.
+hilfe: |
+  Am besten als letzten Schritt verwenden (die Zusammenfassung am Ende fehlt im Bericht).
+  Der Bericht wird mit „Datei öffnen“ oder dem Haken unten im Browser angezeigt.
+  Eine vorhandene Datei gleichen Namens wird überschrieben.
+risiko: gruen
+fortschritt: "Bericht wird in {{ datei }} gespeichert"
+tipp: Ist der Ordner beschreibbar? Ist die Datei gerade im Browser oder Editor geöffnet?
+parameter:
+  - id: datei
+    label: Berichtsdatei (.html)
+    typ: pfad
+    beispiel: C:\Users\Public\Documents\okm-bericht.html
+  - id: titel
+    label: Überschrift
+    typ: text_kurz
+    standard: okm Bericht
+  - id: oeffnen
+    label: Danach im Browser öffnen
+    typ: ja_nein
+    pflicht: false
+    standard: false
+ziele:
+  powershell: |
+    $okmProtokoll = 'Kein Protokoll vorhanden.'
+    if ($OkmLog -and (Test-Path -LiteralPath $OkmLog)) {
+        $okmStrom = New-Object System.IO.FileStream($OkmLog, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+        $okmLeser = New-Object System.IO.StreamReader($okmStrom)
+        try { $okmProtokoll = $okmLeser.ReadToEnd() } finally { $okmLeser.Close() }
+    }
+    $okmTitel = [System.Net.WebUtility]::HtmlEncode({{ titel }})
+    $okmHtml = @(
+        '<!DOCTYPE html>',
+        '<html lang="de"><head><meta charset="utf-8">',
+        ('<title>' + $okmTitel + '</title>'),
+        '<style>body{font-family:Segoe UI,Arial,sans-serif;margin:2em;color:#1d232a}pre{background:#f4f5f7;padding:1em;white-space:pre-wrap}</style>',
+        '</head><body>',
+        ('<h1>' + $okmTitel + '</h1>'),
+        ('<p>Rechner: ' + [System.Net.WebUtility]::HtmlEncode($env:COMPUTERNAME) + ' · Benutzer: ' + [System.Net.WebUtility]::HtmlEncode($env:USERNAME) + ' · Erstellt: ' + (Get-Date -Format 'dd.MM.yyyy HH:mm') + '</p>'),
+        ('<pre>' + [System.Net.WebUtility]::HtmlEncode($okmProtokoll) + '</pre>'),
+        '</body></html>'
+    ) -join [Environment]::NewLine
+    $okmOrdner = Split-Path -Path {{ datei }} -Parent
+    if ($okmOrdner -and -not (Test-Path -LiteralPath $okmOrdner)) { New-Item -ItemType Directory -Path $okmOrdner -Force | Out-Null }
+    [System.IO.File]::WriteAllText({{ datei }}, $okmHtml, (New-Object System.Text.UTF8Encoding($true)))
+    Write-OkmOk ('Bericht gespeichert: ' + {{ datei }})
+    {% if oeffnen %}
+    Invoke-Item -LiteralPath {{ datei }}
+    {% endif %}
+  cmd: |
+    set OKM_DATEI={{ datei }}
+    set OKM_TITEL={{ titel }}
+    powershell -NoProfile -Command "$d = $env:OKM_DATEI.Trim([char]34); $t = [System.Net.WebUtility]::HtmlEncode($env:OKM_TITEL.Trim([char]34)); $l = 'Kein Protokoll vorhanden.'; if (Test-Path -LiteralPath $env:OKM_LOG) { $l = Get-Content -LiteralPath $env:OKM_LOG -Raw -Encoding UTF8 }; $o = Split-Path -Path $d -Parent; if ($o -and -not (Test-Path -LiteralPath $o)) { New-Item -ItemType Directory -Path $o -Force | Out-Null }; $h = @('<!DOCTYPE html>', '<html lang=de><head><meta charset=utf-8>', ('<title>' + $t + '</title>'), '<style>body{font-family:Segoe UI,Arial,sans-serif;margin:2em;color:#1d232a}pre{background:#f4f5f7;padding:1em;white-space:pre-wrap}</style>', '</head><body>', ('<h1>' + $t + '</h1>'), ('<p>Rechner: ' + $env:COMPUTERNAME + ' / Benutzer: ' + $env:USERNAME + ' / Erstellt: ' + (Get-Date -Format 'dd.MM.yyyy HH:mm') + '</p>'), ('<pre>' + [System.Net.WebUtility]::HtmlEncode($l) + '</pre>'), '</body></html>') -join [Environment]::NewLine; [System.IO.File]::WriteAllText($d, $h, (New-Object System.Text.UTF8Encoding($true))); 'Bericht gespeichert: ' + $d"
+    {% if oeffnen %}
+    if not errorlevel 1 start "" {{ datei }}
+    {% endif %}
+  bash: |
+    okm_datei={{ datei }}
+    okm_titel=$(printf '%s' {{ titel }} | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g')
+    mkdir -p -- "$(dirname -- "$okm_datei")"
+    {
+      printf '%s\n' '<!DOCTYPE html>' '<html lang="de"><head><meta charset="utf-8">'
+      printf '<title>%s</title>\n' "$okm_titel"
+      printf '%s\n' '<style>body{font-family:system-ui,sans-serif;margin:2em;color:#1d232a}pre{background:#f4f5f7;padding:1em;white-space:pre-wrap}</style>' '</head><body>'
+      printf '<h1>%s</h1>\n' "$okm_titel"
+      printf '<p>Rechner: %s · Benutzer: %s · Erstellt: %s</p>\n' "$(hostname | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g')" "$(id -un | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g')" "$(date '+%d.%m.%Y %H:%M')"
+      printf '<pre>'
+      if [ -f "$OKM_LOG" ]; then
+        sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -- "$OKM_LOG"
+      else
+        printf '%s\n' 'Kein Protokoll vorhanden.'
+      fi
+      printf '%s\n' '</pre>' '</body></html>'
+    } > "$okm_datei"
+    okm_info "Bericht gespeichert: $okm_datei"
+    {% if oeffnen %}
+    xdg-open "$okm_datei" >/dev/null 2>&1 || okm_warn 'Bericht konnte nicht geöffnet werden.'
+    {% endif %}
+  zsh: |
+    okm_datei={{ datei }}
+    okm_titel=$(printf '%s' {{ titel }} | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g')
+    mkdir -p -- "$(dirname -- "$okm_datei")"
+    {
+      printf '%s\n' '<!DOCTYPE html>' '<html lang="de"><head><meta charset="utf-8">'
+      printf '<title>%s</title>\n' "$okm_titel"
+      printf '%s\n' '<style>body{font-family:system-ui,sans-serif;margin:2em;color:#1d232a}pre{background:#f4f5f7;padding:1em;white-space:pre-wrap}</style>' '</head><body>'
+      printf '<h1>%s</h1>\n' "$okm_titel"
+      printf '<p>Rechner: %s · Benutzer: %s · Erstellt: %s</p>\n' "$(hostname | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g')" "$(id -un | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g')" "$(date '+%d.%m.%Y %H:%M')"
+      printf '<pre>'
+      if [ -f "$OKM_LOG" ]; then
+        sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -- "$OKM_LOG"
+      else
+        printf '%s\n' 'Kein Protokoll vorhanden.'
+      fi
+      printf '%s\n' '</pre>' '</body></html>'
+    } > "$okm_datei"
+    okm_info "Bericht gespeichert: $okm_datei"
+    {% if oeffnen %}
+    open "$okm_datei" >/dev/null 2>&1 || okm_warn 'Bericht konnte nicht geöffnet werden.'
+    {% endif %}

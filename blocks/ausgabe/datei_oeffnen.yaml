@@ -1,0 +1,41 @@
+id: datei_oeffnen
+version: 1
+name: Datei öffnen
+kategorie: Ausgabe
+beschreibung: Öffnet eine Datei mit dem Standardprogramm (z. B. einen Bericht im Browser oder ein Protokoll im Editor). Das Script wartet nicht, bis das Programm geschlossen wird.
+risiko: gruen
+fortschritt: "{{ datei }} wird geöffnet"
+tipp: Gibt es die Datei? Ist der Dateityp einem Programm zugeordnet?
+rechte:
+  bash: nie_root
+  zsh: nie_root
+parameter:
+  - id: datei
+    label: Datei
+    typ: pfad
+    beispiel: C:\Users\Public\Documents\bericht.html
+ziele:
+  powershell: |
+    if (-not (Test-Path -LiteralPath {{ datei }} -PathType Leaf)) { throw 'Die Datei gibt es nicht.' }
+    Invoke-Item -LiteralPath {{ datei }}
+  cmd: |
+    if not exist {{ datei }} (
+      echo Die Datei gibt es nicht.
+      cmd /c exit 1
+    ) else (
+      start "" {{ datei }}
+    )
+  bash: |
+    if [ ! -f {{ datei }} ]; then
+      okm_fehler 'Die Datei gibt es nicht.'
+      false
+    else
+      xdg-open {{ datei }} >/dev/null 2>&1
+    fi
+  zsh: |
+    if [[ ! -f {{ datei }} ]]; then
+      okm_fehler 'Die Datei gibt es nicht.'
+      false
+    else
+      open {{ datei }}
+    fi

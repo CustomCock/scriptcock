@@ -1,0 +1,50 @@
+id: kb_deinstallieren
+version: 1
+name: Windows-Update deinstallieren
+kategorie: Windows Update
+beschreibung: Entfernt ein bestimmtes Windows-Update (KB-Nummer), z. B. wenn es nach der Installation Probleme macht. Ist es nicht installiert, wird das nur gemeldet.
+hilfe: |
+  Nutzt „wusa /uninstall“ ohne Rückfrage und ohne automatischen Neustart. Meist ist danach ein Neustart
+  nötig – das meldet der Baustein.
+  Kumulative Updates (monatliche „Rollups“) lassen sich so oft nicht entfernen; dann über
+  Einstellungen → Windows Update → Updateverlauf → Updates deinstallieren.
+  Damit das Update nicht gleich wieder kommt: in der Update-Verwaltung (WSUS/Intune) zurückstellen.
+risiko: rot
+fortschritt: "Update KB{{ kb }} wird deinstalliert"
+tipp: Ist das Update ein kumulatives Update? Dann über die Einstellungen entfernen (siehe Hilfe).
+rechte:
+  powershell: admin
+  cmd: admin
+parameter:
+  - id: kb
+    label: Update-Nummer
+    typ: kb_nummer
+    beispiel: KB5034441
+ziele:
+  powershell: |
+    $okmKb = 'KB' + {{ kb }}
+    if (-not (Get-HotFix -Id $okmKb -ErrorAction SilentlyContinue)) {
+        Write-OkmInfo ($okmKb + ' ist nicht installiert – nichts zu tun.')
+    } else {
+        $okmProzess = Start-Process -FilePath 'wusa.exe' -ArgumentList ('/uninstall /kb:' + {{ kb }} + ' /quiet /norestart') -Wait -PassThru
+        if ($okmProzess.ExitCode -eq 3010 -or $okmProzess.ExitCode -eq 1641) {
+            Write-OkmWarnung ($okmKb + ' entfernt – für den Abschluss ist ein Neustart nötig.')
+        } elseif ($okmProzess.ExitCode -eq 2359303) {
+            Write-OkmInfo ($okmKb + ' ist nicht installiert – nichts zu tun.')
+        } elseif ($okmProzess.ExitCode -ne 0) {
+            throw ('wusa endete mit Code ' + $okmProzess.ExitCode + ' (0x' + $okmProzess.ExitCode.ToString('X') + ')')
+        } else {
+            Write-OkmOk ($okmKb + ' entfernt.')
+        }
+    }
+  cmd: |
+    for %%k in ({{ kb }}) do wusa /uninstall /kb:%%~k /quiet /norestart
+    if not errorlevel 1 echo Update entfernt.
+    if errorlevel 3010 if not errorlevel 3011 (
+      echo Entfernt - für den Abschluss ist ein Neustart nötig.
+      cmd /c exit 0
+    )
+    if errorlevel 2359303 if not errorlevel 2359304 (
+      echo Das Update ist nicht installiert - nichts zu tun.
+      cmd /c exit 0
+    )

@@ -1,0 +1,41 @@
+id: ordner_oeffnen
+version: 1
+name: Ordner öffnen
+kategorie: Ausgabe
+beschreibung: Öffnet einen Ordner im Explorer bzw. Dateimanager (Finder) – z. B. am Ende, damit der Benutzer das Ergebnis sieht.
+risiko: gruen
+fortschritt: "{{ ordner }} wird geöffnet"
+tipp: Gibt es den Ordner? Auf Linux braucht es eine grafische Sitzung (xdg-open).
+rechte:
+  bash: nie_root
+  zsh: nie_root
+parameter:
+  - id: ordner
+    label: Ordner
+    typ: pfad
+    beispiel: C:\Users\Public\Documents
+ziele:
+  powershell: |
+    if (-not (Test-Path -LiteralPath {{ ordner }} -PathType Container)) { throw 'Den Ordner gibt es nicht.' }
+    Start-Process -FilePath 'explorer.exe' -ArgumentList ('"' + {{ ordner }} + '"')
+  cmd: |
+    if not exist {{ ordner }} (
+      echo Den Ordner gibt es nicht.
+      cmd /c exit 1
+    ) else (
+      start "" explorer.exe {{ ordner }}
+    )
+  bash: |
+    if [ ! -d {{ ordner }} ]; then
+      okm_fehler 'Den Ordner gibt es nicht.'
+      false
+    else
+      xdg-open {{ ordner }} >/dev/null 2>&1
+    fi
+  zsh: |
+    if [[ ! -d {{ ordner }} ]]; then
+      okm_fehler 'Den Ordner gibt es nicht.'
+      false
+    else
+      open {{ ordner }}
+    fi

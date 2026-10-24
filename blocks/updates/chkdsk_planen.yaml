@@ -1,0 +1,40 @@
+id: chkdsk_planen
+version: 1
+name: Datenträgerprüfung beim Neustart planen
+kategorie: Updates
+beschreibung: Markiert ein Laufwerk, sodass Windows es beim nächsten Neustart prüft und Dateisystemfehler repariert (chkdsk /f). Der Neustart dauert dadurch länger.
+hilfe: |
+  Setzt das „Dirty“-Bit des Laufwerks (fsutil dirty set). Beim Start prüft Windows das Laufwerk dann
+  automatisch – unabhängig von der Sprache, ohne J/N-Rückfrage. Das Bit lässt sich nicht zurücknehmen;
+  es verschwindet nach der Prüfung.
+  Das Ergebnis steht danach in der Ereignisanzeige (Anwendung, Quelle „Wininit“).
+risiko: gelb
+fortschritt: "Prüfung von {{ laufwerk }} beim nächsten Neustart wird geplant"
+tipp: Gibt es das Laufwerk? Ist es ein NTFS-Laufwerk (nicht USB-Stick mit FAT)?
+rechte:
+  powershell: admin
+  cmd: admin
+parameter:
+  - id: laufwerk
+    label: Laufwerk
+    typ: laufwerksbuchstabe
+    standard: C
+ziele:
+  powershell: |
+    fsutil.exe dirty set {{ laufwerk }}
+    if ($LASTEXITCODE -ne 0) { throw ('fsutil endete mit Code ' + $LASTEXITCODE) }
+    fsutil.exe dirty query {{ laufwerk }}
+    Write-OkmInfo 'Die Prüfung läuft beim nächsten Neustart (kann je nach Größe lange dauern).'
+  cmd: |
+    fsutil dirty set {{ laufwerk }}
+    if not errorlevel 1 (
+      fsutil dirty query {{ laufwerk }}
+      echo Die Prüfung läuft beim nächsten Neustart.
+    )
+dry_run:
+  powershell: |
+    Write-OkmInfo '[SIMULATION] Laufwerk würde zur Prüfung beim Neustart markiert. Aktueller Zustand:'
+    fsutil.exe dirty query {{ laufwerk }}
+  cmd: |
+    echo [SIMULATION] Laufwerk würde zur Prüfung beim Neustart markiert. Aktueller Zustand:
+    fsutil dirty query {{ laufwerk }}

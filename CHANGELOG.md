@@ -2,6 +2,28 @@
 
 ## Backlog P1
 
+### Paket 4: Neustart, Verknüpfung, Reparatur und Ausgabe
+
+- **System:** `neustart_herunterfahren` (rot, ohne Vorwarnung an den Benutzer, kurze Wartezeit 0–600 s,
+  damit Zusammenfassung und Protokoll noch geschrieben werden; Linux/macOS in ganzen Minuten),
+  `neustart_abbrechen` („nichts geplant“ ist kein Fehler), `wiederherstellungspunkt` (Windows; prüft,
+  ob wirklich ein neuer Punkt entstanden ist, 24-Stunden-Sperre von Windows = Warnung, optional
+  Computerschutz einschalten; Rückgabe `erstellt`; Simulation legt nichts an).
+- **Reparatur (Windows):** `chkdsk_planen` (Dirty-Bit per `fsutil` – sprachunabhängig, keine
+  J/N-Abfrage), `kb_deinstallieren` (rot; prüft per `Get-HotFix`, `wusa /uninstall /quiet /norestart`,
+  3010 = Neustart nötig, 0x240007 = nicht installiert).
+- **Dateien:** `verknuepfung_erstellen` (Desktop, Startmenü, Autostart des Benutzers; Windows `.lnk`,
+  Linux `.desktop` mit Exec-Maskierung nach freedesktop-Spezifikation, macOS Symlink bzw. Anmeldeobjekt
+  – der Pfad geht als argv an osascript, nie in den AppleScript-Text).
+- **Ausgabe (neue Kategorie):** `bericht_html` (Protokoll bis hierhin als HTML mit Rechner/Benutzer/
+  Zeit, alles HTML-maskiert, optional öffnen), `ordner_oeffnen`, `datei_oeffnen`.
+- Neuer Typ: `kb_nummer` (`KB5034441` oder `5034441` → Wert = Ziffern).
+- Tests: `tests/test_paket4.py` – shutdown/pkill/xdg-open/open/osascript nur als Attrappen; Exec-Zeile
+  der `.desktop`-Datei wird nach Spezifikation zurückgeparst (Pfad mit `"`, `$`, Backtick, `%`, `\`);
+  roter Neustart ohne „JA“ löst nichts aus; HTML-Bericht maskiert `<`/`&` aus dem Protokoll.
+- Nachtrag zu Paket 3: Golden-File `diagnosepaket_support.zsh.sh` auf `command log show` aktualisiert
+  (war beim Paket-3-Commit vergessen worden).
+
 ### Paket 3: Software-, Drucker- und Log-Bausteine
 
 - **Software:** `paket_entfernen` und `pakete_aktualisieren` (ein Paket oder alle; winget, apt, dnf,

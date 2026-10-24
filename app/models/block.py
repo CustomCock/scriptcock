@@ -85,6 +85,7 @@ class ParamTyp(StrEnum):
         "pfad_oder_unc"  # Windows-Pfad oder \\\\server\\freigabe\\… (Setup-Dateien vom Fileserver)
     )
     VERSION = "version"  # 1 bis 4 Zahlen mit Punkt, z. B. 115.3.0
+    KB_NUMMER = "kb_nummer"  # Windows-Update-Nummer (KB5034441 oder 5034441), Wert = nur die Ziffern
     MSI_EIGENSCHAFT = "msi_eigenschaft"  # NAME=wert, öffentliche MSI-Eigenschaft ohne Leerzeichen/Quotes
     LISTE = "liste"  # mehrere Werte vom Typ ``listen_typ``
 

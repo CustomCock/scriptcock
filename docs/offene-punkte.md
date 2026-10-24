@@ -58,6 +58,13 @@ Vor dem produktiven Einsatz auf den Test-VMs prüfen (`docs/test-vms.md`).
 | `software_version` | cmd | Gibt es für CMD nicht. macOS sucht nur unter `/Applications`; Windows nur Einträge mit DisplayVersion. |
 | `eventlog_export` | cmd | Exportiert das ganze Protokoll (ohne Zeitraum) als `okm-ereignisse.evtx`. |
 | `logdatei_ende` | powershell | Liest mit der Standard-Codierung von PowerShell 5.1 – UTF-8-Logs ohne BOM können Umlaute falsch zeigen. |
+| `neustart_herunterfahren`, `neustart_abbrechen` | alle | Nur mit Attrappen getestet. macOS: `shutdown` kennt nur Minuten; Abbrechen beendet den wartenden `shutdown`-Prozess (`pkill`). Windows: `shutdown /a` hält von Windows Update geplante Neustarts nicht dauerhaft auf. |
+| `wiederherstellungspunkt` | powershell/cmd | Auf Win 11 prüfen: Verhalten bei abgeschaltetem Computerschutz und bei der 24-Stunden-Sperre; Server-Windows hat keine Wiederherstellungspunkte. CMD liefert keine Rückgabe `erstellt`. |
+| `chkdsk_planen` | powershell/cmd | `fsutil dirty set` auf Win 11 bestätigen (Prüfung läuft beim nächsten Start); kein `/r` (Sektorprüfung) möglich. |
+| `kb_deinstallieren` | powershell/cmd | Kumulative Updates lassen sich mit `wusa` oft nicht entfernen (dann Fehlercode statt Erfolg). CMD: `wusa /kb:` mit Ziffern aus der `for`-Variablen – auf echtem Windows prüfen. |
+| `verknuepfung_erstellen` | alle | Windows (`WScript.Shell`) nur Syntax geprüft. GNOME: Desktop-Verknüpfungen brauchen „Start erlauben“ (`gio set … metadata::trusted` wird versucht). macOS-Anmeldeobjekt per AppleScript braucht ggf. die Automation-Freigabe für „System Events“. |
+| `bericht_html` | powershell/cmd | PowerShell liest das noch offene Transcript (FileShare ReadWrite), CMD das Protokoll per `Get-Content -Encoding UTF8` – beides auf Win 11 prüfen. Die Zusammenfassung am Scriptende fehlt im Bericht. |
+| `ordner_oeffnen`, `datei_oeffnen` | bash | Braucht eine grafische Sitzung (`xdg-open`); in SSH-Sitzungen schlägt der Schritt fehl. |
 | alle Datei-Bausteine aus Paket 1 | powershell/cmd | Unter Linux nur Syntax/Lint geprüft (Windows-Pfade), auf Win 11 ausführen. |
 | alle | powershell/cmd | Ausführen-Checkliste (`docs/test-vms.md`, Abschnitt 4): alle Windows-Zellen (Doppelklick/„Mit PowerShell ausführen“, UAC angefordert/abgelehnt, Konsole UTF-8, Fenster bleibt offen) sind noch **nicht** auf Win 11 geprüft. |
 | alle | bash/zsh | Checkliste bisher nur im Linux-Container mit Attrappen (`ping`, `sudo`); auf Debian 12 und echtem macOS (Terminal.app, echtes sudo) wiederholen. |

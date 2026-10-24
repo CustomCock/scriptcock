@@ -1,0 +1,61 @@
+id: wiederherstellungspunkt
+version: 1
+name: Wiederherstellungspunkt anlegen
+kategorie: System
+beschreibung: Legt einen Windows-Wiederherstellungspunkt an – vor riskanten Änderungen (Treiber, Registry, Software). Prüft danach, ob er wirklich angelegt wurde.
+hilfe: |
+  Windows legt höchstens einen Wiederherstellungspunkt pro 24 Stunden an. Gibt es schon einen aus den
+  letzten 24 Stunden, meldet der Baustein das als Warnung und läuft weiter.
+  Ist der Computerschutz für das Systemlaufwerk aus, bricht der Baustein ab – außer „Computerschutz
+  einschalten“ ist angehakt.
+  Zurück: „rstrui.exe“ (Systemwiederherstellung) starten und den Punkt auswählen.
+risiko: gelb
+fortschritt: "Wiederherstellungspunkt „{{ beschreibung }}“ wird angelegt"
+tipp: Computerschutz prüfen (Systemsteuerung → System → Computerschutz) und den Dienst „Volumeschattenkopie“ (VSS).
+rechte:
+  powershell: admin
+  cmd: admin
+parameter:
+  - id: beschreibung
+    label: Beschreibung
+    typ: text_kurz
+    standard: Vor Änderung durch okm-Script
+  - id: aktivieren
+    label: Computerschutz einschalten, falls aus
+    typ: ja_nein
+    pflicht: false
+    standard: false
+rueckgabe:
+  - id: erstellt
+    typ: ja_nein
+    beschreibung: Ein neuer Wiederherstellungspunkt wurde angelegt
+    ziele: [powershell]
+ziele:
+  powershell: |
+    $okmVorher = @(Get-ComputerRestorePoint -ErrorAction SilentlyContinue).Count
+    {% if aktivieren %}
+    Enable-ComputerRestore -Drive ($env:SystemDrive + '\')
+    {% endif %}
+    Checkpoint-Computer -Description {{ beschreibung }} -RestorePointType MODIFY_SETTINGS -WarningAction SilentlyContinue
+    $okmPunkte = @(Get-ComputerRestorePoint -ErrorAction SilentlyContinue | Sort-Object -Property SequenceNumber)
+    {{ rueckgabe_erstellt }} = $okmPunkte.Count -gt $okmVorher
+    if ({{ rueckgabe_erstellt }}) {
+        Write-OkmOk ('Wiederherstellungspunkt angelegt: ' + {{ beschreibung }})
+    } elseif ($okmPunkte.Count -gt 0) {
+        $okmLetzter = $okmPunkte[-1]
+        $okmZeit = $okmLetzter.ConvertToDateTime($okmLetzter.CreationTime)
+        if ($okmZeit -lt (Get-Date).AddHours(-24)) { throw 'Es wurde kein Wiederherstellungspunkt angelegt.' }
+        Write-OkmWarnung ('Kein neuer Punkt (Windows: höchstens einer pro 24 Stunden). Letzter vom ' + $okmZeit.ToString('dd.MM.yyyy HH:mm') + ': ' + $okmLetzter.Description)
+    } else {
+        throw 'Es wurde kein Wiederherstellungspunkt angelegt – ist der Computerschutz eingeschaltet?'
+    }
+  cmd: |
+    set OKM_BESCHREIBUNG={{ beschreibung }}
+    powershell -NoProfile -Command "$v = @(Get-ComputerRestorePoint -ErrorAction SilentlyContinue).Count; {% if aktivieren %}Enable-ComputerRestore -Drive ($env:SystemDrive + '\'); {% endif %}Checkpoint-Computer -Description $env:OKM_BESCHREIBUNG.Trim([char]34) -RestorePointType MODIFY_SETTINGS -WarningAction SilentlyContinue; $p = @(Get-ComputerRestorePoint -ErrorAction SilentlyContinue | Sort-Object -Property SequenceNumber); if ($p.Count -gt $v) { 'Wiederherstellungspunkt angelegt.' } elseif ($p.Count -gt 0 -and $p[-1].ConvertToDateTime($p[-1].CreationTime) -gt (Get-Date).AddHours(-24)) { 'WARNUNG: Kein neuer Punkt - es gibt schon einen aus den letzten 24 Stunden.' } else { throw 'Es wurde kein Wiederherstellungspunkt angelegt.' }"
+dry_run:
+  powershell: |
+    Write-OkmInfo ('[SIMULATION] Wiederherstellungspunkt „' + {{ beschreibung }} + '“ würde angelegt.')
+    $okmPunkte = @(Get-ComputerRestorePoint -ErrorAction SilentlyContinue)
+    Write-OkmInfo ('Vorhandene Wiederherstellungspunkte: ' + $okmPunkte.Count)
+  cmd: |
+    echo [SIMULATION] Wiederherstellungspunkt würde angelegt.

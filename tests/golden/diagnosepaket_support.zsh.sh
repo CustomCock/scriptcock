@@ -134,7 +134,7 @@ okm_arbeit="$(mktemp -d)"
 { sw_vers; uname -a; uptime; df -h; } > "$okm_arbeit/system.txt" 2>&1 || true
 system_profiler SPHardwareDataType SPSoftwareDataType >> "$okm_arbeit/system.txt" 2>&1 || true
 { ifconfig; netstat -rn; scutil --dns; } > "$okm_arbeit/netzwerk.txt" 2>&1 || true
-log show --last 24h --predicate 'messageType == error' --style compact > "$okm_arbeit/log.txt" 2>&1 || true
+command log show --last 24h --predicate 'messageType == error' --style compact > "$okm_arbeit/log.txt" 2>&1 || true
 ps aux > "$okm_arbeit/prozesse.txt" 2>&1 || true
 okm_paket="$HOME/Desktop/okm-diagnose-$(hostname -s)-$okm_stempel.zip"
 ditto -c -k "$okm_arbeit" "$okm_paket"
