@@ -2,6 +2,27 @@
 
 ## Registry, Richtlinien-Katalog und Palette
 
+### Teil E: Baustein-Palette und Blockly-Suche
+
+- **Palette im Baukasten als Akkordeon:** jede Kategorie mit Icon und Anzahl der Bausteine für das Zielsystem,
+  standardmäßig zu; „Alle aufklappen/zuklappen“, Auf/Zu wird gemerkt.
+- **Suche oben, fest stehend** (gleiche Normalisierung wie der Software-Katalog, auch Beschreibung und
+  Baustein-ID): nur Kategorien mit Treffern klappen auf, Treffer hervorgehoben, leere Kategorien
+  verschwinden; `Esc` leert und stellt den Auf/Zu-Zustand von vorher wieder her, `/` springt hinein.
+- **„Zuletzt benutzt“** (8) und **„Favoriten“** (Stern) ganz oben, in `localStorage` (mit try/catch).
+- **„Nur für <Zielsystem>“** (Standard an) blendet nicht verfügbare Bausteine aus.
+- **Kompakte Zeilen** (Risikopunkt + Name), Beschreibung als Tooltip und beim Tastaturfokus.
+- **Hinzufügen ohne Ziehen:** Doppelklick, `Enter` oder „＋“ – ans Ende bzw. unter den markierten Schritt
+  (Klick auf einen Schritt markiert ihn). Ziehen geht weiter.
+- **Tastatur:** `↓`/`↑` durch Kategorien und Treffer, `Enter` fügt hinzu, `→`/`←` klappt auf/zu.
+- Palette scrollt unabhängig; auf schmalen Bildschirmen eine ausklappbare Leiste über der Schrittliste.
+- **Blockly:** Suchfeld über der Toolbox (`/`), Treffer in der dynamischen Kategorie „Suchergebnisse“,
+  dazu „Zuletzt benutzt“ (gemeinsam mit der Palette) – beides über `registerToolboxCategoryCallback`.
+- Suche als reines Modul `static/js/baustein-suche.js` (unter Node getestet, `tests/test_baustein_suche.py`);
+  Browser-Tests für Palette und Toolbox-Suche; Screenshots `palette-zu`, `palette-suche`, `blockly-suche`
+  in vier Breiten (`python tools/screenshots.py palette`).
+- Geändert: Im Baukasten springt `/` jetzt in die Palettensuche (vorher: Software-Katalog öffnen).
+
 ### Teil D: Rezepte
 
 - **Fünf Rezepte:**

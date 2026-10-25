@@ -6,6 +6,7 @@
 {% include "_editor_kopf.html" %}
 <script src="{{ basis }}/static/vendor/blockly/blockly_compressed.js" defer></script>
 <script src="{{ basis }}/static/vendor/blockly/msg/de.js" defer></script>
+<script src="{{ basis }}/static/js/baustein-suche.js" defer></script>
 <script src="{{ basis }}/static/js/blockly-modus.js" defer></script>
 {% endblock %}
 {% block inhalt %}
@@ -44,7 +45,15 @@
 </div>
 
 <div class="bl-layout">
-  <div id="bl-arbeitsflaeche" class="bl-arbeitsflaeche" aria-label="Blockly-Arbeitsfläche"></div>
+  <div class="bl-links">
+    <div class="bl-suche">
+      <label class="sr-only" for="bl-suche">Baustein suchen</label>
+      <input id="bl-suche" type="search" placeholder="Baustein suchen …  ( / )" autocomplete="off" spellcheck="false"
+             aria-describedby="bl-suche-hilfe">
+      <span id="bl-suche-hilfe" class="feldhilfe">Treffer erscheinen in der Kategorie „Suchergebnisse“ · <kbd>Esc</kbd> leert</span>
+    </div>
+    <div id="bl-arbeitsflaeche" class="bl-arbeitsflaeche" aria-label="Blockly-Arbeitsfläche"></div>
+  </div>
   <section class="bl-ausgabe" aria-label="Vorschau">
     <noscript><p class="fehlerbox">Der Blockly-Modus braucht JavaScript.</p></noscript>
     <div id="bl-vorschau" class="vorschau" aria-live="polite">

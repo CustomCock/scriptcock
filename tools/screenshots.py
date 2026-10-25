@@ -2,7 +2,7 @@
 """Screenshots der Oberfläche in vier Breiten nach ``docs/screenshots/`` (Playwright + Chromium).
 
 Aufruf:  python tools/screenshots.py                # alles
-         python tools/screenshots.py katalog rezepte  # nur bestimmte Bereiche
+         python tools/screenshots.py katalog rezepte  # nur bestimmte Bereiche (katalog, rezepte, palette)
 
 Chromium-Pfad optional über ``CHROMIUM_PFAD`` (sonst Playwright-Standard bzw. /opt/pw-browsers).
 """
@@ -61,7 +61,7 @@ def katalog_seite(seite: Page, url: str) -> None:
 def katalog_panel(seite: Page, url: str) -> None:
     """Baukasten: Katalog in der rechten Spalte unter der Vorschau (bzw. unten auf dem Handy)."""
     seite.goto(f"{url}/baukasten?ziel=powershell")
-    seite.click("[data-hinzufuegen=paket_installieren]")
+    seite.evaluate("window.OkmBaukasten.hinzufuegen('paket_installieren')")
     seite.locator("#software-katalog[open]").wait_for()
     seite.fill("#katalog-suche", "visual c++")
     seite.wait_for_timeout(500)
@@ -76,6 +76,37 @@ def blockly(seite: Page, url: str) -> None:
     seite.wait_for_timeout(500)
 
 
+def _palette_auf(seite: Page) -> None:
+    """Auf schmalen Bildschirmen ist die Palette eine eingeklappte Leiste."""
+    schalter = seite.locator(".bk-palette-schalter")
+    if schalter.is_visible():
+        schalter.click()
+
+
+def palette_zu(seite: Page, url: str) -> None:
+    """Baukasten: Palette mit zugeklappten Kategorien (Standard)."""
+    seite.goto(f"{url}/baukasten?ziel=powershell")
+    seite.evaluate("localStorage.clear()")
+    seite.reload()
+    _palette_auf(seite)
+    seite.wait_for_timeout(200)
+
+
+def palette_suche(seite: Page, url: str) -> None:
+    """Baukasten: Suche in der Palette – nur Kategorien mit Treffern sind offen."""
+    palette_zu(seite, url)
+    seite.fill("#bk-suche", "registry wert")
+    seite.wait_for_timeout(300)
+
+
+def blockly_suche(seite: Page, url: str) -> None:
+    """Blockly: Suchfeld über der Toolbox, Treffer in der Kategorie „Suchergebnisse“."""
+    seite.goto(f"{url}/blockly?ziel=powershell")
+    seite.locator(".blocklyDraggable").first.wait_for()
+    seite.fill("#bl-suche", "drucker")
+    seite.wait_for_timeout(600)
+
+
 def rezepte(seite: Page, url: str) -> None:
     seite.goto(f"{url}/rezepte?ziel=powershell")
     seite.wait_for_timeout(300)
@@ -88,6 +119,11 @@ BEREICHE: dict[str, list[tuple[str, Callable[[Page, str], None]]]] = {
         ("katalog-blockly", blockly),
     ],
     "rezepte": [("rezepte", rezepte)],
+    "palette": [
+        ("palette-zu", palette_zu),
+        ("palette-suche", palette_suche),
+        ("blockly-suche", blockly_suche),
+    ],
 }
 
 

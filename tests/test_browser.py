@@ -59,6 +59,14 @@ def server(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
     thread.join(timeout=5)
 
 
+def palette_auf(seite) -> None:
+    """Palette: Kategorien sind standardmäßig zu, auf schmalen Bildschirmen ist sie eine Leiste."""
+    schalter = seite.locator(".bk-palette-schalter")
+    if schalter.is_visible():
+        schalter.click()
+    seite.click("[data-alle-auf]")
+
+
 def warte_editor(seite, text: str, timeout: int = 5000) -> None:
     """Wartet, bis der Script-Editor sichtbar ist und ``text`` enthält."""
     seite.wait_for_function(
@@ -84,6 +92,7 @@ def test_baukasten_im_browser(server: str, browser) -> None:
     js_fehler: list[str] = []
     seite.on("pageerror", lambda e: js_fehler.append(str(e)))
     seite.goto(f"{server}/baukasten?ziel=bash")
+    palette_auf(seite)
 
     # Hinzufügen per Knopf und per Drag & Drop
     seite.click("[data-hinzufuegen=systeminfo]")
@@ -267,11 +276,17 @@ def test_software_katalog_im_browser(server: str, browser) -> None:
     seite.locator(".katalog-eintrag .kopiert").wait_for()
     assert seite.evaluate("navigator.clipboard.readText()") == "vlc"
 
-    # Baukasten: "/" öffnet das Panel, Plattform folgt dem Zielsystem
+    # Baukasten: "/" springt in die Palettensuche (Teil E), der Katalog öffnet über seinen Kopf;
+    # Plattform folgt dem Zielsystem
     seite = kontext.new_page()
     seite.goto(f"{server}/baukasten?ziel=bash")
+    palette_auf(seite)
     seite.keyboard.press("/")
+    assert seite.evaluate("document.activeElement.id") == "bk-suche"
+    assert seite.get_attribute("#software-katalog", "open") is None
+    seite.click("#software-katalog > summary")
     seite.locator("#software-katalog[open]").wait_for()
+    seite.focus("#katalog-suche")
     assert seite.get_attribute("[data-plattform=linux]", "aria-pressed") == "true"
     seite.keyboard.type("vlc")
     seite.locator(".katalog-eintrag:first-child .katalog-name", has_text="VLC").wait_for()
@@ -394,6 +409,7 @@ def test_katalog_zeilen_brechen_nicht_chaotisch(server: str, browser, breite: in
         seite.goto(f"{server}/software")
     else:
         seite.goto(f"{server}/baukasten?ziel=powershell")
+        palette_auf(seite)
         seite.click("#software-katalog > summary")
     seite.click("[data-plattform=alle]")
     seite.locator(".katalog-eintrag").first.wait_for()
@@ -432,6 +448,7 @@ def test_baukasten_katalog_unter_vorschau(server: str, browser) -> None:
     js_fehler: list[str] = []
     seite.on("pageerror", lambda e: js_fehler.append(str(e)))
     seite.goto(f"{server}/baukasten?ziel=bash")
+    palette_auf(seite)
     katalog = seite.locator("#software-katalog")
     assert katalog.get_attribute("open") is None, "Katalog soll anfangs eingeklappt sein"
     # Position: in der rechten Spalte, unter der Vorschau
@@ -652,6 +669,7 @@ def test_editor_bibliothek_und_erneut_oeffnen(server: str, browser) -> None:
     js_fehler: list[str] = []
     seite.on("pageerror", lambda e: js_fehler.append(str(e)))
     seite.goto(f"{server}/baukasten?ziel=bash")
+    palette_auf(seite)
     seite.evaluate("() => localStorage.setItem('okm-editor-hinweis-gelesen', '1')")
     seite.click("[data-hinzufuegen=systeminfo]")
     warte_editor(seite, "Systeminfo")
@@ -681,6 +699,7 @@ def test_editor_bibliothek_und_erneut_oeffnen(server: str, browser) -> None:
 
     # Erneut öffnen → Editor startet mit dem bearbeiteten Text und Banner
     seite.goto(f"{server}/baukasten?aus={sid}")
+    palette_auf(seite)
     seite.wait_for_function(
         "() => window.OkmEditor && window.OkmEditor.wert().includes('echo aus_dem_editor')"
     )
@@ -805,6 +824,7 @@ def test_tagfeld_fuer_listen(server: str, browser) -> None:
     js_fehler: list[str] = []
     seite.on("pageerror", lambda e: js_fehler.append(str(e)))
     seite.goto(f"{server}/baukasten?ziel=bash")
+    palette_auf(seite)
     seite.click("[data-hinzufuegen=test_liste]")
     eingabe = seite.locator("#schrittliste .tagfeld-eingabe").first
     eingabe.wait_for()
@@ -827,3 +847,51 @@ def test_tagfeld_fuer_listen(server: str, browser) -> None:
     feld_id = eingabe.get_attribute("id")
     assert seite.locator(f"label[for='{feld_id}']").count() == 1
     assert js_fehler == []
+
+
+def test_palette_akkordeon_suche_tastatur(server: str, browser) -> None:
+    """Teil E: Kategorien zu, Suche öffnet nur Treffer, Esc stellt her, Enter fügt hinzu, Favorit/Zuletzt."""
+    seite = browser.new_page(viewport={"width": 1280, "height": 1000})
+    js_fehler: list[str] = []
+    seite.on("pageerror", lambda e: js_fehler.append(str(e)))
+    seite.goto(f"{server}/baukasten?ziel=powershell")
+    offen = "() => [...document.querySelectorAll('.palette-gruppe[data-kategorie][open]')].map(g => g.dataset.kategorie)"
+    assert seite.evaluate(offen) == []
+    seite.click(".palette-gruppe[data-kategorie=Netzwerk] > summary")
+    seite.click("h1")
+    seite.keyboard.press("/")
+    seite.keyboard.type("registry wert setz")
+    seite.locator(".palette-gruppe[data-kategorie=Registry][open]").wait_for()
+    assert seite.evaluate(offen) == ["Registry"]
+    assert seite.locator(".palette-block:not([hidden]) mark").count() > 0
+    seite.keyboard.press("ArrowDown")
+    seite.keyboard.press("Enter")
+    seite.locator("#schrittliste li.schritt[data-block=registry_wert_setzen]").wait_for()
+    seite.keyboard.press("Escape")
+    seite.wait_for_timeout(200)
+    assert seite.evaluate(offen) == ["Netzwerk"]  # Zustand vor der Suche
+    assert seite.locator("[data-fest=zuletzt] .palette-block[data-block=registry_wert_setzen]").count() == 1
+    # Favorit per Stern
+    seite.locator(".palette-gruppe[data-kategorie=Netzwerk] .palette-block[data-block=ping]").hover()
+    seite.click(".palette-gruppe[data-kategorie=Netzwerk] .palette-block[data-block=ping] [data-stern]")
+    assert seite.locator("[data-fest=favoriten]:not([hidden]) .palette-block[data-block=ping]").count() == 1
+    # Nur für Ziel: unter Linux keine Registry-Kategorie
+    seite.click("label.ziel-option:has(input[value=bash])")
+    seite.wait_for_function("document.querySelector('.palette-gruppe[data-kategorie=Registry]').hidden")
+    assert js_fehler == []
+
+
+def test_blockly_toolbox_suche(server: str, browser) -> None:
+    seite = browser.new_page(viewport={"width": 1280, "height": 1000})
+    seite.goto(f"{server}/blockly?ziel=powershell")
+    seite.locator(".blocklyDraggable").first.wait_for()
+    seite.click("h1")
+    seite.keyboard.press("/")
+    assert seite.evaluate("document.activeElement.id") == "bl-suche"
+    seite.keyboard.type("drucker ip")
+    seite.wait_for_function(
+        "() => { const f = window.okmBlockly.arbeitsflaeche.getToolbox().getFlyout();"
+        " return f.isVisible() && f.getWorkspace().getTopBlocks(false).some(b => b.type === 'bk_drucker_ip'); }"
+    )
+    seite.keyboard.press("Escape")
+    seite.wait_for_function("!window.okmBlockly.arbeitsflaeche.getToolbox().getFlyout().isVisible()")

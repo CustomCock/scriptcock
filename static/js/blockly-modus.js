@@ -412,7 +412,11 @@
       });
       return {
         kind: "categoryToolbox",
-        contents: [{
+        contents: [
+          // Dynamisch (registerToolboxCategoryCallback): Treffer des Suchfelds und zuletzt benutzte Bausteine
+          { kind: "category", name: "Suchergebnisse", custom: "OKM_SUCHE", colour: "#e6d3a3" },
+          { kind: "category", name: "Zuletzt benutzt", custom: "OKM_ZULETZT", colour: "#e6d3a3" },
+          {
           kind: "category", name: "Ablauf", colour: FARBE_ABLAUF,
           contents: [
             { kind: "block", type: "ablauf_wenn" }, { kind: "block", type: "ablauf_wenn_fehler" },
@@ -459,6 +463,82 @@
       move: { scrollbars: true, drag: true, wheel: false }
     });
     window.addEventListener("resize", function () { Blockly.svgResize(ws); });
+
+    // --- Toolbox-Suche und „Zuletzt benutzt“ ------------------------------------------------
+    var ABLAUF_NAMEN = {
+      ablauf_wenn: "Wenn … dann … sonst", ablauf_wenn_fehler: "Versuche … wenn das fehlschlägt",
+      ablauf_wiederhole: "Wiederhole N-mal", ablauf_fuer_jeden: "Für jeden Wert", ablauf_warten: "Warte Sekunden",
+      ablauf_bestaetigung: "Weiter nur bei JA", ablauf_abbrechen: "Script beenden", ablauf_kommentar: "Notiz"
+    };
+    var BS = window.OkmBausteinSuche;
+    var suchIndex = BS ? BS.baueIndex(
+      Object.keys(ABLAUF_NAMEN).map(function (typ) {
+        return { id: typ, name: ABLAUF_NAMEN[typ], beschreibung: "", kategorie: "Ablauf", typ: typ };
+      }).concat(daten.katalog.map(function (d) {
+        return { id: d.id, name: d.name, beschreibung: d.beschreibung, kategorie: d.kategorie, typ: "bk_" + d.id, def: d };
+      }))
+    ) : [];
+    var SPEICHER_ZULETZT = "okm.bausteine.zuletzt";  // gemeinsam mit der Palette im Listen-Modus
+    var suchAnfrage = "";
+    var laedt = false;  // beim Laden/Einfügen nichts als „benutzt“ zählen
+    function zuletztLesen() {
+      try { return JSON.parse(window.localStorage.getItem(SPEICHER_ZULETZT) || "[]") || []; } catch (e) { return []; }
+    }
+    function eintragJson(b) {
+      var def = b.def;
+      return { kind: "block", type: b.typ, disabled: !!def && def.ziele.indexOf(ziel()) < 0 };
+    }
+    ws.registerToolboxCategoryCallback("OKM_SUCHE", function () {
+      if (!suchAnfrage) { return [{ kind: "label", text: "Oben ins Suchfeld tippen (/ springt dorthin)." }]; }
+      var treffer = BS.suche(suchIndex, suchAnfrage).slice(0, 40).map(function (t) { return eintragJson(t.baustein); });
+      return treffer.length ? treffer : [{ kind: "label", text: "Nichts gefunden." }];
+    });
+    ws.registerToolboxCategoryCallback("OKM_ZULETZT", function () {
+      var nachId = {};
+      suchIndex.forEach(function (e) { nachId[e.baustein.id] = e.baustein; });
+      var liste = zuletztLesen().filter(function (id) { return nachId[id]; }).map(function (id) { return eintragJson(nachId[id]); });
+      return liste.length ? liste : [{ kind: "label", text: "Noch nichts benutzt." }];
+    });
+    function sucheKategorie() {
+      var tb = ws.getToolbox();
+      return tb ? tb.getToolboxItems().filter(function (k) { return k.getName && k.getName() === "Suchergebnisse"; })[0] : null;
+    }
+    var suchFeld = document.getElementById("bl-suche");
+    var suchZeit = null;
+    function sucheZeigen() {
+      suchAnfrage = suchFeld.value.trim();
+      var tb = ws.getToolbox();
+      var kat = sucheKategorie();
+      if (!tb || !kat) { return; }
+      if (!suchAnfrage) { tb.clearSelection(); return; }
+      if (tb.getSelectedItem() === kat) { tb.refreshSelection(); } else { tb.setSelectedItem(kat); }
+    }
+    if (suchFeld && BS) {
+      suchFeld.addEventListener("input", function () { clearTimeout(suchZeit); suchZeit = setTimeout(sucheZeigen, 150); });
+      suchFeld.addEventListener("keydown", function (ev) {
+        if (ev.key === "Escape") { ev.preventDefault(); ev.stopPropagation(); suchFeld.value = ""; sucheZeigen(); }
+      });
+      // „/“ springt ins Suchfeld (Vorrang vor dem Software-Katalog, daher in der Capture-Phase)
+      document.addEventListener("keydown", function (ev) {
+        if (ev.key !== "/" || ev.ctrlKey || ev.metaKey || ev.altKey) { return; }
+        var a = document.activeElement;
+        if (a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) { return; }
+        if (document.querySelector(".blocklyWidgetDiv:not([style*='none']) input")) { return; }
+        ev.preventDefault();
+        ev.stopPropagation();
+        suchFeld.focus();
+        suchFeld.select();
+      }, true);
+    }
+    // Neu aus der Toolbox gezogene Bausteine merken (neueste zuerst, höchstens 8)
+    ws.addChangeListener(function (ev) {
+      if (laedt || ev.type !== Blockly.Events.BLOCK_CREATE || !BS) { return; }
+      var b = ws.getBlockById(ev.blockId);
+      if (!b || b.isInFlyout) { return; }
+      var id = b.type.indexOf("bk_") === 0 ? b.type.slice(3) : (ABLAUF_NAMEN[b.type] ? b.type : null);
+      if (!id) { return; }
+      try { window.localStorage.setItem(SPEICHER_ZULETZT, JSON.stringify(BS.zuletztDazu(zuletztLesen(), id, 8))); } catch (e) { /* egal */ }
+    });
 
     // --- Zustand laden ---------------------------------------------------------------
     function kette(knoten) {
@@ -537,6 +617,7 @@
       Blockly.serialization.blocks.append(zustand, ws);
     }
 
+    laedt = true;
     var gespeichert = null;
     try { gespeichert = JSON.parse(window.localStorage.getItem(SPEICHER_SCHLUESSEL) || "null"); } catch (e) { gespeichert = null; }
     if (daten.vorbelegung) {
@@ -548,6 +629,8 @@
       } catch (e) { ws.clear(); }
     }
     if (!ws.getBlocksByType("ablauf_start").length) { startBlock([]); }
+    // Create-Events laufen asynchron – danach erst wieder zählen
+    setTimeout(function () { laedt = false; }, 0);
 
     document.getElementById("bl-neu").addEventListener("click", function () {
       if (!window.confirm("Arbeitsfläche leeren und neu beginnen?")) { return; }

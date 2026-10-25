@@ -3,6 +3,7 @@
 {% block titel %}Freier Baukasten{% endblock %}
 {% block breit %} inhalt-breit{% endblock %}
 {% block kopf %}<script src="{{ basis }}/static/vendor/sortable/Sortable.min.js" defer></script>
+<script src="{{ basis }}/static/js/baustein-suche.js" defer></script>
 {% include "_editor_kopf.html" %}{% endblock %}
 {% block inhalt %}
 <div class="seitenkopf">
@@ -20,28 +21,54 @@
 {% endif %}
 
 <div class="bk-layout">
-  <aside class="bk-palette" aria-label="Bausteine">
-    <label class="sr-only" for="bk-suche">Baustein suchen</label>
-    <input id="bk-suche" type="search" placeholder="Baustein suchen …" autocomplete="off">
-    {% for kategorie, bloecke in kategorien.items() %}
-    <section class="palette-gruppe">
-      <h2>{{ kategorie }}</h2>
-      <ul class="palette-liste">
-        {% for b in bloecke %}
-        <li class="palette-block{% if not b.verfuegbar(ziel) %} nicht-verfuegbar{% endif %}" data-block="{{ b.id }}"
-            data-ziele="{{ b.ziele | map(attribute='value') | join(' ') }}"
-            data-suche="{{ (b.name ~ ' ' ~ b.beschreibung ~ ' ' ~ b.kategorie) | lower }}"
-            data-beschreibung="{{ b.beschreibung }}"
-            title="{% if b.verfuegbar(ziel) %}{{ b.beschreibung }}{% else %}Unter {{ ziel_anzeige[ziel] }} nicht verfügbar{% endif %}">
-          <span class="risiko risiko-{{ b.risiko.value }}" title="Risiko: {{ b.risiko.anzeige }}">{{ b.risiko.value }}</span>
-          <span class="palette-name">{{ b.name }}</span>
-          <button type="button" class="hinzufuegen" data-hinzufuegen="{{ b.id }}" aria-label="{{ b.name }} hinzufügen"
-                  {% if not b.verfuegbar(ziel) %}disabled{% endif %}>+</button>
-        </li>
+  <aside class="bk-palette" id="bk-palette" aria-label="Bausteine">
+    {# Schmale Bildschirme: Palette als ausklappbare Leiste über der Schrittliste #}
+    <button type="button" class="bk-palette-schalter knopf" aria-expanded="false" aria-controls="bk-palette-inhalt">{{ i.icon("baukasten") }} Bausteine</button>
+    <div class="bk-palette-inhalt" id="bk-palette-inhalt">
+      <div class="palette-kopf">
+        <label class="sr-only" for="bk-suche">Baustein suchen</label>
+        <input id="bk-suche" type="search" placeholder="Baustein suchen …  ( / )" autocomplete="off" spellcheck="false"
+               aria-describedby="bk-suche-hilfe" aria-controls="bk-palette-gruppen">
+        <label class="schalter palette-nurziel"><input type="checkbox" id="bk-nur-ziel" checked> Nur für <span data-ziel-name>{{ ziel_kurz[ziel] }}</span></label>
+        <div class="palette-knoepfe">
+          <button type="button" class="knopf-klein palette-knopf" data-alle-auf>Alle aufklappen</button>
+          <button type="button" class="knopf-klein palette-knopf" data-alle-zu>Alle zuklappen</button>
+        </div>
+        <p id="bk-suche-hilfe" class="palette-tasten"><kbd>/</kbd> suchen · <kbd>↑</kbd><kbd>↓</kbd> wählen · <kbd>Enter</kbd> hinzufügen · <kbd>→</kbd><kbd>←</kbd> auf/zu · <kbd>Esc</kbd> leeren</p>
+        <p class="palette-anzahl" aria-live="polite" data-palette-anzahl></p>
+      </div>
+      <div id="bk-palette-gruppen">
+        <details class="palette-gruppe palette-fest" data-fest="favoriten" open hidden>
+          <summary><span class="palette-stern-symbol" aria-hidden="true">★</span> <span class="palette-gruppe-name">Favoriten</span> <span class="palette-zahl"></span></summary>
+          <ul class="palette-liste"></ul>
+        </details>
+        <details class="palette-gruppe palette-fest" data-fest="zuletzt" open hidden>
+          <summary>{{ i.icon("zurueck") }} <span class="palette-gruppe-name">Zuletzt benutzt</span> <span class="palette-zahl"></span></summary>
+          <ul class="palette-liste"></ul>
+        </details>
+        {% for kategorie, bloecke in kategorien.items() %}
+        <details class="palette-gruppe" data-kategorie="{{ kategorie }}">
+          <summary>{{ i.kategorie_icon(kategorie) }} <span class="palette-gruppe-name">{{ kategorie }}</span> <span class="palette-zahl"></span></summary>
+          <ul class="palette-liste">
+            {% for b in bloecke %}
+            <li class="palette-block{% if not b.verfuegbar(ziel) %} nicht-verfuegbar{% endif %}" tabindex="-1" data-block="{{ b.id }}"
+                data-ziele="{{ b.ziele | map(attribute='value') | join(' ') }}" data-name="{{ b.name }}"
+                data-kategorie="{{ b.kategorie }}" data-beschreibung="{{ b.beschreibung }}"
+                title="{{ b.beschreibung }}" aria-describedby="bk-beschr-{{ b.id }}">
+              <span class="risiko risiko-{{ b.risiko.value }}" title="Risiko: {{ b.risiko.anzeige }}">{{ b.risiko.value }}</span>
+              <span class="palette-name">{{ b.name }}</span>
+              <button type="button" class="palette-stern" data-stern aria-pressed="false" aria-label="{{ b.name }} als Favorit merken" title="Favorit">☆</button>
+              <button type="button" class="hinzufuegen" data-hinzufuegen="{{ b.id }}" aria-label="{{ b.name }} hinzufügen" tabindex="-1"
+                      {% if not b.verfuegbar(ziel) %}disabled{% endif %}>+</button>
+              <span class="palette-beschreibung" id="bk-beschr-{{ b.id }}">{{ b.beschreibung }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+        </details>
         {% endfor %}
-      </ul>
-    </section>
-    {% endfor %}
+        <p class="palette-leer" hidden>Kein Baustein gefunden. Anderen Begriff versuchen{% raw %}{% endraw %} oder „Nur für …“ ausschalten.</p>
+      </div>
+    </div>
   </aside>
 
   <section class="bk-arbeit">
