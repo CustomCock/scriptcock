@@ -52,8 +52,10 @@ def rezept_felder(registry: Registry, rezept: RezeptDef, ziel: Ziel) -> list[Par
         genutzt = benutzte_parameter(registry, block, ziel)
         for pid, wert in schritt.parameter.items():
             verweis = feld_verweis(wert)
-            if verweis and pid in genutzt:
+            # Optionen einer Richtlinie (e_…) gehören immer dazu
+            if verweis and (pid in genutzt or (block.dynamisch == "richtlinie" and pid.startswith("e_"))):
                 relevant.add(verweis)
+        relevant |= set(schritt.nur_wenn)  # Felder, die Schritte an-/abschalten
     return [f for f in rezept.felder if f.id in relevant]
 
 
@@ -74,6 +76,30 @@ def rechte_hinweis(registry: Registry, ir: ScriptIR, ziel: Ziel) -> RechteHinwei
     if not schritte:
         return None
     return RechteHinweis("Admin" if ziel in (Ziel.POWERSHELL, Ziel.CMD) else "sudo", ", ".join(schritte))
+
+
+def rezept_ablauf(registry: Registry, rezept: RezeptDef, ziel: Ziel) -> list[dict[str, Any]]:
+    """Schritte für „Das Script macht Folgendes“: Block, Richtlinie (falls fest) und Bedingung als Text."""
+    felder = {f.id: f for f in rezept.felder}
+
+    def wert_text(feld: ParameterDef | None, wert: Any) -> str:
+        if isinstance(wert, bool):
+            return "ja" if wert else "nein"
+        option = next((o for o in (feld.optionen if feld else []) if o.wert == str(wert)), None)
+        return option.label if option else str(wert)
+
+    ablauf = []
+    for s in rezept.schritte_fuer(ziel):
+        block = registry.bloecke[s.block]
+        rid = s.parameter.get("richtlinie")
+        r = registry.richtlinien.richtlinie(rid) if isinstance(rid, str) and not feld_verweis(rid) else None
+        bedingung = " und ".join(
+            f"„{felder[f].label if f in felder else f}“ = "
+            + " oder ".join(wert_text(felder.get(f), w) for w in (soll if isinstance(soll, list) else [soll]))
+            for f, soll in s.nur_wenn.items()
+        )
+        ablauf.append({"block": block, "richtlinie": r["titel"] if r else None, "bedingung": bedingung})
+    return ablauf
 
 
 def rezept_bloecke(registry: Registry, rezept: RezeptDef, ziel: Ziel) -> list[BlockDef]:
@@ -123,6 +149,8 @@ def rezept_zu_request(
 
     schritte = []
     for schritt in rezept.schritte_fuer(ziel):
+        if not schritt.bedingung_erfuellt(werte):
+            continue
         parameter: dict[str, Any] = {}
         for pid, wert in schritt.parameter.items():
             verweis = feld_verweis(wert)

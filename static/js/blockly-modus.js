@@ -605,7 +605,7 @@
         }
         params.forEach(function (p) {
           var wert = b.getFieldValue(p.id);
-          if (p.typ === "registry_zeilen") {
+          if (p.typ === "registry_zeilen" || p.typ === "registry_soll_liste") {
             parameter[p.id] = String(wert || "").split("|").map(function (e) { return e.trim(); }).filter(Boolean);
             return;
           }

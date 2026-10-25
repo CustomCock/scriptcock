@@ -221,6 +221,10 @@ Das schaltet ein:
   `wirkung`), `{{ regschutz_cmd }}` (findstr-Muster der gesperrten Pfade) und `{{ <daten>_abfrage }}`
   (erwartete `reg query`-Ausgabe) erzeugt der Generator.
 - `vorschau:` (je Ziel) läuft bei roten Schritten **vor** der JA-Abfrage und darf nichts ändern.
+- **Soll/Ist-Liste** (`typ: registry_soll_liste`): eine Zeile pro Wert `Pfad ; Wertname ; Typ ; Soll`
+  (Blockly: Einträge mit `|` getrennt). Jeder Teil wird wie im Einzelbaustein geprüft, die Pfade gegen den
+  Bereich des Blocks. Im Template ist der Wert ein PowerShell-Array mit Einträgen `Pfad|Wertname|Typ|Soll`
+  (Beispiel: `blocks/registry/registry_soll_ist_liste.yaml`). REG_MULTI_SZ geht dort nicht.
 
 ### Listen (`typ: liste`)
 
@@ -372,3 +376,19 @@ schritte:
 ```
 
 Ein wörtliches `$` am Anfang eines Werts schreibt man als `$$`.
+
+**Bedingte Schritte:** `nur_wenn: {feld: wert}` nimmt einen Schritt nur auf, wenn das Formularfeld diesen
+Wert hat (mehrere Werte als Liste, mehrere Felder = alle müssen passen; ja/nein als `true`/`false`):
+
+```yaml
+  - block: richtlinie_setzen
+    parameter: {richtlinie: edge:msedge:HomepageLocation, zustand: aktiviert, e_homepagelocation: $startseite}
+    nur_wenn: {browser: edge}
+  - block: wiederherstellungspunkt
+    parameter: {aktivieren: false}
+    nur_wenn: {wiederherstellungspunkt: true}
+```
+
+Die Registry prüft beim Start, dass es das Feld gibt und der Wert zum Feld passt; die Rezeptseite zeigt
+„nur wenn …“ an. Bei `richtlinie_setzen` mit fester Richtlinie dürfen die Optionen der Richtlinie (`e_…`)
+wie normale Parameter belegt werden (IDs im Registry-Panel bzw. `GET /api/registry/richtlinie?id=…`).

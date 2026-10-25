@@ -1,0 +1,36 @@
+id: reg_datei_importieren
+name: .reg-Datei sicher importieren
+kategorie: System
+beschreibung: Importiert eine .reg-Datei, sichert vorher alle betroffenen Schlüssel und legt eine Rückgängig-Datei an.
+hilfe: |
+  Vor dem Import wird jeder Schlüssel aus der Datei als .reg gesichert; der Ordner steht in der Zusammenfassung
+  (Doppelklick stellt den alten Stand wieder her). Dateien mit HKEY_CURRENT_USER oder gesperrten Bereichen
+  (SAM, SECURITY, BCD) werden abgelehnt – Benutzer-Einstellungen besser über „Registry-Einstellung setzen“
+  oder den .reg-Import im Baukasten (dort wird jeder Wert einzeln geprüft).
+schlagworte: [registry, reg, import, regedit, datei, einspielen, sicherung, rückgängig]
+felder:
+  - id: datei
+    label: .reg-Datei
+    typ: pfad_oder_unc
+    beispiel: \\fileserver\IT\Einstellungen\app.reg
+  - id: wirkung
+    label: Wann wirkt die Änderung?
+    typ: auswahl
+    standard: sofort
+    optionen:
+      - {wert: sofort, label: sofort}
+      - {wert: explorer_neustart, label: nach Neustart des Explorers}
+      - {wert: abmelden, label: nach Ab- und Anmelden}
+      - {wert: neustart, label: nach Neustart}
+      - {wert: unbekannt, label: weiß nicht}
+  - id: wiederherstellungspunkt
+    label: Vorher zusätzlich einen Wiederherstellungspunkt anlegen
+    typ: ja_nein
+    pflicht: false
+    standard: true
+schritte:
+  - block: wiederherstellungspunkt
+    parameter: {beschreibung: Vor .reg-Import durch okm-Script, aktivieren: false}
+    nur_wenn: {wiederherstellungspunkt: true}
+  - block: registry_import
+    parameter: {datei: $datei, wirkung: $wirkung}

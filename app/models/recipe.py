@@ -23,9 +23,24 @@ class RezeptSchritt(BaseModel):
     parameter: dict[str, Any] = Field(default_factory=dict)
     # Schritt nur für diese Ziele aufnehmen (leer = alle).
     nur_fuer: list[Ziel] = Field(default_factory=list)
+    # Schritt nur, wenn Formularfelder diese Werte haben: {feld_id: wert | [werte]} (alle Bedingungen)
+    nur_wenn: dict[str, Any] = Field(default_factory=dict)
 
     def aktiv_fuer(self, ziel: Ziel) -> bool:
         return not self.nur_fuer or ziel in self.nur_fuer
+
+    def bedingung_erfuellt(self, werte: dict[str, Any]) -> bool:
+        """``werte`` = geprüfte Formularwerte. Vergleich als Text (ja/nein als true/false)."""
+        for feld, soll in self.nur_wenn.items():
+            ist = werte.get(feld)
+            erlaubt = soll if isinstance(soll, list) else [soll]
+            if _als_text(ist) not in [_als_text(s) for s in erlaubt]:
+                return False
+        return True
+
+
+def _als_text(wert: Any) -> str:
+    return ("true" if wert else "false") if isinstance(wert, bool) else str(wert)
 
 
 class RezeptDef(BaseModel):

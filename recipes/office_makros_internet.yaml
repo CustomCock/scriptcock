@@ -1,0 +1,38 @@
+id: office_makros_internet
+name: Office-Makros aus dem Internet blockieren
+kategorie: Sicherheit
+beschreibung: Word, Excel, PowerPoint, Access, Visio, Project und Publisher führen Makros in Dateien aus dem Internet nicht mehr aus – per Gruppenrichtlinie aus den Office-Vorlagen.
+hilfe: |
+  Richtlinie „Blockieren der Ausführung von Makros in Office-Dateien aus dem Internet“ (Microsoft 365 Apps /
+  Office 2016 und neuer) für jede Anwendung. Es ist eine Benutzer-Richtlinie: „Alle Benutzerprofile“ setzt
+  sie für jedes vorhandene Profil, „Standardprofil“ für künftige Benutzer. Wirkt nach dem nächsten Start
+  der Office-Anwendung bzw. nach Neuanmeldung.
+  Eine Domänen-Gruppenrichtlinie hat Vorrang. Zum Prüfen danach „Registry-Einstellungen prüfen“ verwenden.
+schlagworte: [office, makro, makros, vba, internet, motw, sicherheit, word, excel, powerpoint, richtlinie, gpo]
+felder:
+  - id: bereich
+    label: Für wen?
+    typ: registry_bereich
+    standard: alle_benutzer
+    hilfe: Nicht „Computer“ – das ist eine Benutzer-Richtlinie.
+  - id: methode
+    label: Methode
+    typ: auswahl
+    standard: registry_direkt
+    optionen:
+      - {wert: registry_direkt, label: Registry direkt (wirkt sofort)}
+schritte:
+  - block: richtlinie_setzen
+    parameter: {richtlinie: office:word16:L_BlockMacroExecutionFromInternet, zustand: aktiviert, bereich: $bereich, methode: $methode}
+  - block: richtlinie_setzen
+    parameter: {richtlinie: office:excel16:L_BlockMacroExecutionFromInternet, zustand: aktiviert, bereich: $bereich, methode: $methode}
+  - block: richtlinie_setzen
+    parameter: {richtlinie: office:ppt16:L_BlockMacroExecutionFromInternet, zustand: aktiviert, bereich: $bereich, methode: $methode}
+  - block: richtlinie_setzen
+    parameter: {richtlinie: office:access16:L_BlockMacroExecutionFromInternet, zustand: aktiviert, bereich: $bereich, methode: $methode}
+  - block: richtlinie_setzen
+    parameter: {richtlinie: office:visio16:L_BlockMacroExecutionFromInternet, zustand: aktiviert, bereich: $bereich, methode: $methode}
+  - block: richtlinie_setzen
+    parameter: {richtlinie: office:proj16:L_BlockMacroExecutionFromInternet, zustand: aktiviert, bereich: $bereich, methode: $methode}
+  - block: richtlinie_setzen
+    parameter: {richtlinie: office:pub16:L_BlockMacroExecutionFromInternet, zustand: aktiviert, bereich: $bereich, methode: $methode}

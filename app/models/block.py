@@ -97,6 +97,7 @@ class ParamTyp(StrEnum):
     REGISTRY_BEREICH = "registry_bereich"  # wessen Registry: computer, angemeldeter_benutzer, …
     REGISTRY_TEXT = "registry_text"  # Text für Registry-Werte (auch & % $ ; …), ≤ 4096, keine Steuerzeichen
     REGISTRY_ZEILEN = "registry_zeilen"  # mehrere Texte, einer pro Zeile (Listen mit Kommas, MULTI_SZ)
+    REGISTRY_SOLL_LISTE = "registry_soll_liste"  # Zeilen „Pfad ; Wertname ; Typ ; Soll“ → Soll/Ist-Liste
     RICHTLINIE = (
         "richtlinie"  # ID aus dem Richtlinien-Katalog (registry/katalog), z. B. edge:msedge:HomepageLocation
     )
@@ -120,7 +121,7 @@ ZAHLENTYPEN: dict[str, tuple[int | None, int | None]] = {
 }
 # Als Listeneintrag nicht erlaubt
 NICHT_IN_LISTEN = frozenset(
-    {"liste", "variable", "ja_nein", "registry_daten", "registry_zeilen", "richtlinie"}
+    {"liste", "variable", "ja_nein", "registry_daten", "registry_zeilen", "registry_soll_liste", "richtlinie"}
 )
 
 REGISTRY_TYPEN = ("REG_SZ", "REG_EXPAND_SZ", "REG_DWORD", "REG_QWORD", "REG_MULTI_SZ", "REG_BINARY")

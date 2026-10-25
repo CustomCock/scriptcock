@@ -1,0 +1,32 @@
+id: registry_einstellung_pruefen
+name: Registry-Einstellungen prüfen (Soll/Ist)
+kategorie: Diagnose
+beschreibung: Vergleicht eine Liste von Registry-Werten mit ihrem Soll und speichert das Ergebnis als HTML-Bericht. Ändert nichts.
+hilfe: |
+  Eine Zeile pro Wert: Pfad ; Wertname ; Typ ; Soll. Je Wert steht OK oder ABWEICHUNG im Bericht,
+  am Ende die Anzahl der Abweichungen.
+  Gut nach „Registry-Einstellung setzen“ oder zum Kontrollieren von Gruppenrichtlinien.
+schlagworte: [registry, prüfen, soll, ist, vergleich, kontrolle, bericht, compliance, gruppenrichtlinie]
+felder:
+  - id: bereich
+    label: Wessen Registry?
+    typ: registry_bereich
+    standard: computer
+  - id: eintraege
+    label: Werte (eine Zeile pro Wert)
+    typ: registry_soll_liste
+    beispiel: HKLM\SOFTWARE\Policies\Microsoft\Edge ; HomepageLocation ; REG_SZ ; https://intranet.okm.local
+  - id: bericht
+    label: Bericht speichern unter
+    typ: pfad
+    standard: C:\Users\Public\Documents\okm-registry-pruefung.html
+  - id: oeffnen
+    label: Bericht danach im Browser öffnen
+    typ: ja_nein
+    pflicht: false
+    standard: true
+schritte:
+  - block: registry_soll_ist_liste
+    parameter: {bereich: $bereich, eintraege: $eintraege}
+  - block: bericht_html
+    parameter: {datei: $bericht, titel: Registry Soll-Ist-Vergleich, oeffnen: $oeffnen}

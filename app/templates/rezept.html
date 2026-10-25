@@ -49,10 +49,11 @@
     <section class="panel ablauf" aria-label="Enthaltene Schritte">
       <h2>Das Script macht Folgendes</h2>
       <ol>
-        {% for b in bloecke %}
+        {% for s in ablauf %}{% set b = s.block %}
         <li><span class="risiko risiko-{{ b.risiko.value }}" title="{{ b.risiko.anzeige }}">{{ b.risiko.value }}</span>
           {{ b.name }}{% if b.braucht_admin(ziel) %} <span class="marke">{{ "Admin" if ziel.value in ("powershell", "cmd") else "sudo" }}</span>{% endif %}
-          <span class="schritt-text">{{ b.beschreibung }}</span></li>
+          {% if s.bedingung %}<span class="marke marke-leise">nur wenn {{ s.bedingung }}</span>{% endif %}
+          <span class="schritt-text">{{ s.richtlinie if s.richtlinie else b.beschreibung }}</span></li>
         {% endfor %}
       </ol>
       {% if risiko == Risiko.ROT %}

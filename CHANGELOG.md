@@ -2,6 +2,27 @@
 
 ## Registry, Richtlinien-Katalog und Palette
 
+### Teil D: Rezepte
+
+- **Fünf Rezepte:**
+  - „Registry-Einstellung setzen“: ein Wert mit Bereich, `wenn_vorhanden`, Wirkung; Sicherung als .reg,
+    optional Wiederherstellungspunkt; PowerShell und CMD.
+  - „Registry-Einstellungen prüfen (Soll/Ist)“: Liste von Werten → OK/ABWEICHUNG je Wert + HTML-Bericht.
+  - „.reg-Datei sicher importieren“: optional Wiederherstellungspunkt, Sicherung aller betroffenen
+    Schlüssel, Import, Rückgängig-Ordner in der Zusammenfassung.
+  - „Browser-Richtlinien setzen“: Edge, Chrome oder Firefox per Auswahl; Software-Prüfung, Startseite,
+    automatische Updates, Pflicht-Erweiterungen – alles über Richtlinien aus den Hersteller-Vorlagen.
+  - „Office-Makros aus dem Internet blockieren“: die Richtlinie für Word, Excel, PowerPoint, Access, Visio,
+    Project und Publisher.
+- **Neuer Baustein** `registry_soll_ist_liste` mit Parametertyp `registry_soll_liste`
+  (`Pfad ; Wertname ; Typ ; Soll` je Zeile, Rückgabe `abweichungen`).
+- **Bedingte Rezeptschritte** `nur_wenn: {feld: wert}` (Prüfung beim Start, Anzeige „nur wenn …“ auf der
+  Rezeptseite, bei Richtlinien der Titel der Richtlinie statt der Bausteinbeschreibung).
+- Fix: Rezeptfelder für Bezugsparameter (Bereich zum Pfad) und für Optionen einer Richtlinie (`e_…`) wurden
+  nicht immer übernommen – z. B. galt unter CMD dann stillschweigend „Computer“.
+- Tests: `tests/test_rezepte_registry.py` (alle Varianten der Rezepte, Soll-Liste, `nur_wenn`), Golden-Files
+  für die neuen Rezepte.
+
 ### Teil C: Registry in der Oberfläche
 
 - **Registry-Panel** (`_registry.html`, `static/js/registry-katalog.js`, `RegistryKatalog.mount`) – eingeklappt

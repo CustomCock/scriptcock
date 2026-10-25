@@ -48,7 +48,13 @@ from app.models.block import (
 )
 from app.registry import Registry
 from app.regschutz import lade_schutz
-from app.validation import ValidierungsFehler, pruefe_wert_fuer_ziel, registry_ps_form, verweis_teile
+from app.validation import (
+    ValidierungsFehler,
+    pruefe_wert_fuer_ziel,
+    registry_ps_form,
+    soll_liste_script,
+    verweis_teile,
+)
 
 
 class GenerierungsFehler(ValueError):
@@ -373,6 +379,8 @@ class Generator(ABC):
                     if regtyp is None or not isinstance(regtyp.wert, str):
                         raise GenerierungsFehler(f"{block.name}: Registry-Typ fehlt.")
                     kontext[p.id] = escaping.registry_daten(self.ziel, regtyp.wert, wert.wert)
+                elif p.typ is ParamTyp.REGISTRY_SOLL_LISTE and isinstance(wert.wert, list):
+                    kontext[p.id] = escaping.liste(self.ziel, soll_liste_script(wert.wert))
                 elif p.typ is ParamTyp.VARIABLE and isinstance(wert.wert, str):
                     kontext[p.id] = escaping.variable_lesen(self.ziel, *verweis_teile(wert.wert))
                 elif isinstance(wert.wert, list):

@@ -1,0 +1,69 @@
+id: registry_einstellung_setzen
+name: Registry-Einstellung setzen
+kategorie: System
+beschreibung: Setzt einen Registry-Wert – für den Computer oder das richtige Benutzerprofil, mit Sicherung vorher und Kontrolle danach.
+hilfe: |
+  Vor dem Schreiben sichert das Script den betroffenen Schlüssel als .reg-Datei (Rückgängig-Ordner steht in der
+  Zusammenfassung); auf Wunsch zusätzlich ein Wiederherstellungspunkt (nur PowerShell).
+  Für Benutzer-Einstellungen nicht HKCU wählen, sondern den Bereich – sonst landet der Wert nach dem
+  Admin-Neustart im Profil des Admin-Kontos.
+  Unter HKLM\SYSTEM und …\Policies\… ist der Schritt rot. Gruppenrichtlinien besser über „Richtlinie setzen“.
+schlagworte: [registry, regedit, wert, setzen, dword, schlüssel, einstellung, hklm, hkcu]
+felder:
+  - id: bereich
+    label: Wessen Registry?
+    typ: registry_bereich
+    standard: computer
+  - id: pfad
+    label: Schlüssel
+    typ: registry_pfad
+    beispiel: HKLM\SOFTWARE\Firma\App
+    hilfe: Computer = HKLM\…; bei einem Benutzer-Bereich Software\… oder HKCU\….
+  - id: wertname
+    label: Wertname (leer = Standardwert)
+    typ: registry_wertname
+    pflicht: false
+  - id: typ
+    label: Typ
+    typ: registry_typ
+    standard: REG_DWORD
+  - id: daten
+    label: Daten
+    typ: registry_daten
+    beispiel: "1"
+    hilfe: "DWORD/QWORD: Zahl (dezimal oder 0x…). MULTI_SZ: eine Zeile pro Eintrag. BINARY: Hex-Bytes."
+  - id: wenn_vorhanden
+    label: Wenn der Wert schon da ist
+    typ: auswahl
+    standard: ueberschreiben
+    optionen:
+      - {wert: ueberschreiben, label: überschreiben}
+      - {wert: nur_wenn_fehlt, label: "nicht anfassen (nur setzen, wenn er fehlt)"}
+      - {wert: abbrechen, label: abbrechen}
+  - id: wirkung
+    label: Wann wirkt die Änderung?
+    typ: auswahl
+    standard: sofort
+    optionen:
+      - {wert: sofort, label: sofort}
+      - {wert: explorer_neustart, label: nach Neustart des Explorers}
+      - {wert: abmelden, label: nach Ab- und Anmelden}
+      - {wert: neustart, label: nach Neustart}
+  - id: wiederherstellungspunkt
+    label: Vorher zusätzlich einen Wiederherstellungspunkt anlegen
+    typ: ja_nein
+    pflicht: false
+    standard: false
+schritte:
+  - block: wiederherstellungspunkt
+    parameter: {beschreibung: Vor Registry-Änderung durch okm-Script, aktivieren: false}
+    nur_wenn: {wiederherstellungspunkt: true}
+  - block: registry_wert_setzen
+    parameter:
+      bereich: $bereich
+      pfad: $pfad
+      wertname: $wertname
+      typ: $typ
+      daten: $daten
+      wenn_vorhanden: $wenn_vorhanden
+      wirkung: $wirkung

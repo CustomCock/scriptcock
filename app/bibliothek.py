@@ -289,7 +289,7 @@ def _katalog_hinweis(registry: Registry, s: BlockSchritt) -> str | None:
 
 def _trenner(pv: ParamValue, blockly: bool) -> str:
     """REG_MULTI_SZ: im Formular eine Zeile pro Eintrag, in Blockly (einzeilig) mit „ | “."""
-    if pv.typ in (ParamTyp.REGISTRY_DATEN, ParamTyp.REGISTRY_ZEILEN):
+    if pv.typ in (ParamTyp.REGISTRY_DATEN, ParamTyp.REGISTRY_ZEILEN, ParamTyp.REGISTRY_SOLL_LISTE):
         return " | " if blockly else "\n"
     return ", "
 

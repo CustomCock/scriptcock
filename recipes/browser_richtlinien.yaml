@@ -1,0 +1,89 @@
+id: browser_richtlinien
+name: Browser-Richtlinien setzen
+kategorie: Software
+beschreibung: Setzt für Edge, Chrome oder Firefox die Startseite, automatische Updates und Pflicht-Erweiterungen als Gruppenrichtlinie – nach einer Prüfung, ob der Browser installiert ist.
+hilfe: |
+  Die Werte stammen aus den offiziellen Richtlinien-Vorlagen der Hersteller (Registry-Panel → Richtlinien).
+  Edge und Chrome übernehmen die Startseite laut Vorlage nur auf Rechnern in einer Domäne, in Entra ID
+  oder in der Geräteverwaltung. Updates: Edge über die Edge-Update-Richtlinie, Chrome mit Hinweis auf
+  einen nötigen Neustart (die Google-Update-Vorlagen sind nicht im Katalog), Firefox automatisch.
+  Erweiterungen: Edge/Chrome „Erweiterungs-ID;Update-URL“, Firefox die Download-URL der .xpi – eine pro Zeile.
+schlagworte: [browser, edge, chrome, firefox, startseite, homepage, erweiterungen, extensions, updates, richtlinie, gpo]
+felder:
+  - id: browser
+    label: Browser
+    typ: auswahl
+    standard: edge
+    optionen:
+      - {wert: edge, label: Microsoft Edge}
+      - {wert: chrome, label: Google Chrome}
+      - {wert: firefox, label: Mozilla Firefox}
+  - id: startseite
+    label: Startseite
+    typ: registry_text
+    beispiel: https://intranet.okm.local
+  - id: updates
+    label: Automatische Updates erzwingen
+    typ: ja_nein
+    pflicht: false
+    standard: true
+  - id: erweiterungen_setzen
+    label: Pflicht-Erweiterungen festlegen (ersetzt die bisherige Liste)
+    typ: ja_nein
+    pflicht: false
+    standard: false
+  - id: erweiterungen
+    label: Erweiterungen (eine pro Zeile)
+    typ: registry_zeilen
+    pflicht: false
+    hilfe: "Edge/Chrome: Erweiterungs-ID;Update-URL (z. B. aus dem Web Store). Firefox: URL der .xpi-Datei."
+schritte:
+  # Software-Prüfung vorher (meldet „Nicht installiert“, ohne abzubrechen)
+  - block: software_version
+    parameter: {name: Microsoft Edge, mindestens: "100"}
+    nur_wenn: {browser: edge}
+  - block: software_version
+    parameter: {name: Google Chrome, mindestens: "100"}
+    nur_wenn: {browser: chrome}
+  - block: software_version
+    parameter: {name: Mozilla Firefox, mindestens: "100"}
+    nur_wenn: {browser: firefox}
+  # Startseite
+  - block: richtlinie_setzen
+    parameter: {richtlinie: edge:msedge:HomepageLocation, zustand: aktiviert, bereich: computer, e_homepagelocation: $startseite}
+    nur_wenn: {browser: edge}
+  - block: richtlinie_setzen
+    parameter: {richtlinie: edge:msedge:HomepageIsNewTabPage, zustand: deaktiviert, bereich: computer}
+    nur_wenn: {browser: edge}
+  - block: richtlinie_setzen
+    parameter: {richtlinie: chrome:chrome:HomepageLocation, zustand: aktiviert, bereich: computer, e_homepagelocation: $startseite}
+    nur_wenn: {browser: chrome}
+  - block: richtlinie_setzen
+    parameter: {richtlinie: chrome:chrome:HomepageIsNewTabPage, zustand: deaktiviert, bereich: computer}
+    nur_wenn: {browser: chrome}
+  - block: richtlinie_setzen
+    parameter: {richtlinie: firefox:firefox:HomepageURL, zustand: aktiviert, bereich: computer, e_homepageurl: $startseite, e_homepagelocked: true}
+    nur_wenn: {browser: firefox}
+  # Updates
+  - block: richtlinie_setzen
+    parameter: {richtlinie: edge:msedgeupdate:Pol_UpdatePolicyMicrosoftEdge, zustand: aktiviert, e_part_updatepolicy: "0"}
+    nur_wenn: {browser: edge, updates: true}
+  - block: richtlinie_setzen
+    parameter: {richtlinie: chrome:chrome:RelaunchNotification, zustand: aktiviert, bereich: computer, e_relaunchnotification: "1"}
+    nur_wenn: {browser: chrome, updates: true}
+  - block: richtlinie_setzen
+    parameter: {richtlinie: firefox:firefox:AppAutoUpdate, zustand: aktiviert, bereich: computer}
+    nur_wenn: {browser: firefox, updates: true}
+  - block: richtlinie_setzen
+    parameter: {richtlinie: firefox:firefox:DisableAppUpdate, zustand: deaktiviert, bereich: computer}
+    nur_wenn: {browser: firefox, updates: true}
+  # Erweiterungen
+  - block: richtlinie_setzen
+    parameter: {richtlinie: edge:msedge:ExtensionInstallForcelist, zustand: aktiviert, bereich: computer, e_extensioninstallforcelistdesc: $erweiterungen}
+    nur_wenn: {browser: edge, erweiterungen_setzen: true}
+  - block: richtlinie_setzen
+    parameter: {richtlinie: chrome:chrome:ExtensionInstallForcelist, zustand: aktiviert, bereich: computer, e_extensioninstallforcelistdesc: $erweiterungen}
+    nur_wenn: {browser: chrome, erweiterungen_setzen: true}
+  - block: richtlinie_setzen
+    parameter: {richtlinie: firefox:firefox:Extensions_Install, zustand: aktiviert, bereich: computer, e_extensions: $erweiterungen}
+    nur_wenn: {browser: firefox, erweiterungen_setzen: true}

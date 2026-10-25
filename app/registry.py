@@ -130,6 +130,10 @@ def cmd_klammern_ok(quelle: str) -> bool:
     return tiefe == 0
 
 
+def _mit_bezug(p: ParameterDef) -> bool:
+    return p.bezug is not None or p.typ in (ParamTyp.REGISTRY_PFAD, ParamTyp.REGISTRY_SOLL_LISTE)
+
+
 def _konstanten(parameter: dict[str, Any]) -> dict[str, Any]:
     return {k: konstante(v) for k, v in parameter.items()}
 
@@ -178,7 +182,9 @@ class Registry:
         for art in ("ziele", "pruefung", "dry_run", "vorschau"):
             variablen |= self.variablen.get((block.id, art, ziel), frozenset())
         abgeleitet = block.abgeleitete_variablen()
-        return {abgeleitet.get(v, v) for v in variablen}
+        genutzt = {abgeleitet.get(v, v) for v in variablen}
+        # Bezugsparameter (z. B. „bereich“ zum Pfad, „typ“ zu den Daten) steuern die Prüfung mit
+        return genutzt | {p.bezug or "bereich" for p in block.parameter if p.id in genutzt and _mit_bezug(p)}
 
     def rezept_ziele(self, rezept: RezeptDef) -> list[Ziel]:
         """Ziele, für die alle aktiven Schritte eines Rezepts verfügbar sind.
@@ -346,6 +352,17 @@ def _pruefe_rezept(rezept: RezeptDef, reg: Registry, fehler: list[str]) -> None:
         for ziel in schritt.nur_fuer:
             if not block.verfuegbar(ziel):
                 fehler.append(f"{ort}: Block '{block.id}' ist für {ziel.value} nicht verfügbar")
+        for fid, soll in schritt.nur_wenn.items():
+            feld = felder.get(fid)
+            if feld is None:
+                fehler.append(f"{ort}.nur_wenn: Formularfeld '{fid}' existiert nicht")
+                continue
+            benutzt.add(fid)
+            for wert in soll if isinstance(soll, list) else [soll]:
+                try:
+                    validiere_wert(feld, wert)
+                except ValidierungsFehler as e:
+                    fehler.append(f"{ort}.nur_wenn.{fid}: {e}")
         for pid, wert in schritt.parameter.items():
             param = reg.param_mit_elementen(block, pid, _konstanten(schritt.parameter))
             if param is None:

@@ -540,6 +540,57 @@ _WERTNAME = ParameterDef(id="wertname", label="Wertname", typ=ParamTyp.REGISTRY_
 _RICHTLINIE_ID = re.compile(r"^[a-z0-9_]{1,40}:[A-Za-z0-9_.\-]{1,100}:[A-Za-z0-9_.\-]{1,200}$")
 
 
+MAX_SOLL_EINTRAEGE = 50
+_SOLL_PFAD = ParameterDef(id="pfad", label="Pfad", typ=ParamTyp.REGISTRY_PFAD)
+_SOLL_TYP = ParameterDef(id="typ", label="Typ", typ=ParamTyp.REGISTRY_TYP)
+
+
+def registry_soll_liste(roh: Any) -> list[str | int]:
+    """Soll/Ist-Liste: eine Zeile (Blockly: ein Listeneintrag) pro Wert, „Pfad ; Wertname ; Typ ; Soll“.
+
+    Jeder Teil wird wie im Einzelbaustein geprüft (Pfad, Wertname, Typ, Daten passend zum Typ). Ergebnis je
+    Eintrag ``"Pfad ; Wertname ; TYP ; Daten"`` (normalisiert – erneutes Prüfen ändert nichts). Fürs Script
+    macht der Generator daraus ``Pfad|Wertname|TYP|Daten`` (``soll_liste_script``); Pfad und Wertname dürfen
+    deshalb kein ``|`` enthalten, die Daten schon. REG_MULTI_SZ geht hier nicht (mehrzeilig).
+    """
+    if isinstance(roh, list):
+        zeilen = [str(z) for z in roh]
+    elif isinstance(roh, str):
+        zeilen = roh.replace("\r\n", "\n").split("\n")
+    else:
+        raise ValidierungsFehler("Bitte eine Zeile pro Wert angeben.")
+    eintraege: list[str | int] = []
+    for n, zeile in enumerate(zeilen, 1):
+        if not zeile.strip():
+            continue
+        teile = [t.strip() for t in zeile.split(";", 3)]
+        if len(teile) != 4:
+            raise ValidierungsFehler(f"Zeile {n}: bitte „Pfad ; Wertname ; Typ ; Soll“ angeben.")
+        pfad, name, typ, daten = teile
+        try:
+            pfad_n = validiere_wert(_SOLL_PFAD, pfad).wert
+            name_n = _registry_wertname(name, _WERTNAME) if name else ""
+            typ_n = validiere_wert(_SOLL_TYP, typ).wert
+            if typ_n == "REG_MULTI_SZ":
+                raise ValidierungsFehler("REG_MULTI_SZ bitte mit „Registry-Wert prüfen“ einzeln prüfen.")
+            daten_n = registry_daten(daten, str(typ_n))
+        except ValidierungsFehler as e:
+            raise ValidierungsFehler(f"Zeile {n}: {e}") from None
+        if "|" in f"{pfad_n}{name_n}":
+            raise ValidierungsFehler(f"Zeile {n}: „|“ ist in Pfad und Wertname hier nicht erlaubt.")
+        eintraege.append(f"{pfad_n} ; {name_n} ; {typ_n} ; {daten_n}")
+    if not eintraege:
+        raise ValidierungsFehler("Bitte mindestens einen Wert angeben.")
+    if len(eintraege) > MAX_SOLL_EINTRAEGE:
+        raise ValidierungsFehler(f"Höchstens {MAX_SOLL_EINTRAEGE} Werte pro Schritt.")
+    return eintraege
+
+
+def soll_liste_script(eintraege: list[str | int]) -> list[str | int]:
+    """Geprüfte Soll/Ist-Liste → Einträge ``Pfad|Wertname|TYP|Daten`` für das Script."""
+    return ["|".join(t.strip() for t in str(e).split(";", 3)) for e in eintraege]
+
+
 def _registry_text(text: str, p: ParameterDef) -> str:
     """Text für einen Registry-Wert (URLs, Pfade, %Variablen% …) – keine Steuerzeichen, ≤ 4096."""
     if len(text) > MAX_REGISTRY_TEXT:
@@ -853,6 +904,8 @@ def validiere_wert(p: ParameterDef, roh: Any, regtyp: str | None = None) -> Para
     wert: str | int | bool | list[str | int]
     if p.typ is ParamTyp.REGISTRY_ZEILEN:
         return ParamValue(typ=p.typ, wert=[] if leer else registry_daten(roh, "REG_MULTI_SZ"))
+    if p.typ is ParamTyp.REGISTRY_SOLL_LISTE:
+        return ParamValue(typ=p.typ, wert=registry_soll_liste(roh))
     if p.typ is ParamTyp.REGISTRY_DATEN:
         if regtyp is None:
             regtyp = (
@@ -938,6 +991,7 @@ _OHNE_SCHLEIFENWERT = frozenset(
         ParamTyp.REGISTRY_DATEN,
         ParamTyp.REGISTRY_BEREICH,
         ParamTyp.REGISTRY_ZEILEN,
+        ParamTyp.REGISTRY_SOLL_LISTE,
         ParamTyp.RICHTLINIE,
     }
 )
@@ -1324,6 +1378,9 @@ class _BaumPruefer:
         schutz = lade_schutz()
         risiko: Risiko | None = None
         for p in block.parameter:
+            if p.typ is ParamTyp.REGISTRY_SOLL_LISTE:
+                self.soll_liste_pruefen(i, block, p, werte)
+                continue
             if p.typ is not ParamTyp.REGISTRY_PFAD:
                 continue
             wert = werte.get(p.id)
@@ -1363,6 +1420,26 @@ class _BaumPruefer:
             elif schutz.rot_fuer(voll) and block.risiko is not Risiko.ROT:
                 risiko = Risiko.ROT
         return risiko
+
+    def soll_liste_pruefen(
+        self, i: int, block: BlockDef, p: ParameterDef, werte: dict[str, ParamValue]
+    ) -> None:
+        """Soll/Ist-Liste: jeden Pfad wie beim Lesen gegen den Bereich prüfen und in Script-Form bringen."""
+        wert = werte.get(p.id)
+        if wert is None or not isinstance(wert.wert, list):
+            return
+        bereich_wert = werte.get(p.bezug or "bereich")
+        bereich = bereich_wert.wert if bereich_wert is not None else None
+        neu: list[str | int] = []
+        for n, eintrag in enumerate(wert.wert, 1):
+            pfad, rest = (t.strip() for t in str(eintrag).split(";", 1))
+            try:
+                form = registry_pfad_fuer_bereich(pfad, bereich if isinstance(bereich, str) else None, True)
+            except ValidierungsFehler as e:
+                self.fehler.append(Feldfehler(i, p.id, f"{p.label}: Wert {n}: {e}"))
+                continue
+            neu.append(f"{form} ; {rest}")
+        werte[p.id] = ParamValue(typ=wert.typ, wert=neu)
 
     def verweis_pruefen(self, nr: int, wert: str, erwartet: RueckgabeTyp | None) -> RueckgabeDef:
         """Löst ``"<schritt>.<id>"`` auf; ``nr`` = Nummer des Blocks, der den Wert liest."""
