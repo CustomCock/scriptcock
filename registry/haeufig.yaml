@@ -1,97 +1,248 @@
-# Häufige Einstellungen – Schnellzugriff im Registry-Panel (Tab „Häufig“).
+# Häufige Einstellungen – Reiter „Häufig“ im Registry-Panel.
 #
-# Jeder Eintrag verweist auf eine Richtlinie aus dem Richtlinien-Katalog (registry/katalog/), also auf
-# die offiziellen Administrativen Vorlagen des Herstellers – Titel, Erklärung, Schlüssel und Werte
-# kommen von dort. Keine freien Registry-Tipps (Foren, Gedächtnis): Was nicht als Richtlinie in einer
-# Hersteller-Vorlage steht, kommt hier nicht rein. tests/test_richtlinien.py prüft jeden Eintrag gegen
-# den Katalog und die Validierung.
+# Regel: Jeder Eintrag ist belegt.
+#   - Schritte mit „richtlinie:“ verweisen auf den Richtlinien-Katalog (registry/katalog/), also auf die
+#     offiziellen Administrativen Vorlagen des Herstellers – die Vorlage ist die Quelle.
+#   - Schritte mit „block:“ (freie Registry-Werte) brauchen „quelle“ mit einer Microsoft-Learn- bzw.
+#     Herstellerseite, auf der Schlüssel, Wertname und Daten genau so stehen.
+#   Keine Registry-Tipps aus Foren oder aus dem Gedächtnis. Kandidaten ohne offizielle Quelle stehen in
+#   docs/offene-punkte.md. tests/test_richtlinien.py prüft jeden Eintrag gegen Katalog und Validierung.
 #
 # Felder:
-#   id          kurzer Name (eindeutig)
-#   titel       Anzeige im Panel
-#   gruppe      Windows | Microsoft Edge | Google Chrome | Mozilla Firefox | Office
-#   richtlinie  Richtlinien-ID aus dem Katalog (<paket>:<admx>:<name>)
-#   zustand     aktiviert | deaktiviert | nicht_konfiguriert
-#   werte       Elementwerte (Parameter-IDs e_…); Auswahl = Nummer der Option als Text
-#   anpassen    Elemente, die der Benutzer nach dem Übernehmen ausfüllen soll (Beispielwert ersetzen)
-#   hinweis     optional: Einschränkung aus der Erklärung der Richtlinie
+#   id           kurzer Name (eindeutig)
+#   titel        Anzeige im Panel
+#   beschreibung ein Satz, was passiert
+#   gruppe       Überschrift im Panel
+#   bereich      computer | benutzer (benutzer = der Bereich ist beim Übernehmen wählbar)
+#   wirkung      sofort | explorer_neustart | gpupdate | abmelden | neustart
+#   risiko       gelb | rot (so wie die Validierung den Schritt einstuft)
+#   quelle       {titel, url} – Pflicht, sobald ein Schritt „block:“ nutzt
+#   schritte     [{richtlinie, zustand, werte?} | {block, parameter}]
+#   anpassen     Parameter-IDs, deren Beispielwert der Benutzer ersetzen soll
+#   hinweis      optional: Einschränkung laut Quelle
 
 eintraege:
-  - id: copilot_aus
-    titel: Windows Copilot ausschalten
+  # --- Windows ---------------------------------------------------------------------------------
+  - id: lange_pfade
+    titel: Lange Pfade aktivieren (über 260 Zeichen)
+    beschreibung: Programme, die es unterstützen, dürfen Pfade länger als 260 Zeichen verwenden.
     gruppe: Windows
-    richtlinie: windows:windowscopilot:TurnOffWindowsCopilot
-    zustand: aktiviert
-    hinweis: Benutzer-Richtlinie – wirkt nach dem Neuanmelden.
+    bereich: computer
+    wirkung: neustart
+    risiko: rot
+    schritte:
+      - richtlinie: windows:filesys:LongPathsEnabled
+        zustand: aktiviert
+    hinweis: Schreibt unter HKLM\SYSTEM – deshalb roter Schritt.
 
-  - id: anwenderfeatures_aus
-    titel: Vorschläge und Werbe-Apps von Microsoft ausschalten
+  - id: smb1_aus
+    titel: SMBv1-Server ausschalten
+    beschreibung: Schaltet das veraltete SMB-Protokoll Version 1 im Dateiserver-Dienst ab.
     gruppe: Windows
-    richtlinie: windows:cloudcontent:DisableWindowsConsumerFeatures
-    zustand: aktiviert
-    hinweis: Laut Vorlage nur für Enterprise- und Education-Editionen.
-
-  - id: autoplay_aus
-    titel: Automatische Wiedergabe auf allen Laufwerken ausschalten
-    gruppe: Windows
-    richtlinie: windows:autoplay:Autorun
-    zustand: aktiviert
-    werte:
-      e_autorun_box: "1"
+    bereich: computer
+    wirkung: neustart
+    risiko: rot
+    quelle:
+      titel: "Microsoft Learn: Detect, enable, and disable SMBv1, SMBv2, and SMBv3 in Windows"
+      url: https://learn.microsoft.com/en-us/windows-server/storage/file-server/troubleshoot/detect-enable-and-disable-smbv1-v2-v3
+    schritte:
+      - block: registry_wert_setzen
+        parameter:
+          bereich: computer
+          pfad: HKLM\SYSTEM\CurrentControlSet\Services\LanmanServer\Parameters
+          wertname: SMB1
+          typ: REG_DWORD
+          daten: "0"
+          wirkung: neustart
+    hinweis: >-
+      Laut Microsoft ist SMBv1 unter Windows 11 nicht mehr installiert; ältere Geräte (NAS, Scanner), die nur
+      SMBv1 können, erreichen den Rechner danach nicht mehr.
 
   - id: autorun_aus
-    titel: AutoAusführen (autorun.inf) nie ausführen
+    titel: Automatische Wiedergabe und AutoAusführen ausschalten
+    beschreibung: Keine automatische Wiedergabe auf allen Laufwerken, autorun.inf wird nie ausgeführt.
     gruppe: Windows
-    richtlinie: windows:autoplay:NoAutorun
-    zustand: aktiviert
-    werte:
-      e_noautorun_dropdown: "0"
+    bereich: computer
+    wirkung: sofort
+    risiko: gelb
+    schritte:
+      - richtlinie: windows:autoplay:Autorun
+        zustand: aktiviert
+        werte: {e_autorun_box: "1"}
+      - richtlinie: windows:autoplay:NoAutorun
+        zustand: aktiviert
+        werte: {e_noautorun_dropdown: "0"}
+
+  - id: aktive_stunden
+    titel: Windows Update – Nutzungszeit festlegen
+    beschreibung: Kein automatischer Neustart nach Updates zwischen Start und Ende der Nutzungszeit.
+    gruppe: Windows
+    bereich: computer
+    wirkung: gpupdate
+    risiko: gelb
+    schritte:
+      - richtlinie: windows:windowsupdate:ActiveHours
+        zustand: aktiviert
+        werte: {e_activehoursstarttime: "7", e_activehoursendtime: "18"}
+    anpassen: [e_activehoursstarttime, e_activehoursendtime]
+
+  - id: copilot_aus
+    titel: Windows Copilot ausschalten
+    beschreibung: Copilot ist nicht verfügbar, das Symbol in der Taskleiste verschwindet.
+    gruppe: Windows
+    bereich: benutzer
+    wirkung: abmelden
+    risiko: gelb
+    schritte:
+      - richtlinie: windows:windowscopilot:TurnOffWindowsCopilot
+        zustand: aktiviert
 
   - id: diagnosedaten_erforderlich
     titel: Nur erforderliche Diagnosedaten senden
+    beschreibung: Windows sendet nur die erforderlichen Diagnosedaten; Benutzer können nicht erhöhen.
     gruppe: Windows
-    richtlinie: windows:datacollection:AllowTelemetry
-    zustand: aktiviert
-    werte:
-      e_allowtelemetry: "1"
+    bereich: computer
+    wirkung: gpupdate
+    risiko: gelb
+    schritte:
+      - richtlinie: windows:datacollection:AllowTelemetry
+        zustand: aktiviert
+        werte: {e_allowtelemetry: "1"}
 
-  - id: erste_anmeldung_animation_aus
-    titel: Animation bei der ersten Anmeldung ausschalten
-    gruppe: Windows
-    richtlinie: windows:logon:EnableFirstLogonAnimation
-    zustand: deaktiviert
+  # --- Remotedesktop ---------------------------------------------------------------------------
+  - id: rdp_an_mit_nla
+    titel: Remotedesktop einschalten (mit NLA)
+    beschreibung: Erlaubt Remotedesktop-Verbindungen und verlangt Authentifizierung auf Netzwerkebene.
+    gruppe: Remotedesktop
+    bereich: computer
+    wirkung: gpupdate
+    risiko: gelb
+    schritte:
+      - richtlinie: windows:terminalserver:TS_DISABLE_CONNECTIONS
+        zustand: aktiviert
+      - richtlinie: windows:terminalserver:TS_USER_AUTHENTICATION_POLICY
+        zustand: aktiviert
+    hinweis: Die Windows-Firewall-Regel für Remotedesktop wird dadurch nicht geöffnet.
 
+  - id: rdp_aus
+    titel: Remotedesktop ausschalten
+    beschreibung: Verbietet eingehende Remotedesktop-Verbindungen.
+    gruppe: Remotedesktop
+    bereich: computer
+    wirkung: gpupdate
+    risiko: gelb
+    schritte:
+      - richtlinie: windows:terminalserver:TS_DISABLE_CONNECTIONS
+        zustand: deaktiviert
+
+  - id: nla_erzwingen
+    titel: NLA für Remotedesktop erzwingen
+    beschreibung: Remotedesktop nur mit Authentifizierung auf Netzwerkebene.
+    gruppe: Remotedesktop
+    bereich: computer
+    wirkung: gpupdate
+    risiko: gelb
+    schritte:
+      - richtlinie: windows:terminalserver:TS_USER_AUTHENTICATION_POLICY
+        zustand: aktiviert
+
+  # --- Office / OneDrive -----------------------------------------------------------------------
+  - id: office_makros_internet
+    titel: Office-Makros aus dem Internet blockieren
+    beschreibung: Word, Excel, PowerPoint, Access und Visio führen Makros in Dateien aus dem Internet nicht aus.
+    gruppe: Office und OneDrive
+    bereich: benutzer
+    wirkung: abmelden
+    risiko: gelb
+    schritte:
+      - {richtlinie: office:word16:L_BlockMacroExecutionFromInternet, zustand: aktiviert}
+      - {richtlinie: office:excel16:L_BlockMacroExecutionFromInternet, zustand: aktiviert}
+      - {richtlinie: office:ppt16:L_BlockMacroExecutionFromInternet, zustand: aktiviert}
+      - {richtlinie: office:access16:L_BlockMacroExecutionFromInternet, zustand: aktiviert}
+      - {richtlinie: office:visio16:L_BlockMacroExecutionFromInternet, zustand: aktiviert}
+
+  - id: onedrive_still_anmelden
+    titel: OneDrive mit dem Firmenkonto still anmelden
+    beschreibung: Die OneDrive-Synchronisierung meldet Benutzer mit ihrem Windows-Konto (Entra ID) ohne Rückfrage an.
+    gruppe: Office und OneDrive
+    bereich: computer
+    wirkung: abmelden
+    risiko: rot
+    quelle:
+      titel: "Microsoft Learn: Use OneDrive policies to control sync settings (SilentAccountConfig)"
+      url: https://learn.microsoft.com/en-us/sharepoint/use-group-policy
+    schritte:
+      - block: registry_wert_setzen
+        parameter:
+          bereich: computer
+          pfad: HKLM\SOFTWARE\Policies\Microsoft\OneDrive
+          wertname: SilentAccountConfig
+          typ: REG_DWORD
+          daten: "1"
+          wirkung: abmelden
+    hinweis: >-
+      Gilt nur für Firmenkonten (Entra ID). Freier Wert unter …\Policies\… – deshalb roter Schritt; mit den
+      OneDrive-Vorlagen im Katalog würde daraus eine Richtlinie.
+
+  # --- Browser ---------------------------------------------------------------------------------
   - id: edge_startseite
     titel: Edge-Startseite festlegen
-    gruppe: Microsoft Edge
-    richtlinie: edge:msedge:HomepageLocation
-    zustand: aktiviert
-    werte:
-      e_homepagelocation: "https://intranet.okm.local"
+    beschreibung: Startseite fest vorgeben, die Schaltfläche „Start“ öffnet diese Seite.
+    gruppe: Browser
+    bereich: computer
+    wirkung: sofort
+    risiko: gelb
+    schritte:
+      - richtlinie: edge:msedge:HomepageLocation
+        zustand: aktiviert
+        werte: {e_homepagelocation: "https://intranet.okm.local"}
+      - richtlinie: edge:msedge:HomepageIsNewTabPage
+        zustand: deaktiviert
     anpassen: [e_homepagelocation]
-    hinweis: >-
-      Laut Vorlage nur auf Rechnern in einer Domäne, in Entra ID oder in der Geräteverwaltung wirksam.
+    hinweis: Laut Vorlage nur auf Rechnern in einer Domäne, in Entra ID oder in der Geräteverwaltung wirksam.
+
+  - id: chrome_startseite
+    titel: Chrome-Startseite festlegen
+    beschreibung: Startseite fest vorgeben, die Schaltfläche „Start“ öffnet diese Seite.
+    gruppe: Browser
+    bereich: computer
+    wirkung: sofort
+    risiko: gelb
+    schritte:
+      - richtlinie: chrome:chrome:HomepageLocation
+        zustand: aktiviert
+        werte: {e_homepagelocation: "https://intranet.okm.local"}
+      - richtlinie: chrome:chrome:HomepageIsNewTabPage
+        zustand: deaktiviert
+    anpassen: [e_homepagelocation]
 
   - id: edge_erster_start_aus
     titel: Edge-Begrüßung beim ersten Start ausblenden
-    gruppe: Microsoft Edge
-    richtlinie: edge:msedge:HideFirstRunExperience
-    zustand: aktiviert
+    beschreibung: Keine Willkommensseite und kein Begrüßungsbildschirm beim ersten Start von Edge.
+    gruppe: Browser
+    bereich: computer
+    wirkung: sofort
+    risiko: gelb
+    schritte:
+      - {richtlinie: edge:msedge:HideFirstRunExperience, zustand: aktiviert}
 
-  - id: edge_passwortmanager_aus
-    titel: Passwort-Speichern in Edge ausschalten
-    gruppe: Microsoft Edge
-    richtlinie: edge:msedge:PasswordManagerEnabled
-    zustand: deaktiviert
-
-  - id: chrome_passwortmanager_aus
-    titel: Passwort-Speichern in Chrome ausschalten
-    gruppe: Google Chrome
-    richtlinie: chrome:chrome:PasswordManagerEnabled
-    zustand: deaktiviert
+  - id: browser_passwortmanager_aus
+    titel: Passwort-Speichern in Edge und Chrome ausschalten
+    beschreibung: Der eingebaute Kennwort-Manager bietet nicht mehr an, Kennwörter zu speichern.
+    gruppe: Browser
+    bereich: computer
+    wirkung: sofort
+    risiko: gelb
+    schritte:
+      - {richtlinie: edge:msedge:PasswordManagerEnabled, zustand: deaktiviert}
+      - {richtlinie: chrome:chrome:PasswordManagerEnabled, zustand: deaktiviert}
 
   - id: firefox_telemetrie_aus
     titel: Firefox-Telemetrie ausschalten
-    gruppe: Mozilla Firefox
-    richtlinie: firefox:firefox:DisableTelemetry
-    zustand: aktiviert
+    beschreibung: Firefox sendet keine Telemetriedaten an Mozilla.
+    gruppe: Browser
+    bereich: computer
+    wirkung: sofort
+    risiko: gelb
+    schritte:
+      - {richtlinie: firefox:firefox:DisableTelemetry, zustand: aktiviert}

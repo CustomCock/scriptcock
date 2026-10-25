@@ -1,0 +1,100 @@
+{# Registry-Panel – EINE Komponente für /registry, Rezept, Baukasten und Blockly (wie _katalog.html).
+   erwartet: registry_modus ("seite" | "rezept" | "baukasten" | "blockly"), optional registry_ziel (Ziel).
+   Außer auf /registry ein einklappbarer Abschnitt unter dem Software-Katalog. Inhalte baut
+   static/js/registry-katalog.js (RegistryKatalog.mount) – Richtlinien kommen per API (/api/registry/…). #}
+{% import "_icons.html" as i %}
+{% set seite = registry_modus == "seite" %}
+{% set inhalt %}
+  <div class="regkat-reiter" role="tablist" aria-label="Registry">
+    <button type="button" role="tab" id="regkat-tab-richtlinien" aria-controls="regkat-richtlinien" aria-selected="true" data-reiter="richtlinien">Richtlinien</button>
+    <button type="button" role="tab" id="regkat-tab-haeufig" aria-controls="regkat-haeufig" aria-selected="false" tabindex="-1" data-reiter="haeufig">Häufige Einstellungen</button>
+    <button type="button" role="tab" id="regkat-tab-eigen" aria-controls="regkat-eigen" aria-selected="false" tabindex="-1" data-reiter="eigen">Eigener Eintrag</button>
+  </div>
+  <p class="regkat-zielhinweis hinweis" data-ziel-hinweis hidden>Registry-Bausteine gibt es nur für Windows (PowerShell/CMD) – zum Übernehmen das Zielsystem umstellen.</p>
+  <p class="regkat-auswahlmodus" data-auswahlmodus hidden role="status"></p>
+
+  {# --- Reiter 1: Richtlinien (ADMX) --- #}
+  <div role="tabpanel" id="regkat-richtlinien" aria-labelledby="regkat-tab-richtlinien" class="regkat-panel">
+    <label class="sr-only" for="regkat-suche">Richtlinien suchen</label>
+    <input id="regkat-suche" class="katalog-suche" type="search" placeholder="Richtlinien suchen … (z. B. makro internet, startseite, copilot)"
+           autocomplete="off" spellcheck="false" aria-controls="regkat-liste">
+    <div class="regkat-filter">
+      <label class="regkat-filter-paket"><span class="sr-only">Paket</span>
+        <select data-filter-paket aria-label="Paket"><option value="">Alle Pakete</option></select>
+      </label>
+      <div class="katalog-plattform" role="group" aria-label="Gilt für">
+        {% for wert, text in [("", "Alle"), ("machine", "Computer"), ("user", "Benutzer")] %}
+        <button type="button" class="katalog-schalter" data-klasse="{{ wert }}" aria-pressed="{{ 'true' if wert == '' else 'false' }}">{{ text }}</button>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="regkat-raster">
+      <nav class="regkat-baum" aria-label="Kategorien">
+        <button type="button" class="regkat-baum-alle" data-kategorie="" aria-pressed="true">Alle Kategorien</button>
+        <ul class="regkat-baum-liste" role="tree" data-baum></ul>
+      </nav>
+      <div class="regkat-treffer">
+        <div class="katalog-status"><span data-anzahl aria-live="polite"></span></div>
+        <ul id="regkat-liste" class="katalog-liste regkat-liste" data-liste></ul>
+        <p class="katalog-leer" data-leer hidden>Nichts gefunden. Anderen Begriff oder weniger Filter versuchen.</p>
+        <div class="regkat-seiten" data-seiten hidden>
+          <button type="button" class="knopf" data-zurueck>← Zurück</button>
+          <span data-seite></span>
+          <button type="button" class="knopf" data-weiter>Weiter →</button>
+        </div>
+      </div>
+    </div>
+    <article class="regkat-detail" data-detail hidden aria-live="polite"></article>
+  </div>
+
+  {# --- Reiter 2: Häufige Einstellungen --- #}
+  <div role="tabpanel" id="regkat-haeufig" aria-labelledby="regkat-tab-haeufig" class="regkat-panel" hidden>
+    <p class="feldhilfe">Nur belegte Einstellungen: Richtlinien aus den Hersteller-Vorlagen oder Werte mit Quelle bei Microsoft Learn.</p>
+    <div class="regkat-karten" data-karten></div>
+  </div>
+
+  {# --- Reiter 3: Eigener Eintrag --- #}
+  <div role="tabpanel" id="regkat-eigen" aria-labelledby="regkat-tab-eigen" class="regkat-panel" hidden>
+    <section class="regkat-eigen-formular" aria-labelledby="regkat-eigen-titel">
+      <h3 id="regkat-eigen-titel">Registry-Wert setzen</h3>
+      <div class="regkat-felder" data-eigen>
+        {% for p in registry_wert_setzen.parameter if p.id in ("bereich", "pfad", "wertname", "typ", "daten", "wenn_vorhanden", "wirkung") %}
+          {% with f=p, name="regkat." ~ p.id, dom="regkat-" ~ p.id, wert=none, aktion="" %}{% include "_feld.html" %}{% endwith %}
+        {% endfor %}
+      </div>
+      <div class="regkat-pfadvorschau" data-pfadvorschau aria-live="polite">
+        <div><span class="katalog-id-label">reg.exe</span> <code data-pfad-reg>–</code></div>
+        <div><span class="katalog-id-label">PowerShell</span> <code data-pfad-ps>–</code></div>
+        <p class="feldhilfe" data-pfad-hinweis></p>
+      </div>
+      <div class="aktionen">
+        <button type="button" class="knopf" data-eigen-uebernehmen>{{ i.icon("plus") }} Ins Script übernehmen</button>
+      </div>
+    </section>
+    <section class="regkat-reg" aria-labelledby="regkat-reg-titel">
+      <h3 id="regkat-reg-titel">.reg-Inhalt einfügen</h3>
+      <p class="feldhilfe">Am Referenz-PC in regedit „Exportieren“ und den Inhalt hier einfügen (oder die Datei wählen). Daraus werden die passenden Bausteine – erst Vorschau, dann übernehmen.</p>
+      <label class="sr-only" for="regkat-reg-text">.reg-Inhalt</label>
+      <textarea id="regkat-reg-text" rows="8" spellcheck="false" data-reg-text placeholder="Windows Registry Editor Version 5.00&#10;&#10;[HKEY_LOCAL_MACHINE\SOFTWARE\Firma]&#10;&quot;Wert&quot;=dword:00000001"></textarea>
+      <div class="aktionen">
+        <label class="knopf regkat-datei">Datei wählen …<input type="file" accept=".reg,text/plain" data-reg-datei class="sr-only"></label>
+        <button type="button" class="knopf" data-reg-auswerten>Auswerten</button>
+        <button type="button" class="knopf" data-reg-uebernehmen disabled>{{ i.icon("plus") }} <span>Übernehmen (<span data-anzahl-reg>0</span>)</span></button>
+      </div>
+      <div data-reg-ergebnis aria-live="polite"></div>
+    </section>
+  </div>
+  {% if not seite %}<p class="katalog-fuss"><a href="{{ basis }}/registry" target="_blank" rel="noopener">als eigene Seite öffnen</a></p>{% endif %}
+  <div class="sr-only" aria-live="polite" data-meldung></div>
+{% endset %}
+{% if seite %}
+<section id="registry-katalog" class="katalog regkat katalog-seite" data-modus="seite" aria-label="Registry">
+  <div class="katalog-inhalt">{{ inhalt }}</div>
+</section>
+{% else %}
+<details id="registry-katalog" class="katalog regkat katalog-eingebettet" data-modus="{{ registry_modus }}"
+         {% if registry_ziel %}data-ziel="{{ registry_ziel.value }}"{% endif %}>
+  <summary class="katalog-kopf">{{ i.icon("registry") }} <span>Registry</span> <span class="katalog-kopf-hilfe">Richtlinien, häufige Einstellungen, .reg-Import</span></summary>
+  <div class="katalog-inhalt">{{ inhalt }}</div>
+</details>
+{% endif %}

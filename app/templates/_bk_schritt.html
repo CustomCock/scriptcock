@@ -14,10 +14,39 @@
   {% if hinweis %}<p class="feldhilfe">{{ hinweis }}</p>{% endif %}
   <div class="feldstatus" id="status-{{ uid }}" aria-live="polite"></div>
   {% for p in block.parameter %}
-    {% if p.id in genutzt %}
+    {% if block.dynamisch == "richtlinie" and p.id == "richtlinie" %}
+      {# Richtlinie setzen: Auswahl über das Registry-Panel, die Optionen folgen unten #}
+      <input type="hidden" name="p.{{ uid }}.richtlinie" value="{{ werte.get('richtlinie', '') }}">
+      <div class="feld bk-richtlinie">
+        <span class="bk-richtlinie-label">Richtlinie <span class="pflicht" title="Pflichtfeld">*</span></span>
+        {% if richtlinie %}
+          <strong class="bk-richtlinie-name">{{ richtlinie.titel }}</strong>
+          <span class="feldhilfe">{{ richtlinie.kategorie_pfad | join(" › ") }} · {{ "Computer" if richtlinie.klasse == "machine" else ("Benutzer" if richtlinie.klasse == "user" else "Computer und Benutzer") }}</span>
+        {% elif werte.get("richtlinie") %}
+          <span class="fehlertext">„{{ werte.richtlinie }}“ gibt es im Katalog nicht (mehr).</span>
+        {% else %}
+          <span class="feldhilfe">Noch keine Richtlinie gewählt.</span>
+        {% endif %}
+        <button type="button" class="knopf" data-richtlinie-waehlen data-richtlinie="{{ werte.get('richtlinie', '') }}">Richtlinie wählen …</button>
+      </div>
+    {% elif block.dynamisch == "richtlinie" and p.id == "bereich" %}
+      {# Computer-Richtlinien gelten immer für den Computer; Benutzer-Richtlinien nie für „Computer“ #}
+      {% if richtlinie and richtlinie.klasse != "machine" %}
+        {% set vorgabe = werte.get("bereich") or ("angemeldeter_benutzer" if richtlinie.klasse == "user" else "computer") %}
+        {% with f=p, name="p." ~ uid ~ "." ~ p.id, dom=uid ~ "-" ~ p.id, wert=vorgabe, aktion="" %}{% include "_feld.html" %}{% endwith %}
+      {% endif %}
+    {% elif p.id in genutzt %}
       {% with f=p, name="p." ~ uid ~ "." ~ p.id, dom=uid ~ "-" ~ p.id, wert=werte.get(p.id), aktion="" %}{% include "_feld.html" %}{% endwith %}
     {% elif p.id in werte %}
       <input type="hidden" name="p.{{ uid }}.{{ p.id }}" value="{{ werte[p.id] }}">
     {% endif %}
   {% endfor %}
+  {% if element_parameter %}
+  <fieldset class="bk-elemente">
+    <legend>Optionen der Richtlinie <span class="feldhilfe">(gelten nur bei „Aktiviert“)</span></legend>
+    {% for p in element_parameter %}
+      {% with f=p, name="p." ~ uid ~ "." ~ p.id, dom=uid ~ "-" ~ p.id, wert=werte.get(p.id), aktion="" %}{% include "_feld.html" %}{% endwith %}
+    {% endfor %}
+  </fieldset>
+  {% endif %}
 </li>

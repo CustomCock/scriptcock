@@ -103,6 +103,7 @@
     {% with editor_ziel=ziel, editor_dateiname="", editor_text="", editor_verborgen=True %}{% include "_editor.html" %}{% endwith %}
     <div id="bk-ergebnis" aria-live="polite"></div>
     {% with katalog_modus="baukasten", katalog_ziel=ziel %}{% include "_katalog.html" %}{% endwith %}
+    {% with registry_modus="baukasten", registry_ziel=ziel %}{% include "_registry.html" %}{% endwith %}
   </section>
 </div>
 {% endblock %}

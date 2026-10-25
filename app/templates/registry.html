@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block titel %}Registry{% endblock %}
+{% block breit %} inhalt-breit{% endblock %}
+{% block inhalt %}
+<div class="seitenkopf">
+  <div>
+    <h1>Registry</h1>
+    <p class="untertitel">Gruppenrichtlinien aus den offiziellen Vorlagen von Windows, Office, Edge, Chrome und Firefox nachschlagen,
+      häufige Einstellungen finden und .reg-Exporte prüfen. Ins Script übernehmen geht im Baukasten, in Blockly und in den Rezepten.</p>
+  </div>
+</div>
+{% with registry_modus="seite", registry_ziel=none %}{% include "_registry.html" %}{% endwith %}
+{% endblock %}

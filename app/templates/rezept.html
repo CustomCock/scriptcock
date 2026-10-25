@@ -73,6 +73,7 @@
       </div>
     </div>
     {% with katalog_modus="rezept", katalog_ziel=ziel, katalog_mehrfach=(felder | selectattr("listen_typ", "equalto", "paketname") | list | length > 0) %}{% include "_katalog.html" %}{% endwith %}
+    {% with registry_modus="rezept", registry_ziel=ziel %}{% include "_registry.html" %}{% endwith %}
   </div>
 </div>
 {% endblock %}

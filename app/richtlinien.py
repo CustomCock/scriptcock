@@ -47,6 +47,36 @@ def haeufig(datei: Path = HAEUFIG_YAML) -> tuple[dict[str, Any], ...]:
     return tuple(dict(e) for e in daten.get("eintraege", []))
 
 
+HAEUFIG_FELDER = frozenset(
+    {
+        "id",
+        "titel",
+        "beschreibung",
+        "gruppe",
+        "bereich",
+        "wirkung",
+        "risiko",
+        "quelle",
+        "schritte",
+        "anpassen",
+        "hinweis",
+    }
+)
+
+
+def haeufig_schritte(eintrag: dict[str, Any]) -> list[dict[str, Any]]:
+    """Eintrag aus ``haeufig.yaml`` → Schritte im Request-Format (``block_id`` + ``parameter``)."""
+    schritte = []
+    for s in eintrag.get("schritte", []):
+        if "richtlinie" in s:
+            parameter = {"richtlinie": s["richtlinie"], "zustand": s.get("zustand", "aktiviert")}
+            parameter.update(s.get("werte", {}))
+            schritte.append({"block_id": "richtlinie_setzen", "parameter": parameter})
+        else:
+            schritte.append({"block_id": s["block"], "parameter": dict(s.get("parameter", {}))})
+    return schritte
+
+
 def _fts_anfrage(q: str) -> str | None:
     woerter = re.findall(r"\w+", normalisiere(q))
     if not woerter:

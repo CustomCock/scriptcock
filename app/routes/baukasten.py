@@ -49,6 +49,9 @@ async def _formular(request: Request) -> BaukastenFormular:
 def _schritt_kontext(
     reg: Registry, block: BlockDef, ziel: Ziel, uid: str, werte: dict[str, str]
 ) -> dict[str, Any]:
+    richtlinie: dict[str, Any] | None = None
+    if block.dynamisch == "richtlinie" and werte.get("richtlinie"):
+        richtlinie = reg.richtlinien.richtlinie(werte["richtlinie"])
     return {
         "uid": uid,
         "block": block,
@@ -58,6 +61,9 @@ def _schritt_kontext(
         "verfuegbar": block.verfuegbar(ziel),
         "admin": block.braucht_admin(ziel),
         "hinweis": block.hinweise.get(ziel),
+        # Richtlinie setzen: gewählte Richtlinie und ihre Optionen als zusätzliche Felder
+        "richtlinie": richtlinie,
+        "element_parameter": reg.element_parameter(block, werte.get("richtlinie")),
     }
 
 
@@ -133,11 +139,8 @@ async def neuer_schritt(
         raise HTTPException(404, "Unbekannter Baustein")
     # Vorbelegte Werte (p.<parameter>=…), z. B. aus dem Software-Katalog. Sie landen nur als
     # Formularwerte im HTML und werden wie jede Eingabe erst beim Erzeugen geprüft.
-    werte = {
-        k[2:]: v[:MAX_VORBELEGUNG]
-        for k, v in request.query_params.items()
-        if k.startswith("p.") and b.param(k[2:]) is not None
-    }
+    roh = {k[2:]: v[:MAX_VORBELEGUNG] for k, v in request.query_params.items() if k.startswith("p.")}
+    werte = {k: v for k, v in roh.items() if reg.param_mit_elementen(b, k, roh) is not None}
     return _render(request, "_bk_schritt.html", benutzer, **_schritt_kontext(reg, b, z, neue_uid(), werte))
 
 

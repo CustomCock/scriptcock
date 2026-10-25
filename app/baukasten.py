@@ -163,7 +163,8 @@ def rezept_aus_formular(
             fehler.append(Feldfehler(i, None, f"Unbekannter Baustein „{block_id}“."))
             continue
         parameter: dict[str, Any] = {}
-        for p in block.parameter:
+        # Richtlinie: die Optionen (e_…) der gewählten Richtlinie gehören dazu
+        for p in [*block.parameter, *registry.element_parameter(block, werte.get("richtlinie"))]:
             roh = werte.get(p.id, "")
             if roh.strip() == "":
                 if p.pflicht and p.standard is None:

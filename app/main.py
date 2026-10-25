@@ -23,6 +23,7 @@ from app.katalog import lade_katalog
 from app.models.software import SoftwareKatalog
 from app.registry import Registry, lade_registry
 from app.routes import api, baukasten, bibliothek, blockly, export, pages, software, verwaltung
+from app.routes import registry as registry_routes
 from app.routes import werkzeuge as werkzeuge_routes
 
 PROJEKT = Path(__file__).resolve().parent.parent
@@ -74,6 +75,7 @@ def create_app(
         auth_disabled=einst.auth_disabled,
         katalog=app.state.katalog,
         katalog_daten=app.state.katalog.als_daten(),
+        registry_wert_setzen=app.state.registry.bloecke["registry_wert_setzen"],
     )
     app.state.templates = templates
 
@@ -124,6 +126,7 @@ def create_app(
     app.include_router(software.router)
     app.include_router(export.router)
     app.include_router(werkzeuge_routes.router)
+    app.include_router(registry_routes.router)
     app.include_router(api.router, prefix="/api/v1")
 
     @app.get("/healthz", include_in_schema=False)

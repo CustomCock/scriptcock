@@ -18,6 +18,7 @@ from app.export import exportiere
 from app.ir import (
     Abbrechen,
     Bestaetigung,
+    BlockSchritt,
     FuerJeden,
     Knoten,
     Kommentar,
@@ -268,9 +269,27 @@ def _als_text(wert: str | int | bool | list[str | int] | None, trenner: str = ",
     return str(wert)
 
 
+def _katalog_hinweis(registry: Registry, s: BlockSchritt) -> str | None:
+    """Richtlinie seit dem Speichern aus dem Katalog verschwunden oder Paket aktualisiert?"""
+    if not s.katalog_stand:
+        return None
+    rid = s.parameter.get("richtlinie")
+    r = registry.richtlinien.richtlinie(str(rid.wert)) if rid is not None else None
+    if r is None:
+        return f"Die Richtlinie „{rid.wert if rid else ''}“ gibt es im aktuellen Katalog nicht mehr."
+    paket = registry.richtlinien.paket(r["paket"]) or {}
+    aktuell = f"{r['paket']}@{paket.get('version', '')}"
+    if aktuell != s.katalog_stand:
+        return (
+            f"„{r['titel']}“ stammt aus einem älteren Vorlagen-Stand ({s.katalog_stand} → {aktuell}). "
+            "Bitte Optionen und Vorschau prüfen."
+        )
+    return None
+
+
 def _trenner(pv: ParamValue, blockly: bool) -> str:
     """REG_MULTI_SZ: im Formular eine Zeile pro Eintrag, in Blockly (einzeilig) mit „ | “."""
-    if pv.typ is ParamTyp.REGISTRY_DATEN:
+    if pv.typ in (ParamTyp.REGISTRY_DATEN, ParamTyp.REGISTRY_ZEILEN):
         return " | " if blockly else "\n"
     return ", "
 
@@ -305,9 +324,13 @@ def wiederherstellen(registry: Registry, eintrag: GespeichertesScript) -> Wieder
                 f"Schritt {nr}: „{block.name}“ wurde seit dem Speichern geändert "
                 f"(Version {s.block_version} → {block.version}). Bitte Werte und Vorschau prüfen."
             )
+        stand = _katalog_hinweis(registry, s)
+        if stand:
+            hinweise.append(f"Schritt {nr}: {stand}")
         werte: dict[str, str] = {}
+        roh = {pid: pv.wert for pid, pv in s.parameter.items()}
         for pid, pv in s.parameter.items():
-            if block.param(pid) is None:
+            if registry.param_mit_elementen(block, pid, roh) is None:
                 hinweise.append(f"Schritt {nr}: Den Parameter „{pid}“ gibt es bei „{block.name}“ nicht mehr.")
                 continue
             text = _als_text(pv.wert, _trenner(pv, blockly=False))
@@ -387,10 +410,14 @@ def baum_wiederherstellen(
                 f"„{block.name}“ wurde seit dem Speichern geändert (Version {k.block_version} → "
                 f"{block.version}). Bitte Werte und Vorschau prüfen."
             )
+        roh = {pid: pv.wert for pid, pv in k.parameter.items()}
+        stand = _katalog_hinweis(registry, k)
+        if stand:
+            hinweise.append(stand)
         werte = {
             pid: SCHLEIFENWERT_BLOCKLY if pv.schleife else text
             for pid, pv in k.parameter.items()
-            if block.param(pid) is not None
+            if registry.param_mit_elementen(block, pid, roh) is not None
             and (text := _als_text(pv.wert, _trenner(pv, blockly=True))) is not None
         }
         return {"art": "block", "block_id": block.id, "parameter": werte}

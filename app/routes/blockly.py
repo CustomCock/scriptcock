@@ -20,6 +20,7 @@ from app.ir import ScriptIR
 from app.models.block import ZAHLENTYPEN
 from app.registry import Registry
 from app.routes.pages import HLJS_SPRACHE, _render, _sitzung
+from app.routes.registry import richtlinie_daten
 from app.service import Benutzer, Ergebnis, rechte_hinweis
 from app.validation import MAX_SCHLEIFENWERTE, MAX_TIEFE, MAX_WARTEN, MAX_WIEDERHOLUNGEN, FehlerSammlung
 
@@ -49,6 +50,23 @@ def katalog(reg: Registry) -> list[dict[str, Any]]:
         }
         for b in sorted(reg.bloecke.values(), key=lambda b: (b.kategorie, b.name))
     ]
+
+
+def _richtlinien_der_vorbelegung(reg: Registry, vorbelegung: dict[str, Any] | None) -> dict[str, Any]:
+    """Titel + Optionen der Richtlinien in einem geöffneten Script (für den dynamischen Block)."""
+    ergebnis: dict[str, Any] = {}
+
+    def besuchen(knoten: list[Any]) -> None:
+        for k in knoten:
+            if k.get("art") == "block" and k.get("block_id") == "richtlinie_setzen":
+                rid = k["parameter"].get("richtlinie")
+                if rid and rid not in ergebnis and (info := richtlinie_daten(reg, rid)) is not None:
+                    ergebnis[rid] = info
+            for feld in ("versuche", "sonst", "rumpf", "dann"):
+                besuchen(k.get(feld) or [])
+
+    besuchen(vorbelegung["schritte"] if vorbelegung else [])
+    return ergebnis
 
 
 @router.get("/blockly", name="blockly", response_class=HTMLResponse)
@@ -84,6 +102,7 @@ async def blockly_seite(
             "hinweise": hinweise,
         }
     daten = {
+        "richtlinien": _richtlinien_der_vorbelegung(reg, vorbelegung),
         "basis": request.app.state.einstellungen.root_path,
         "ziel": z.value,
         "ist_admin": benutzer.ist_admin,

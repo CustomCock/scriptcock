@@ -2,6 +2,37 @@
 
 ## Registry, Richtlinien-Katalog und Palette
 
+### Teil C: Registry in der Oberfläche
+
+- **Registry-Panel** (`_registry.html`, `static/js/registry-katalog.js`, `RegistryKatalog.mount`) – eingeklappt
+  unter dem Software-Katalog in Rezept, Baukasten und Blockly, als eigene Seite `/registry` (Menüpunkt). Drei
+  Reiter:
+  - **Richtlinien:** Volltextsuche über `GET /api/registry/suche` (FTS5, 150 ms Debounce, 25 pro Seite),
+    Filter Paket und Computer/Benutzer, Kategoriebaum mit Anzahl (lazy über `/api/registry/kategorien`),
+    Detail mit Erklärung, „Unterstützt auf“, Schlüssel/Wertnamen zum Kopieren und Formular für Zustand,
+    Bereich, Methode und Optionen → „＋ Ins Script übernehmen“.
+  - **Häufige Einstellungen:** Karten mit Schritten, Wirkung, Risiko und Quelle.
+  - **Eigener Eintrag:** Formular für „Registry-Wert setzen“ mit Live-Vorschau des Pfads (reg.exe- und
+    PowerShell-Schreibweise) und **.reg-Import**: eingefügten Text oder Datei (auch UTF-16 von regedit)
+    auswerten, jeder Schritt einzeln geprüft (Fehler mit Zeilennummer), Auswahl übernehmen.
+- **.reg-Parser** (`app/regdatei.py`): Version 5.00 und REGEDIT4, `[Schlüssel]`, `[-Schlüssel]`, `@`,
+  `"Name"=-`, Strings mit Escapes, `dword:`, `hex:`, `hex(2)`, `hex(7)`, `hex(b)`, `hex(4)`,
+  Fortsetzungszeilen. HKCU → Bereich „Angemeldeter Benutzer“, HKCR → `HKLM\SOFTWARE\Classes`, HKU/HKCC
+  abgelehnt.
+- **Listen-Modus:** „Richtlinie setzen“ zeigt den Namen der Richtlinie und „Richtlinie wählen …“ (öffnet das
+  Panel, die Auswahl lädt den Schritt neu); die Optionen der Richtlinie erscheinen als normale Felder
+  (`p.<uid>.e_…`). Bereich nur bei Benutzer-Richtlinien. Auch „Als Rezept speichern“, „Erneut öffnen“ und
+  Rezept-YAML kennen die Optionen (`Registry.param_mit_elementen`).
+- **Blockly:** Block „Richtlinie setzen“ mit Titelanzeige und Knopf „wählen …“; die Felder entstehen aus den
+  Optionen (extraState mit Definitionen und Werten – Entwurf, „Erneut öffnen“ und Rückgängig stellen alles
+  wieder her). „＋“ im Panel füllt den gewählten Block bzw. hängt neue Blöcke unter dem ausgewählten an
+  (`okmBlockly.einfuegen`).
+- „Erneut öffnen“ meldet, wenn eine Richtlinie aus einem älteren Vorlagen-Stand stammt oder nicht mehr im
+  Katalog ist (`BlockSchritt.katalog_stand`).
+- Fix: Dynamische Bausteine zeigen im Formular alle Parameter (`benutzte_parameter`).
+- Tests: `tests/test_registry_ui.py` (.reg-Parser inkl. UTF-16/BOM und Fehlerzeilen, API, Einbindung,
+  Listen-Modus, Rezept aus Liste, Blockly-Daten); Abläufe im Browser mit Playwright geprüft.
+
 ### Teil B: Richtlinien-Katalog (ADMX)
 
 - **Quellen** (`registry/admx-quellen.yaml`): offizielle Vorlagen für Windows 11 (25H2), Microsoft 365
@@ -27,8 +58,10 @@
   im Script geprüft, bei LGPO auch die EXE im ZIP. Quelle „Intranet“: die App spiegelt die Original-Dateien
   unter `GET /werkzeuge/<id>/<datei>` (nur Einträge aus der YAML; Adresse über `OKM_WERKZEUG_URL`).
   Central Store = roter Schritt.
-- **Häufige Einstellungen** (`registry/haeufig.yaml`): elf Schnellzugriffe, ausschließlich Verweise auf
-  Katalog-Richtlinien (Copilot, AutoPlay/AutoRun, Diagnosedaten, Edge/Chrome/Firefox …).
+- **Häufige Einstellungen** (`registry/haeufig.yaml`): 16 Einträge mit Beschreibung, Bereich, Schritten,
+  `wirkung`, `risiko` und belegter Quelle – Richtlinien aus den Hersteller-Vorlagen (lange Pfade,
+  Remotedesktop/NLA, AutoRun, Office-Makros aus dem Internet, Nutzungszeit, Startseiten …) oder freie Werte
+  mit Microsoft-Learn-Seite (SMBv1, OneDrive-Anmeldung). Ein Test prüft Katalog, Validierung und Risiko.
 - Richtlinien-/Werkzeug-Hilfen stehen in `hilfen/richtlinien.ps1` und kommen nur in Scripte mit diesen
   Bausteinen – bestehende Registry-Scripte bleiben byte-gleich.
 - Tests: `tests/test_richtlinien.py` mit eigenen Vorlagen in `tests/daten/admx/` (alle Element-Arten,

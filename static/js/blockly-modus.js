@@ -161,6 +161,11 @@
         if (eingabe) { eingabe.setVisible(genutzt.indexOf(p.id) >= 0); }
       });
       block.setWarningText(def.ziele.indexOf(z) >= 0 ? null : "Unter " + daten.ziele[z] + " nicht verfügbar.", "ziel");
+      if (block.type === "bk_richtlinie_setzen" && block.getInput("P_bereich")) {
+        // Bereich nur bei Benutzer-Richtlinien (Computer-Richtlinien gelten immer für den Computer)
+        var info = richtlinienInfo[block.okmRichtlinie];
+        block.getInput("P_bereich").setVisible(!!info && info.klasse !== "machine");
+      }
     }
 
     daten.katalog.forEach(function (def) {
@@ -180,6 +185,109 @@
         }
       };
     });
+
+    // --- „Richtlinie setzen“: Felder entstehen aus der gewählten Richtlinie ---------------
+    // Titel und Optionen (Parameter-Definitionen) stehen im extraState, damit Entwurf (localStorage)
+    // und „Erneut öffnen“ den Block vollständig wiederherstellen – ohne erneute Anfrage.
+    var richtlinienInfo = daten.richtlinien || {};
+    var RL_DEF = katalog.richtlinie_setzen;
+    class KnopfFeld extends Blockly.FieldLabel {
+      constructor(text, aktion) {
+        super(text, "okm-feldknopf");
+        this.aktion = aktion;
+        this.SERIALIZABLE = false;
+        this.CURSOR = "pointer";
+      }
+      showEditor_() { this.aktion(this.getSourceBlock()); }
+    }
+    function richtlinieWaehlen(block) {
+      if (!window.okmRegistry) { return; }
+      window.okmRegistry.waehleRichtlinie(function (schritt, info) {
+        var rid = schritt.parameter.richtlinie;
+        var r = (info.richtlinien || {})[rid];
+        if (r) { richtlinienInfo[rid] = { titel: r.titel, klasse: r.klasse, parameter: r.parameter }; }
+        var vorher = JSON.stringify(block.saveExtraState());
+        Blockly.Events.setGroup(true);
+        block.richtlinieSetzen(rid, richtlinienInfo[rid]);
+        Blockly.Events.fire(new Blockly.Events.BlockChange(block, "mutation", null, vorher, JSON.stringify(block.saveExtraState())));
+        Object.keys(schritt.parameter).forEach(function (pid) {
+          if (pid !== "richtlinie" && block.getField(pid)) { block.setFieldValue(blocklyWert(feldDef(block, pid), schritt.parameter[pid]), pid); }
+        });
+        Blockly.Events.setGroup(false);
+      }, block.okmRichtlinie, "diesen Baustein");
+    }
+    function feldDef(block, pid) {
+      return RL_DEF.parameter.concat(block.okmElemente || []).filter(function (p) { return p.id === pid; })[0] || {};
+    }
+    if (RL_DEF) {
+      Blockly.Blocks.bk_richtlinie_setzen = {
+        init: function () {
+          var block = this;
+          this.okmRichtlinie = "";
+          this.okmElemente = [];
+          this.appendDummyInput("KOPF").appendField(RL_DEF.name);
+          this.appendDummyInput("RICHTLINIE").setAlign(RECHTS).appendField("Richtlinie *")
+            .appendField(new Blockly.FieldLabelSerializable("(keine gewählt)"), "RL_TITEL")
+            .appendField(new KnopfFeld("wählen …", richtlinieWaehlen), "RL_WAEHLEN");
+          RL_DEF.parameter.forEach(function (p) {
+            if (p.id === "richtlinie") { return; }
+            block.appendDummyInput("P_" + p.id).setAlign(RECHTS).appendField(p.label).appendField(feldFuer(p), p.id);
+          });
+          this.setPreviousStatement(true, "schritt");
+          this.setNextStatement(true, "schritt");
+          this.setColour(FARBEN[RL_DEF.risiko] || FARBE_ABLAUF);
+          this.setTooltip(RL_DEF.beschreibung + "\n\n„wählen …“ öffnet das Registry-Panel.");
+          zielAnwenden(this, RL_DEF);
+          this.richtlinieSetzen("", null);
+        },
+        saveExtraState: function () {
+          if (!this.okmRichtlinie) { return null; }
+          var block = this;
+          var info = richtlinienInfo[this.okmRichtlinie] || {};
+          // Werte der Optionen mitspeichern: beim Rückgängig-Machen baut loadExtraState die Felder neu auf
+          var werte = {};
+          this.okmElemente.forEach(function (p) { if (block.getField(p.id)) { werte[p.id] = block.getFieldValue(p.id); } });
+          return { richtlinie: this.okmRichtlinie, titel: info.titel || "", klasse: info.klasse || "", parameter: this.okmElemente, werte: werte };
+        },
+        loadExtraState: function (s) {
+          var block = this;
+          if (s && s.richtlinie) {
+            richtlinienInfo[s.richtlinie] = richtlinienInfo[s.richtlinie] || { titel: s.titel, klasse: s.klasse, parameter: s.parameter || [] };
+          }
+          this.richtlinieSetzen(s && s.richtlinie, s && s.richtlinie ? richtlinienInfo[s.richtlinie] : null);
+          Object.keys((s && s.werte) || {}).forEach(function (pid) {
+            if (block.getField(pid)) { block.setFieldValue(s.werte[pid], pid); }
+          });
+        },
+        /* Neue Richtlinie: Titel setzen, alte Options-Eingänge weg, neue aus den Elementen aufbauen */
+        richtlinieSetzen: function (rid, info) {
+          var block = this;
+          this.okmRichtlinie = rid || "";
+          this.setFieldValue(info ? info.titel : (rid ? rid + " (nicht im Katalog)" : "(keine gewählt)"), "RL_TITEL");
+          (this.okmElemente || []).forEach(function (p) { if (block.getInput("E_" + p.id)) { block.removeInput("E_" + p.id); } });
+          this.okmElemente = info ? (info.parameter || []) : [];
+          this.okmElemente.forEach(function (p) {
+            var pflicht = p.pflicht && p.typ !== "ja_nein" ? " *" : "";
+            block.appendDummyInput("E_" + p.id).setAlign(RECHTS).appendField(p.label + pflicht).appendField(feldFuer(p), p.id);
+          });
+          // Computer-Richtlinien: Bereich ausblenden; Benutzer-Richtlinien: angemeldeter Benutzer vorbelegen
+          var bereich = this.getInput("P_bereich");
+          var klasse = info ? info.klasse : "";
+          if (bereich) {
+            bereich.setVisible(klasse === "user" || klasse === "both");
+            if (klasse === "user" && this.getFieldValue("bereich") === "computer") { this.setFieldValue("angemeldeter_benutzer", "bereich"); }
+          }
+          if (this.rendered) { this.render(); }
+        }
+      };
+    }
+    /* Wert aus Panel/Server → Feldwert in Blockly */
+    function blocklyWert(p, wert) {
+      if (p.typ === "ja_nein") { return wert === true || wert === "true" ? "TRUE" : "FALSE"; }
+      if (Array.isArray(wert)) { return wert.join(" | "); }
+      if (p.typ === "port" || daten.zahlentypen[p.typ]) { return Number(wert); }
+      return wert === null || wert === undefined ? "" : String(wert);
+    }
 
     Blockly.Blocks.ablauf_start = {
       init: function () {
@@ -399,17 +507,27 @@
       if (!def) { return null; }
       var id = "okm-s" + (++ladeNr);
       var felder = {};
-      def.parameter.forEach(function (p) {
-        if (k.parameter[p.id] === undefined) { return; }
+      var params = def.parameter;
+      var extra = null;
+      if (k.block_id === "richtlinie_setzen" && k.parameter.richtlinie) {
+        // Optionen der Richtlinie als zusätzliche Felder; Definitionen kommen in den extraState
+        var info = richtlinienInfo[k.parameter.richtlinie];
+        extra = { richtlinie: k.parameter.richtlinie, titel: info ? info.titel : "", klasse: info ? info.klasse : "", parameter: info ? info.parameter : [] };
+        params = params.concat(extra.parameter);
+      }
+      params.forEach(function (p) {
+        if (k.parameter[p.id] === undefined || (extra && p.id === "richtlinie")) { return; }
         var wert = k.parameter[p.id];
-        if (p.typ === "ja_nein") { wert = wert === "true" ? "TRUE" : "FALSE"; }
+        if (p.typ === "ja_nein") { wert = wert === "true" || wert === true ? "TRUE" : "FALSE"; }
         else if (wert === SCHLEIFENWERT) { /* bleibt Text */ }
         else if (Array.isArray(wert)) { wert = wert.join(" | "); }
         else if (p.typ === "port" || daten.zahlentypen[p.typ]) { wert = Number(wert); }
         else if (p.typ === "variable") { wert = verweisLaden(wert); }
         felder[p.id] = wert;
       });
-      return { type: "bk_" + def.id, id: id, fields: felder };
+      var zustand = { type: "bk_" + def.id, id: id, fields: felder };
+      if (extra) { zustand.extraState = extra; }
+      return zustand;
     }
     function startBlock(schritte) {
       ladeNr = 0;
@@ -477,8 +595,20 @@
         var def = katalog[b.type.slice(3)];
         if (def.risiko === "rot") { hatRot = true; }
         var parameter = {};
-        def.parameter.forEach(function (p) {
+        var params = def.parameter;
+        if (b.type === "bk_richtlinie_setzen") {
+          parameter.richtlinie = b.okmRichtlinie || "";
+          params = params.filter(function (p) { return p.id !== "richtlinie"; }).concat(b.okmElemente || []);
+          if (b.getInput("P_bereich") && !b.getInput("P_bereich").isVisible()) {
+            params = params.filter(function (p) { return p.id !== "bereich"; });  // Computer-Richtlinie
+          }
+        }
+        params.forEach(function (p) {
           var wert = b.getFieldValue(p.id);
+          if (p.typ === "registry_zeilen") {
+            parameter[p.id] = String(wert || "").split("|").map(function (e) { return e.trim(); }).filter(Boolean);
+            return;
+          }
           if (p.typ === "ja_nein") { wert = wert === "TRUE" ? "true" : "false"; }
           else if (p.typ === "variable") { wert = verweisText(wert); }
           else if (wert === SCHLEIFENWERT) { wert = { schleifenwert: true }; }  // Backend prüft, ob in Schleife
@@ -626,8 +756,47 @@
       });
     });
 
+    // --- Schritte aus dem Registry-Panel einfügen -------------------------------------------
+    /* Neuen Block unter „nach“ einhängen (ausgewählter Block bzw. zuletzt eingefügter), sonst ans Ende */
+    function anhaengen(neu, nach) {
+      if (nach && nach.type === "ablauf_start") {
+        nach.getInput("SCHRITTE").connection.connect(neu.previousConnection);
+      } else if (nach && nach.nextConnection && nach.workspace === ws && !nach.isInFlyout) {
+        nach.nextConnection.connect(neu.previousConnection);
+      } else {
+        var start = ws.getBlocksByType("ablauf_start")[0];
+        if (!start) { return; }
+        var verbindung = start.getInput("SCHRITTE").connection;
+        var letzter = verbindung.targetBlock();
+        while (letzter && letzter.getNextBlock()) { letzter = letzter.getNextBlock(); }
+        if (letzter) { letzter.nextConnection.connect(neu.previousConnection); } else { verbindung.connect(neu.previousConnection); }
+      }
+    }
+    function einfuegen(schritte, info) {
+      Object.keys((info && info.richtlinien) || {}).forEach(function (rid) {
+        var r = info.richtlinien[rid];
+        if (r) { richtlinienInfo[rid] = { titel: r.titel, klasse: r.klasse, parameter: r.parameter }; }
+      });
+      var sel = Blockly.getSelected ? Blockly.getSelected() : null;
+      var letzter = null;
+      Blockly.Events.setGroup(true);
+      schritte.forEach(function (s) {
+        var zustand = einzel({ art: "block", block_id: s.block_id, parameter: s.parameter });
+        if (!zustand) { return; }
+        delete zustand.id;  // Blockly vergibt eine neue ID
+        var neu = Blockly.serialization.blocks.append(zustand, ws);
+        anhaengen(neu, letzter || sel);
+        letzter = neu;
+      });
+      Blockly.Events.setGroup(false);
+      if (letzter) {
+        if (Blockly.common && Blockly.common.setSelected) { Blockly.common.setSelected(letzter); } else if (letzter.select) { letzter.select(); }
+        letzter.workspace.centerOnBlock && letzter.workspace.centerOnBlock(letzter.id);
+      }
+    }
+
     vorschau();
-    window.okmBlockly = { arbeitsflaeche: ws, serialisieren: serialisieren, vorschau: vorschau };
+    window.okmBlockly = { arbeitsflaeche: ws, serialisieren: serialisieren, vorschau: vorschau, einfuegen: einfuegen };
   }
 
   document.addEventListener("DOMContentLoaded", init);

@@ -1,6 +1,6 @@
 {%- import "_icons.html" as i -%}
 {%- set pfad = request.url.path[basis | length:] or "/" -%}
-{%- set aktiv = "start" if pfad == "/" else ("rezepte" if pfad.startswith("/rezepte") else ("baukasten" if pfad.startswith("/baukasten") else ("blockly" if pfad.startswith("/blockly") else ("bibliothek" if pfad.startswith("/bibliothek") or pfad.startswith("/skripte") else ("verwaltung" if pfad.startswith("/verwaltung") else ("software" if pfad.startswith("/software") else "")))))) -%}
+{%- set aktiv = "start" if pfad == "/" else ("rezepte" if pfad.startswith("/rezepte") else ("baukasten" if pfad.startswith("/baukasten") else ("blockly" if pfad.startswith("/blockly") else ("bibliothek" if pfad.startswith("/bibliothek") or pfad.startswith("/skripte") else ("verwaltung" if pfad.startswith("/verwaltung") else ("software" if pfad.startswith("/software") else ("registry" if pfad.startswith("/registry") else ""))))))) -%}
 <!doctype html>
 <html lang="de">
 <head>
@@ -20,6 +20,7 @@
   <script src="{{ basis }}/static/js/app.js" defer></script>
   <script src="{{ basis }}/static/js/katalog-suche.js" defer></script>
   <script src="{{ basis }}/static/js/software-katalog.js" defer></script>
+  <script src="{{ basis }}/static/js/registry-katalog.js" defer></script>
   {% block kopf %}{% endblock %}
 </head>
 <body data-basis="{{ basis }}">
@@ -36,6 +37,7 @@
           ("blockly", "/blockly", "Blockly"),
           ("bibliothek", "/bibliothek", "Bibliothek"),
           ("software", "/software", "Software"),
+          ("registry", "/registry", "Registry"),
         ] %}
         <a href="{{ basis }}{{ ziel_pfad }}"{% if aktiv == schluessel %} class="aktiv" aria-current="page"{% endif %}>{{ i.icon(schluessel) }}<span>{{ text }}</span></a>
         {% endfor %}

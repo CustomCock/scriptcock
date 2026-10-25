@@ -28,6 +28,10 @@
     <textarea id="f-{{ dom }}" name="{{ name }}" rows="2" spellcheck="false" data-typ="registry_daten"
       placeholder="{{ 'z. B. ' ~ f.beispiel if f.beispiel is not none else '' }} – bei REG_MULTI_SZ eine Zeile pro Eintrag"
       {% if f.pflicht %}required{% endif %} {{ pruefen|safe }} aria-describedby="status-{{ dom }} hilfe-{{ dom }}">{{ (aktuell | join("\n")) if aktuell is iterable and aktuell is not string else (aktuell if aktuell is not none else '') }}</textarea>
+  {% elif f.typ == ParamTyp.REGISTRY_ZEILEN %}
+    {# Listen einer Richtlinie (multiText/list): eine Zeile pro Eintrag #}
+    <textarea id="f-{{ dom }}" name="{{ name }}" rows="3" spellcheck="false" data-typ="registry_zeilen"
+      placeholder="eine Zeile pro Eintrag" {{ pruefen|safe }} aria-describedby="status-{{ dom }} hilfe-{{ dom }}">{{ (aktuell | join("\n")) if aktuell is iterable and aktuell is not string else (aktuell if aktuell is not none else '') }}</textarea>
   {% elif f.typ == ParamTyp.LISTE %}
     {% set liste_text = (aktuell | join(", ")) if aktuell is iterable and aktuell is not string else (aktuell if aktuell is not none else '') %}
     <input id="f-{{ dom }}" name="{{ name }}" type="text" autocomplete="off" spellcheck="false" data-typ="liste"

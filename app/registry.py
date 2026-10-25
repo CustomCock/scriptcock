@@ -26,7 +26,7 @@ from app.codeenv import code_umgebung, text_umgebung
 from app.escaping import Ziel
 from app.models.block import EINGEBAUTE_VARIABLEN, RUECKGABE_PRAEFIX, BlockDef, ParameterDef, ParamTyp, Recht
 from app.models.recipe import RezeptDef, RezeptSchritt, feld_verweis, konstante
-from app.richtlinien import RichtlinienKatalog
+from app.richtlinien import ELEMENT_PRAEFIX, RichtlinienKatalog, parameter_fuer
 from app.validation import ValidierungsFehler, pruefe_wert_fuer_ziel, validiere_wert
 
 PROJEKT = Path(__file__).resolve().parent.parent
@@ -130,6 +130,10 @@ def cmd_klammern_ok(quelle: str) -> bool:
     return tiefe == 0
 
 
+def _konstanten(parameter: dict[str, Any]) -> dict[str, Any]:
+    return {k: konstante(v) for k, v in parameter.items()}
+
+
 @dataclass
 class Registry:
     bloecke: dict[str, BlockDef] = field(default_factory=dict)
@@ -146,10 +150,30 @@ class Registry:
     def kategorien(self) -> list[str]:
         return sorted({b.kategorie for b in self.bloecke.values()})
 
+    def element_parameter(self, block: BlockDef, richtlinie_id: Any) -> list[ParameterDef]:
+        """Dynamische Parameter (``e_…``) von ``richtlinie_setzen`` für die gewählte Richtlinie."""
+        if block.dynamisch != "richtlinie" or not isinstance(richtlinie_id, str) or not richtlinie_id:
+            return []
+        r = self.richtlinien.richtlinie(richtlinie_id)
+        return [p for p, _ in parameter_fuer(r)] if r is not None else []
+
+    def param_mit_elementen(
+        self, block: BlockDef, pid: str, parameter: dict[str, Any]
+    ) -> ParameterDef | None:
+        """Wie ``block.param``, kennt bei Richtlinien aber auch die Elemente der gewählten Richtlinie."""
+        p = block.param(pid)
+        if p is None and pid.startswith(ELEMENT_PRAEFIX):
+            rid = parameter.get("richtlinie")
+            p = next((e for e in self.element_parameter(block, rid) if e.id == pid), None)
+        return p
+
     def benutzte_parameter(self, block: BlockDef, ziel: Ziel) -> set[str]:
         """Parameter-IDs, die die Templates des Blocks für ``ziel`` tatsächlich verwenden."""
         if not block.verfuegbar(ziel):
             return set()
+        if block.dynamisch is not None:
+            # Code entsteht im Generator (richtlinie_code/werkzeug_code) aus allen Parametern
+            return {p.id for p in block.parameter}
         variablen: set[str] = set()
         for art in ("ziele", "pruefung", "dry_run", "vorschau"):
             variablen |= self.variablen.get((block.id, art, ziel), frozenset())
@@ -173,7 +197,7 @@ class Registry:
         if block is None or not block.verfuegbar(ziel):
             return False
         for pid, wert in schritt.parameter.items():
-            param = block.param(pid)
+            param = self.param_mit_elementen(block, pid, _konstanten(schritt.parameter))
             if param is None or feld_verweis(wert) is not None:
                 continue
             try:
@@ -323,7 +347,7 @@ def _pruefe_rezept(rezept: RezeptDef, reg: Registry, fehler: list[str]) -> None:
             if not block.verfuegbar(ziel):
                 fehler.append(f"{ort}: Block '{block.id}' ist für {ziel.value} nicht verfügbar")
         for pid, wert in schritt.parameter.items():
-            param = block.param(pid)
+            param = reg.param_mit_elementen(block, pid, _konstanten(schritt.parameter))
             if param is None:
                 fehler.append(f"{ort}: Block '{block.id}' hat keinen Parameter '{pid}'")
                 continue

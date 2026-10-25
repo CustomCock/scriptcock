@@ -103,7 +103,12 @@
       }
       return window.htmx.ajax("GET", url, { target: liste, swap: "beforeend" });
     }
-    window.OkmBaukasten = { ziel: ziel, hinzufuegen: function (blockId, werte) { return hinzufuegen(blockId, null, werte); } };
+    window.OkmBaukasten = {
+      ziel: ziel,
+      hinzufuegen: function (blockId, werte) { return hinzufuegen(blockId, null, werte); },
+      // Schritt neu vom Server holen (z. B. nach „Richtlinie wählen …“), Position bleibt
+      ersetzen: function (schritt, blockId, werte) { return hinzufuegen(blockId, schritt, werte); }
+    };
 
     document.addEventListener("click", function (ev) {
       var knopf = ev.target.closest("[data-hinzufuegen]");

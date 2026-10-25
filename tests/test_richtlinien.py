@@ -22,9 +22,11 @@ from app.main import create_app
 from app.models.block import ParamTyp, Risiko
 from app.registry import Registry, lade_registry
 from app.richtlinien import (
+    HAEUFIG_FELDER,
     Operation,
     RichtlinienKatalog,
     haeufig,
+    haeufig_schritte,
     normalisiere,
     operationen,
     parameter_fuer,
@@ -432,19 +434,32 @@ def test_code_ohne_kontrolle_ohne_richtlinien_hilfen(reg: Registry) -> None:
 # --- Häufige Einstellungen (echter Katalog) -------------------------------------------------------
 
 
-def test_haeufig_nur_katalog_richtlinien(registry: Registry) -> None:
+def test_haeufig_belegt_und_gueltig(registry: Registry) -> None:
     eintraege = haeufig()
     assert eintraege
     assert len({e["id"] for e in eintraege}) == len(eintraege)
     for e in eintraege:
-        assert set(e) <= {"id", "titel", "gruppe", "richtlinie", "zustand", "werte", "anpassen", "hinweis"}, e
-        r = registry.richtlinien.richtlinie(e["richtlinie"])
-        assert r is not None, f"{e['id']}: {e['richtlinie']} fehlt im Katalog"
-        params = {p.id for p, _ in parameter_fuer(r)}
-        assert set(e.get("werte", {})) <= params, e["id"]
-        assert set(e.get("anpassen", [])) <= set(e.get("werte", {})), e["id"]
-        schritt = richtlinie(e["richtlinie"], zustand=e["zustand"], **e.get("werte", {}))
-        ir = ir_aus(registry, Ziel.POWERSHELL, [schritt])
+        assert set(e) <= HAEUFIG_FELDER, e["id"]
+        for feld in ("titel", "beschreibung", "gruppe", "bereich", "wirkung", "risiko", "schritte"):
+            assert e.get(feld), f"{e['id']}: {feld} fehlt"
+        assert e["bereich"] in ("computer", "benutzer")
+        werte: set[str] = set()
+        for s in e["schritte"]:
+            if "richtlinie" in s:
+                r = registry.richtlinien.richtlinie(s["richtlinie"])
+                assert r is not None, f"{e['id']}: {s['richtlinie']} fehlt im Katalog"
+                params = {p.id for p, _ in parameter_fuer(r)}
+                assert set(s.get("werte", {})) <= params, e["id"]
+                werte |= set(s.get("werte", {}))
+            else:
+                # Freie Registry-Werte nur mit belegter Quelle (Microsoft Learn / Hersteller)
+                assert s["block"].startswith("registry_"), e["id"]
+                assert e["quelle"]["url"].startswith("https://learn.microsoft.com/"), e["id"]
+                werte |= set(s["parameter"])
+        assert set(e.get("anpassen", [])) <= werte, e["id"]
+        ir = ir_aus(registry, Ziel.POWERSHELL, haeufig_schritte(e), rot_bestaetigt=True)
+        rot = any(getattr(s, "risiko", None) is Risiko.ROT for s in ir.schritte)
+        assert rot == (e["risiko"] == "rot"), f"{e['id']}: Risiko {e['risiko']} passt nicht zur Validierung"
         assert generator_fuer(Ziel.POWERSHELL, registry).erzeuge(ir).text
 
 
