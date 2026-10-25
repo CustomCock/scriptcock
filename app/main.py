@@ -18,11 +18,12 @@ from app.auth import KeinZugriff, NichtAngemeldet, oauth_client
 from app.auth import router as auth_router
 from app.baukasten import lade_db_rezepte
 from app.config import Einstellungen, einstellungen
-from app.db import Datenbank
+from app.db import Datenbank, datenverzeichnis
 from app.katalog import lade_katalog
 from app.models.software import SoftwareKatalog
 from app.registry import Registry, lade_registry
 from app.routes import api, baukasten, bibliothek, blockly, export, pages, software, verwaltung
+from app.routes import werkzeuge as werkzeuge_routes
 
 PROJEKT = Path(__file__).resolve().parent.parent
 log = logging.getLogger("baukasten")
@@ -54,6 +55,10 @@ def create_app(
     app = FastAPI(title="okm Script-Baukasten", version=__version__, root_path=einst.root_path, docs_url=None)
     app.state.einstellungen = einst
     app.state.registry = registry or lade_registry()
+    if einst.werkzeug_url:
+        app.state.registry.werkzeug_url = einst.werkzeug_url.rstrip("/")
+    if registry is None:
+        app.state.registry.richtlinien.cache = datenverzeichnis(einst.database_url)
     app.state.katalog = katalog or lade_katalog()
     app.state.db = datenbank or Datenbank(einst.database_url)
     app.state.oauth = oauth_client(einst)
@@ -118,6 +123,7 @@ def create_app(
     app.include_router(blockly.router)
     app.include_router(software.router)
     app.include_router(export.router)
+    app.include_router(werkzeuge_routes.router)
     app.include_router(api.router, prefix="/api/v1")
 
     @app.get("/healthz", include_in_schema=False)

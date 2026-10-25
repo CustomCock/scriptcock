@@ -12,3 +12,6 @@ build/
 dist/
 data/
 checkliste/
+
+# Rohpakete der ADMX-Vorlagen (Größe, Herstellerlizenz) – ins Git kommt nur der erzeugte Katalog
+registry/quellen/

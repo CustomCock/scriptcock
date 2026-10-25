@@ -583,4 +583,3 @@ function Import-OkmRegistryDatei([string]$Datei, [string]$Ansicht = '64', [switc
     $global:LASTEXITCODE = 0
     Write-OkmInfo 'Importiert.'
 }
-# ===== Ende Registry-Hilfen ============================================================

@@ -15,7 +15,16 @@ ID_MUSTER = r"^[a-z][a-z0-9_]*$"
 # Vom Generator gesetzt: whatif/sudo immer; die übrigen für Registry-Bausteine (CMD: SID-Schleife für
 # den angemeldeten Benutzer, Rang der „wirkung“, findstr-Muster der gesperrten Bereiche)
 EINGEBAUTE_VARIABLEN = frozenset(
-    {"whatif", "sudo", "benutzer_anfang", "benutzer_ende", "wirkung_rang", "regschutz_cmd"}
+    {
+        "whatif",
+        "sudo",
+        "benutzer_anfang",
+        "benutzer_ende",
+        "wirkung_rang",
+        "regschutz_cmd",
+        "richtlinie_code",
+        "werkzeug_code",
+    }
 )
 # Platzhalter für Rückgabewerte: {{ rueckgabe_<id> }} = Variablenname, den der Generator vergibt.
 RUECKGABE_PRAEFIX = "rueckgabe_"
@@ -86,6 +95,11 @@ class ParamTyp(StrEnum):
     REGISTRY_TYP = "registry_typ"  # REG_SZ, REG_EXPAND_SZ, REG_DWORD, REG_QWORD, REG_MULTI_SZ, REG_BINARY
     REGISTRY_DATEN = "registry_daten"  # je nach Typ (Parameter ``bezug``) geprüft
     REGISTRY_BEREICH = "registry_bereich"  # wessen Registry: computer, angemeldeter_benutzer, …
+    REGISTRY_TEXT = "registry_text"  # Text für Registry-Werte (auch & % $ ; …), ≤ 4096, keine Steuerzeichen
+    REGISTRY_ZEILEN = "registry_zeilen"  # mehrere Texte, einer pro Zeile (Listen mit Kommas, MULTI_SZ)
+    RICHTLINIE = (
+        "richtlinie"  # ID aus dem Richtlinien-Katalog (registry/katalog), z. B. edge:msedge:HomepageLocation
+    )
     DATEINAME = "dateiname"  # ein Datei-/Ordnername ohne Pfad (kein . / .., keine reservierten Namen)
     RECHNERNAME = "rechnername"  # NetBIOS-tauglich: 1–15 Zeichen, Buchstaben/Ziffern/-, → GROSS
     DNSNAME = "dnsname"  # Name für DNS-Abfragen, Labels dürfen mit _ beginnen (_ldap._tcp.…)
@@ -105,7 +119,9 @@ ZAHLENTYPEN: dict[str, tuple[int | None, int | None]] = {
     "dauer_sek": (1, 86_400),
 }
 # Als Listeneintrag nicht erlaubt
-NICHT_IN_LISTEN = frozenset({"liste", "variable", "ja_nein", "registry_daten"})
+NICHT_IN_LISTEN = frozenset(
+    {"liste", "variable", "ja_nein", "registry_daten", "registry_zeilen", "richtlinie"}
+)
 
 REGISTRY_TYPEN = ("REG_SZ", "REG_EXPAND_SZ", "REG_DWORD", "REG_QWORD", "REG_MULTI_SZ", "REG_BINARY")
 REGISTRY_BEREICHE: dict[str, str] = {
@@ -251,6 +267,9 @@ class BlockDef(BaseModel):
     # Windows-Registry: Art des Zugriffs → Schutzliste (registry/schutz.yaml), Risiko je Pfad,
     # Registry-Hilfsfunktionen in der Präambel
     registry: Literal["lesen", "schreiben", "wert_loeschen", "schluessel_loeschen", "import"] | None = None
+    # Parameter, die erst zur Laufzeit feststehen: "richtlinie" = Elemente der gewählten ADMX-Richtlinie
+    # (app/richtlinien.py), IDs mit Präfix "e_"; "werkzeug" = Code für admin_werkzeug_bereitstellen
+    dynamisch: Literal["richtlinie", "werkzeug"] | None = None
 
     # Wird von der Registry gesetzt (relativer Pfad, für Fehlermeldungen).
     quelle: str = ""

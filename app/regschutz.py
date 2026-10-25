@@ -32,8 +32,9 @@ class Schutz:
     def gesperrt_fuer(self, pfad: str) -> bool:
         return self._unter(pfad, self.gesperrt)
 
-    def rot_fuer(self, pfad: str) -> bool:
-        return self._unter(pfad, self.rot) or bool(set(self._teile(pfad)) & self.rot_teile)
+    def rot_fuer(self, pfad: str, ausser: frozenset[str] = frozenset()) -> bool:
+        """``ausser``: Teile aus ``rot_teile``, die hier nicht zählen (Katalog-Richtlinien: „policies“)."""
+        return self._unter(pfad, self.rot) or bool(set(self._teile(pfad)) & (self.rot_teile - ausser))
 
     def zu_flach_zum_loeschen(self, pfad: str) -> bool:
         return len(self._teile(pfad)) - 1 < self.loeschen_min_ebenen

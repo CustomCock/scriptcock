@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Eigene Test-Vorlage (keine Herstellerdatei): deckt alle Element-Arten und Sonderfälle ab. -->
+<policyDefinitions xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions" revision="1.0" schemaVersion="1.0">
+  <policyNamespaces>
+    <target prefix="okmtest" namespace="Okm.Policies.Test" />
+    <using prefix="zweit" namespace="Okm.Policies.Zweit" />
+  </policyNamespaces>
+  <resources minRequiredRevision="1.0" />
+  <supportedOn>
+    <definitions>
+      <definition name="SUPPORTED_Okm1" displayName="$(string.SUPPORTED_Okm1)" />
+    </definitions>
+  </supportedOn>
+  <categories>
+    <category name="Okm" displayName="$(string.Okm)" />
+    <category name="Unter" displayName="$(string.Unter)">
+      <parentCategory ref="Okm" />
+    </category>
+    <category name="Fremd" displayName="$(string.Fremd)">
+      <parentCategory ref="zweit:ZweitWurzel" />
+    </category>
+  </categories>
+  <policies>
+    <!-- Nur valueName: Konvention aktiviert = DWORD 1, deaktiviert = DWORD 0 -->
+    <policy name="Einfach" class="Machine" displayName="$(string.Einfach)" explainText="$(string.Einfach_Help)" key="Software\Policies\Okm\Test" valueName="Einfach">
+      <parentCategory ref="Okm" />
+      <supportedOn ref="SUPPORTED_Okm1" />
+    </policy>
+    <!-- Eigene Werte, deaktiviert = löschen, plus enabledList in anderem Schlüssel -->
+    <policy name="MitWerten" class="Both" displayName="$(string.MitWerten)" explainText="$(string.MitWerten_Help)" key="Software\Policies\Okm\Test" valueName="Modus">
+      <parentCategory ref="Unter" />
+      <enabledValue><string>an</string></enabledValue>
+      <disabledValue><delete /></disabledValue>
+      <enabledList defaultKey="Software\Policies\Okm\Test\Extra">
+        <item valueName="Zusatz"><value><decimal value="7" /></value></item>
+      </enabledList>
+    </policy>
+    <!-- Alle Element-Arten -->
+    <policy name="Elemente" class="Machine" displayName="$(string.Elemente)" explainText="$(string.Elemente_Help)" presentation="$(presentation.Elemente)" key="Software\Policies\Okm\Elemente">
+      <parentCategory ref="Unter" />
+      <elements>
+        <boolean id="Schalter" valueName="Schalter">
+          <trueValue><decimal value="5" /></trueValue>
+          <falseValue><decimal value="0" /></falseValue>
+        </boolean>
+        <decimal id="Anzahl" valueName="Anzahl" minValue="1" maxValue="10" />
+        <decimal id="AlsText" valueName="AlsText" maxValue="99" storeAsText="true" />
+        <longDecimal id="Gross" valueName="Gross" />
+        <text id="Pfad" valueName="Pfad" expandable="true" maxLength="20" />
+        <multiText id="Zeilen" valueName="Zeilen" maxStrings="3" />
+        <enum id="Stufe" valueName="Stufe" required="true">
+          <item displayName="$(string.Stufe_Aus)"><value><decimal value="0" /></value></item>
+          <item displayName="$(string.Stufe_Hoch)">
+            <value><string>hoch</string></value>
+            <valueList><item key="Software\Policies\Okm\Elemente\Hoch" valueName="Aktiv"><value><decimal value="1" /></value></item></valueList>
+          </item>
+        </enum>
+        <list id="Zuordnung" key="Software\Policies\Okm\Elemente\Zuordnung" explicitValue="true" />
+        <list id="Reihe" key="Software\Policies\Okm\Elemente\Reihe" valuePrefix="R" additive="true" />
+      </elements>
+    </policy>
+    <!-- Benutzer-Richtlinie, Text nur auf Englisch -->
+    <policy name="NurEnglisch" class="User" displayName="$(string.NurEnglisch)" explainText="$(string.NurEnglisch_Help)" key="Software\Policies\Okm\Benutzer" valueName="Wert">
+      <parentCategory ref="Fremd" />
+    </policy>
+    <!-- Ungültig: unbekannte Klasse → ausgelassen -->
+    <policy name="KaputtKlasse" class="Irgendwas" displayName="$(string.Einfach)" key="Software\Policies\Okm\Test" valueName="X">
+      <parentCategory ref="Okm" />
+    </policy>
+    <!-- Ungültig: Wertname mit Zeilenumbruch-Escape bzw. Schlüssel mit Wurzel → ausgelassen -->
+    <policy name="KaputtWurzel" class="Machine" displayName="$(string.Einfach)" key="HKEY_LOCAL_MACHINE\Software\Policies\Okm" valueName="X">
+      <parentCategory ref="Okm" />
+    </policy>
+  </policies>
+</policyDefinitions>

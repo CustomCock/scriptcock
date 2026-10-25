@@ -18,7 +18,9 @@ FESTE_ZEIT = datetime(2026, 1, 15, 9, 30, 0)
 
 @pytest.fixture(scope="session")
 def registry() -> Registry:
-    return lade_registry()
+    reg = lade_registry()
+    reg.werkzeug_url = "https://baukasten.okm.test"
+    return reg
 
 
 def beispielwerte(block: BlockDef, ziel: Ziel) -> dict[str, Any]:

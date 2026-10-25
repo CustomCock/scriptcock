@@ -1,0 +1,65 @@
+id: admin_werkzeug_bereitstellen
+version: 1
+name: Admin-Werkzeug bereitstellen
+kategorie: Registry
+beschreibung: Lädt LGPO.exe, die Gruppenrichtlinien-Vorlagen eines Herstellers oder die Software selbst herunter – immer mit Prüfsumme (SHA-256). Ist die richtige Version schon da, wird nichts geladen.
+hilfe: |
+  Quelle „Intranet“: der Baukasten-Server liefert genau die geprüften Original-Dateien (kein Internet
+  beim Kunden nötig). „Hersteller“: offizielle Download-Adresse. Weicht die Prüfsumme ab, bricht der
+  Schritt ab.
+  Werkzeuge liegen danach unter C:\ProgramData\okm\werkzeuge\<Name>\<Version>\, Vorlagen unter
+  C:\Windows\PolicyDefinitions (neuere vorhandene Vorlagen bleiben, ältere werden gesichert).
+  „Central Store“ kopiert die Vorlagen in die Domäne – das betrifft alle Rechner (roter Schritt).
+risiko: gelb
+dynamisch: werkzeug
+fortschritt: "Admin-Werkzeug: {{ was }} {{ paket }}"
+tipp: Kommt der Rechner an die Quelle (Intranet-Adresse bzw. Internet, Proxy)? Bei „Prüfsumme passt nicht“ hat sich die Datei geändert – die IT muss die Quelle aktualisieren.
+rechte:
+  powershell: admin
+parameter:
+  - id: was
+    label: Was?
+    typ: auswahl
+    standard: lgpo
+    optionen:
+      - wert: lgpo
+        label: LGPO.exe (für „Lokale Gruppenrichtlinie“)
+      - wert: vorlagen
+        label: Vorlagen (ADMX/ADML) eines Pakets – damit die Einstellungen in gpedit erscheinen
+      - wert: software
+        label: Software installieren, falls sie fehlt
+  - id: paket
+    label: Paket (bei Vorlagen/Software)
+    typ: auswahl
+    standard: edge
+    optionen:
+      - wert: windows
+        label: Windows 11
+      - wert: office
+        label: Microsoft 365 Apps / Office
+      - wert: edge
+        label: Microsoft Edge
+      - wert: chrome
+        label: Google Chrome
+      - wert: firefox
+        label: Mozilla Firefox
+  - id: quelle
+    label: Quelle
+    typ: auswahl
+    standard: intranet
+    optionen:
+      - wert: intranet
+        label: Intranet (Baukasten-Server)
+      - wert: hersteller
+        label: Hersteller (Internet)
+  - id: central_store
+    label: Vorlagen in den Central Store der Domäne kopieren (alle Rechner!)
+    typ: ja_nein
+    pflicht: false
+    standard: false
+ziele:
+  powershell: |
+    {{ werkzeug_code }}
+dry_run:
+  powershell: |
+    {{ werkzeug_code }}

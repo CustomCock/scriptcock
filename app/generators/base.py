@@ -172,7 +172,9 @@ class Generator(ABC):
         self.mit_kontrolle = ir.hat_verzweigung()
         self.hat_abbrechen = any(isinstance(k, Abbrechen) for k in alle_knoten(ir.schritte))
         # Registry-Bausteine: Hilfsfunktionen, 64-Bit-Neustart und Hinweise in der Zusammenfassung
-        self.mit_registry = any(b.registry is not None for b in defs)
+        self.mit_registry = any(b.registry is not None or b.dynamisch is not None for b in defs)
+        self.mit_richtlinien = any(b.dynamisch == "richtlinie" for b in defs)
+        self.mit_dynamisch = any(b.dynamisch is not None for b in defs)
 
         zeilen: list[str] = []
         zeilen += self.kopf(ir, defs)
@@ -401,9 +403,41 @@ class Generator(ABC):
         for r in block.rueckgaben(self.ziel):
             kontext[RUECKGABE_PRAEFIX + r.id] = escaping.variable_setzen(self.ziel, self._nr, r.id)
         kontext.update(self._registry_kontext(block, schritt, bereich))
+        kontext.update(self._dynamischer_kontext(block, schritt, dry))
         kontext["whatif"] = escaping.vertraut(" -WhatIf" if dry and self.ziel is Ziel.POWERSHELL else "")
         # Linux/macOS: privilegierte Befehle laufen über okm_sudo (root: direkt, sonst sudo)
         kontext["sudo"] = escaping.vertraut("okm_sudo " if block.recht(self.ziel) is Recht.ROOT else "")
+        return kontext
+
+    def _richtlinie_kopf(self, schritt: BlockSchritt) -> list[str]:
+        rid = schritt.parameter.get("richtlinie")
+        r = self.registry.richtlinien.richtlinie(str(rid.wert)) if rid is not None else None
+        if r is None:
+            return []
+        paket = self.registry.richtlinien.paket(r["paket"]) or {}
+        zustand = schritt.parameter.get("zustand")
+        return [
+            f"Richtlinie: {r['titel']} ({zustand.wert if zustand is not None else ''})",
+            f"Paket: {paket.get('name', r['paket'])} {paket.get('version', '')}".rstrip(),
+            f"Kategorie: {' > '.join(r['kategorie_pfad'])}",
+        ]
+
+    def _dynamischer_kontext(self, block: BlockDef, schritt: BlockSchritt, dry: bool) -> dict[str, Escaped]:
+        """``richtlinie_code``/``werkzeug_code`` für dynamische Bausteine (nur PowerShell)."""
+        kontext = {"richtlinie_code": escaping.leer(), "werkzeug_code": escaping.leer()}
+        if block.dynamisch is None or self.ziel is not Ziel.POWERSHELL:
+            return kontext
+        from app.generators import richtlinie_ps
+
+        try:
+            if block.dynamisch == "richtlinie":
+                zeilen = richtlinie_ps.richtlinie_code(self.registry, schritt, dry)
+                kontext["richtlinie_code"] = escaping.vertraut("\n".join(zeilen))
+            else:
+                zeilen = richtlinie_ps.werkzeug_code(self.registry, schritt, dry)
+                kontext["werkzeug_code"] = escaping.vertraut("\n".join(zeilen))
+        except (richtlinie_ps.CodeFehler, UnsicherError) as e:
+            raise GenerierungsFehler(f"{block.name}: {e}") from None
         return kontext
 
     @staticmethod
@@ -545,6 +579,8 @@ class Generator(ABC):
                         " " * einzug
                         + f"{next(zaehler):>2}. {k(b.name)} [Risiko: {(kn.risiko or b.risiko).value}{admin}]"
                     )
+                    if b.dynamisch == "richtlinie":
+                        zeilen.extend(" " * (einzug + 4) + k(z) for z in self._richtlinie_kopf(kn))
 
         liste(ir.schritte, 2)
         zeilen += ["", "Generiert mit dem okm Script-Baukasten", "=" * 70]

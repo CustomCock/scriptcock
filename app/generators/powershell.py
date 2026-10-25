@@ -15,8 +15,11 @@ from app.ir import ScriptIR, Vergleich
 from app.models.block import BlockDef, RueckgabeDef, RueckgabeTyp
 from app.regschutz import lade_schutz
 
-# Hilfsfunktionen für Registry-Bausteine (nur im Script, wenn ein Registry-Baustein vorkommt)
-REGISTRY_HILFEN = (Path(__file__).parent / "hilfen" / "registry.ps1").read_text(encoding="utf-8").splitlines()
+# Hilfsfunktionen für Registry-Bausteine (nur im Script, wenn ein Registry-Baustein vorkommt);
+# die für Richtlinien/Admin-Werkzeuge nur, wenn ein dynamischer Baustein vorkommt
+_HILFEN = Path(__file__).parent / "hilfen"
+REGISTRY_HILFEN = (_HILFEN / "registry.ps1").read_text(encoding="utf-8").splitlines()
+RICHTLINIEN_HILFEN = (_HILFEN / "richtlinien.ps1").read_text(encoding="utf-8").splitlines()
 
 
 def _lit(text: str) -> str:
@@ -185,15 +188,23 @@ class PowerShellGenerator(Generator):
             "# Gesperrte Registry-Bereiche (registry/schutz.yaml) – gilt auch für importierte .reg-Dateien",
             f"$script:OkmRegGesperrt = @({gesperrt})",
             *REGISTRY_HILFEN,
+            *(RICHTLINIEN_HILFEN if self.mit_dynamisch else []),
+            "# ===== Ende Registry-Hilfen ============================================================",
             "",
         ]
 
     def _registry_hinweise(self) -> list[str]:
         rueck = "' Rückgängig machen: die .reg-Dateien in ' + $script:OkmRegSicherung"
+        lgpo = [
+            "    if ($script:OkmLgpoSicherung) {",
+            "        Write-Host (' Gruppenrichtlinie zurück: LGPO.exe /g ' + $script:OkmLgpoSicherung)",
+            "    }",
+        ]
         return [
             "    if ($script:OkmRegSicherung) {",
             f"        Write-Host ({rueck} + ' doppelklicken (höchste Nummer zuerst).')",
             "    }",
+            *(lgpo if self.mit_dynamisch else []),
             "    if ($script:OkmWirkung -gt 0) {",
             "        Write-Host (' Damit die Änderungen wirken: ' + "
             "$script:OkmWirkungText[$script:OkmWirkung]) -ForegroundColor Yellow",
@@ -332,7 +343,10 @@ class PowerShellGenerator(Generator):
         ]
 
     def abschluss(self, ir: ScriptIR) -> list[str]:
-        return ["$OkmStatus = 'fertig'", "Exit-OkmScript 0"]
+        gpupdate = (
+            ["# Computer-Richtlinien einmal anwenden", "Invoke-OkmGpupdate"] if self.mit_richtlinien else []
+        )
+        return [*gpupdate, "$OkmStatus = 'fertig'", "Exit-OkmScript 0"]
 
     def rueckgaben_vorbelegen(self, rueckgaben: list[tuple[Escaped, RueckgabeDef]]) -> list[str]:
         return [

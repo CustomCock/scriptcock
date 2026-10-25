@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitionResources xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions" revision="1.0" schemaVersion="1.0">
+  <displayName>Okm-Test</displayName>
+  <description>Eigene Testvorlage</description>
+  <resources>
+    <stringTable>
+      <string id="SUPPORTED_Okm1">Mindestens Okm 1</string>
+      <string id="Okm">Okm-Test</string>
+      <string id="Unter">Unterkategorie Ärger</string>
+      <string id="Fremd">Fremd verankert</string>
+      <string id="Einfach">Einfache Einstellung</string>
+      <string id="Einfach_Help">Schaltet die Makrosperre für Dateien aus dem Internet ein.</string>
+      <string id="MitWerten">Modus mit Werten</string>
+      <string id="MitWerten_Help">Setzt den Modus.</string>
+      <string id="Elemente">Alle Elemente</string>
+      <string id="Elemente_Help">Testet jede Element-Art.</string>
+      <string id="Stufe_Aus">Aus</string>
+      <string id="Stufe_Hoch">Hoch</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="Elemente">
+        <dropdownList refId="Stufe" defaultItem="1">Stufe:</dropdownList>
+        <checkBox refId="Schalter" defaultChecked="true">Schalter an</checkBox>
+        <decimalTextBox refId="Anzahl" defaultValue="3">Anzahl:</decimalTextBox>
+        <decimalTextBox refId="AlsText">Als Text:</decimalTextBox>
+        <decimalTextBox refId="Gross">Groß:</decimalTextBox>
+        <textBox refId="Pfad"><label>Pfad:</label><defaultValue>%TEMP%</defaultValue></textBox>
+        <multiTextBox refId="Zeilen">Zeilen:</multiTextBox>
+        <listBox refId="Zuordnung">Zuordnung:</listBox>
+        <listBox refId="Reihe">Reihe:</listBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

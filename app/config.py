@@ -15,6 +15,9 @@ class Einstellungen(BaseSettings):
     database_url: str = Field(default="sqlite:///./data/baukasten.db", alias="DATABASE_URL")
     root_path: str = Field(default="", alias="ROOT_PATH")
     cookie_secure: bool = Field(default=True, alias="SESSION_COOKIE_SECURE")
+    # Adresse, unter der Windows-Rechner diese App erreichen (für „Admin-Werkzeug bereitstellen“,
+    # Quelle Intranet), z. B. https://baukasten.okm.local – leer = Quelle Intranet nicht verfügbar
+    werkzeug_url: str = Field(default="", alias="OKM_WERKZEUG_URL")
 
     auth_disabled: bool = Field(default=False, alias="AUTH_DISABLED")
     dev_benutzer: str = Field(default="entwickler", alias="DEV_BENUTZER")

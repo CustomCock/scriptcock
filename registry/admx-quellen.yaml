@@ -1,0 +1,154 @@
+# Quellen der Administrativen Vorlagen (ADMX/ADML) für den Richtlinien-Katalog.
+#
+# Nur offizielle Herstellerquellen. Links und SHA-256 wurden beim Eintragen auf der jeweils
+# genannten Herstellerseite nachgeschlagen bzw. beim ersten Download berechnet. Ändert ein Hersteller
+# die Datei, bricht tools/admx_holen.py beim Hash-Vergleich ab – dann Seite prüfen, Version/URL/Hash
+# hier aktualisieren (siehe docs/richtlinien-katalog.md).
+#
+# Felder je Paket:
+#   id          kurzer Name (Teil der Richtlinien-ID, nie ändern)
+#   name        Anzeige
+#   version     Stand des Pakets
+#   seite       offizielle Download-Seite des Herstellers
+#   format      msi | exe | office | zip | cab | dateien | manuell
+#               (office = Office-Installer mit eingebettetem CAB, Sprache der ADML am Inhalt erkannt)
+#   dateien     [{url, sha256, ziel?}] – bei "dateien": ziel = Pfad im Paketordner
+#   admx        Glob (ohne Groß/klein) der .admx-Dateien im entpackten Paket
+#   adml_de     Glob der deutschen .adml-Dateien, adml_en dasselbe für en-US (Rückfall)
+#   software    winget-ID im Software-Katalog (für „Software installieren, falls sie fehlt“)
+#   hinweis     Besonderheiten
+
+pakete:
+  - id: windows
+    name: Windows 11
+    version: "25H2 (Sep 2025 Update)"
+    seite: https://www.microsoft.com/en-us/download/details.aspx?id=108394
+    format: msi
+    dateien:
+      - url: "https://download.microsoft.com/download/f35d3000-b6c9-4ca6-bedc-5e4ec15a6b7a/Administrative Templates (admx) for Windows 11 Sep 2025 Update.msi"
+        sha256: 4fff0dc4f1ec759cabd76c0d02bae80dfde454ea8ecd20b6c6845e8889f59117
+    admx: "**/policydefinitions/*.admx"
+    adml_de: "**/policydefinitions/de-de/*.adml"
+    adml_en: "**/policydefinitions/en-us/*.adml"
+
+  - id: office
+    name: Microsoft 365 Apps / Office
+    version: "5568.1000"
+    seite: https://www.microsoft.com/en-us/download/details.aspx?id=49030
+    format: office
+    dateien:
+      - url: https://download.microsoft.com/download/cd208613-5ca8-445f-9855-5081666d124e/admintemplates_x64_5568_1000_en-us.exe
+        sha256: a775828c86808bed55343c4738bed9458825d6fb7fa1948c2726e0b38dc45cfa
+    admx: "**/admx/*.admx"
+    adml_de: "**/admx/de-de/*.adml"
+    adml_en: "**/admx/en-us/*.adml"
+    software: Microsoft.Office
+    hinweis: Enthält auch die Richtlinien für Microsoft Teams (laut Microsoft kein eigenes Teams-Paket).
+
+  - id: edge
+    name: Microsoft Edge
+    version: "158.0.4344.0"
+    seite: https://www.microsoft.com/en-us/edge/business/download
+    format: cab
+    dateien:
+      # Link und SHA-256 aus der offiziellen Produktliste: https://edgeupdates.microsoft.com/api/products?view=enterprise
+      - url: https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/e6a43319-7f4b-4ae3-89f3-684a99cef473/MicrosoftEdgePolicyTemplates.cab
+        sha256: d32b05ae0b5ab496a2f2f2a63b2dcff02deb74914bd0572b40aa2a04714a1055
+    admx: "**/windows/admx/*.admx"
+    adml_de: "**/windows/admx/de-de/*.adml"
+    adml_en: "**/windows/admx/en-us/*.adml"
+    software: Microsoft.Edge
+
+  - id: chrome
+    name: Google Chrome
+    version: "Stand 23.10.2026"
+    seite: https://support.google.com/chrome/a/answer/187202
+    format: zip
+    dateien:
+      # Google veröffentlicht nur diese „immer aktuelle“ URL – bei jeder Aktualisierung Hash neu eintragen
+      - url: https://dl.google.com/dl/edgedl/chrome/policy/policy_templates.zip
+        sha256: dc18f621010d86cd8aa91e780f4c2b85adc1df560d4728a5ff60206711c4e27c
+    admx: "windows/admx/*.admx"
+    adml_de: "windows/admx/de-de/*.adml"
+    adml_en: "windows/admx/en-us/*.adml"
+    software: Google.Chrome
+
+  - id: firefox
+    name: Mozilla Firefox
+    version: "8.4"
+    seite: https://github.com/mozilla/policy-templates/releases
+    format: dateien
+    dateien:
+      - url: https://raw.githubusercontent.com/mozilla/policy-templates/v8.4/windows/firefox.admx
+        sha256: 6f32bc4afc7bf141c9713598122d0786a981f318112b6d09ca1caf1399d26f05
+        ziel: windows/firefox.admx
+      - url: https://raw.githubusercontent.com/mozilla/policy-templates/v8.4/windows/mozilla.admx
+        sha256: c1a07a146e6373deb42ddcd6958a8a178f1f748f3fe0474677546c562cf554e2
+        ziel: windows/mozilla.admx
+      - url: https://raw.githubusercontent.com/mozilla/policy-templates/v8.4/windows/de-DE/firefox.adml
+        sha256: e555e2f07402c0993b53ea55c913f403941c05f34378b5fab823a666df28d483
+        ziel: windows/de-DE/firefox.adml
+      - url: https://raw.githubusercontent.com/mozilla/policy-templates/v8.4/windows/de-DE/mozilla.adml
+        sha256: cf5dd71f00b574aa99937eec9e72819344f4280550ce17923f88f1820be78ac6
+        ziel: windows/de-DE/mozilla.adml
+      - url: https://raw.githubusercontent.com/mozilla/policy-templates/v8.4/windows/en-US/firefox.adml
+        sha256: 387788a86cc584660843be619b4719c1565bfb33a895a1a34af5e6e83ae89302
+        ziel: windows/en-US/firefox.adml
+      - url: https://raw.githubusercontent.com/mozilla/policy-templates/v8.4/windows/en-US/mozilla.adml
+        sha256: cf5dd71f00b574aa99937eec9e72819344f4280550ce17923f88f1820be78ac6
+        ziel: windows/en-US/mozilla.adml
+    admx: "windows/*.admx"
+    adml_de: "windows/de-de/*.adml"
+    adml_en: "windows/en-us/*.adml"
+    software: Mozilla.Firefox
+
+  # --- Ohne verifizierten Direkt-Download: Dateien von Hand nach registry/quellen/<id>/admx ablegen ---
+  - id: onedrive
+    name: Microsoft OneDrive
+    version: "aus der Installation"
+    seite: https://learn.microsoft.com/de-de/sharepoint/use-group-policy
+    format: manuell
+    admx: "*.admx"
+    adml_de: "de-de/*.adml"
+    adml_en: "en-us/*.adml"
+    software: Microsoft.OneDrive
+    hinweis: >-
+      Die Vorlagen liegen bei jeder OneDrive-Installation unter
+      %LOCALAPPDATA%\Microsoft\OneDrive\<Version>\adm\ (OneDrive.admx, de\OneDrive.adml).
+
+  - id: adobe_reader
+    name: Adobe Acrobat Reader
+    version: ""
+    seite: https://www.adobe.com/devnet-docs/acrobatetk/tools/DesktopDeployment/gpo.html
+    format: manuell
+    admx: "*.admx"
+    adml_de: "de-de/*.adml"
+    adml_en: "en-us/*.adml"
+    software: Adobe.Acrobat.Reader.64-bit
+    hinweis: >-
+      Adobe verweist auf der Seite auf Vorlagen im Enterprise Toolkit; ein öffentlicher Direktlink war
+      beim Einrichten nicht erreichbar.
+
+  - id: zoom
+    name: Zoom Workplace
+    version: ""
+    seite: https://support.zoom.com/
+    format: manuell
+    admx: "*.admx"
+    adml_de: "de-de/*.adml"
+    adml_en: "en-us/*.adml"
+    software: Zoom.Zoom
+    hinweis: >-
+      Zoom stellt die Vorlagen im Support-Artikel „Mass-deploying with Group Policy Objects“ bereit
+      (Abschnitt „Available Templates“); die Seite wird per JavaScript aufgebaut, daher kein Direktlink.
+
+# Werkzeuge, die Scripte bei Bedarf herunterladen (Baustein admin_werkzeug_bereitstellen)
+werkzeuge:
+  - id: lgpo
+    name: LGPO.exe (Microsoft Security Compliance Toolkit)
+    version: "3.0"
+    seite: https://www.microsoft.com/en-us/download/details.aspx?id=55319
+    url: https://download.microsoft.com/download/8/5/c/85c25433-a1b0-4ffa-9429-7e023e7da8d8/LGPO.zip
+    sha256: cb7159d134a0a1e7b1ed2ada9a3ce8ce8f4de391d14403d55438af824247cc55
+    datei: LGPO_30/LGPO.exe
+    datei_sha256: 0c97f29543418b30340c4ff5d930d31e6196dd59c2cc74b6b890fa7b90c910c7

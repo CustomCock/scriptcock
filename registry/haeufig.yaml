@@ -1,0 +1,97 @@
+# Häufige Einstellungen – Schnellzugriff im Registry-Panel (Tab „Häufig“).
+#
+# Jeder Eintrag verweist auf eine Richtlinie aus dem Richtlinien-Katalog (registry/katalog/), also auf
+# die offiziellen Administrativen Vorlagen des Herstellers – Titel, Erklärung, Schlüssel und Werte
+# kommen von dort. Keine freien Registry-Tipps (Foren, Gedächtnis): Was nicht als Richtlinie in einer
+# Hersteller-Vorlage steht, kommt hier nicht rein. tests/test_richtlinien.py prüft jeden Eintrag gegen
+# den Katalog und die Validierung.
+#
+# Felder:
+#   id          kurzer Name (eindeutig)
+#   titel       Anzeige im Panel
+#   gruppe      Windows | Microsoft Edge | Google Chrome | Mozilla Firefox | Office
+#   richtlinie  Richtlinien-ID aus dem Katalog (<paket>:<admx>:<name>)
+#   zustand     aktiviert | deaktiviert | nicht_konfiguriert
+#   werte       Elementwerte (Parameter-IDs e_…); Auswahl = Nummer der Option als Text
+#   anpassen    Elemente, die der Benutzer nach dem Übernehmen ausfüllen soll (Beispielwert ersetzen)
+#   hinweis     optional: Einschränkung aus der Erklärung der Richtlinie
+
+eintraege:
+  - id: copilot_aus
+    titel: Windows Copilot ausschalten
+    gruppe: Windows
+    richtlinie: windows:windowscopilot:TurnOffWindowsCopilot
+    zustand: aktiviert
+    hinweis: Benutzer-Richtlinie – wirkt nach dem Neuanmelden.
+
+  - id: anwenderfeatures_aus
+    titel: Vorschläge und Werbe-Apps von Microsoft ausschalten
+    gruppe: Windows
+    richtlinie: windows:cloudcontent:DisableWindowsConsumerFeatures
+    zustand: aktiviert
+    hinweis: Laut Vorlage nur für Enterprise- und Education-Editionen.
+
+  - id: autoplay_aus
+    titel: Automatische Wiedergabe auf allen Laufwerken ausschalten
+    gruppe: Windows
+    richtlinie: windows:autoplay:Autorun
+    zustand: aktiviert
+    werte:
+      e_autorun_box: "1"
+
+  - id: autorun_aus
+    titel: AutoAusführen (autorun.inf) nie ausführen
+    gruppe: Windows
+    richtlinie: windows:autoplay:NoAutorun
+    zustand: aktiviert
+    werte:
+      e_noautorun_dropdown: "0"
+
+  - id: diagnosedaten_erforderlich
+    titel: Nur erforderliche Diagnosedaten senden
+    gruppe: Windows
+    richtlinie: windows:datacollection:AllowTelemetry
+    zustand: aktiviert
+    werte:
+      e_allowtelemetry: "1"
+
+  - id: erste_anmeldung_animation_aus
+    titel: Animation bei der ersten Anmeldung ausschalten
+    gruppe: Windows
+    richtlinie: windows:logon:EnableFirstLogonAnimation
+    zustand: deaktiviert
+
+  - id: edge_startseite
+    titel: Edge-Startseite festlegen
+    gruppe: Microsoft Edge
+    richtlinie: edge:msedge:HomepageLocation
+    zustand: aktiviert
+    werte:
+      e_homepagelocation: "https://intranet.okm.local"
+    anpassen: [e_homepagelocation]
+    hinweis: >-
+      Laut Vorlage nur auf Rechnern in einer Domäne, in Entra ID oder in der Geräteverwaltung wirksam.
+
+  - id: edge_erster_start_aus
+    titel: Edge-Begrüßung beim ersten Start ausblenden
+    gruppe: Microsoft Edge
+    richtlinie: edge:msedge:HideFirstRunExperience
+    zustand: aktiviert
+
+  - id: edge_passwortmanager_aus
+    titel: Passwort-Speichern in Edge ausschalten
+    gruppe: Microsoft Edge
+    richtlinie: edge:msedge:PasswordManagerEnabled
+    zustand: deaktiviert
+
+  - id: chrome_passwortmanager_aus
+    titel: Passwort-Speichern in Chrome ausschalten
+    gruppe: Google Chrome
+    richtlinie: chrome:chrome:PasswordManagerEnabled
+    zustand: deaktiviert
+
+  - id: firefox_telemetrie_aus
+    titel: Firefox-Telemetrie ausschalten
+    gruppe: Mozilla Firefox
+    richtlinie: firefox:firefox:DisableTelemetry
+    zustand: aktiviert

@@ -45,6 +45,8 @@ class BlockSchritt(BaseModel):
     parameter: dict[str, ParamValue]
     # Höheres Risiko als im Block (z. B. Registry-Schreiben unter HKLM\SYSTEM → rot)
     risiko: Risiko | None = None
+    # Stand des Richtlinien-Katalogs beim Erzeugen („edge@158.0.4344.0“), nur bei richtlinie_setzen
+    katalog_stand: str | None = None
 
 
 class WennFehler(BaseModel):

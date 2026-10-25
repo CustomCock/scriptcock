@@ -26,6 +26,7 @@ from app.codeenv import code_umgebung, text_umgebung
 from app.escaping import Ziel
 from app.models.block import EINGEBAUTE_VARIABLEN, RUECKGABE_PRAEFIX, BlockDef, ParameterDef, ParamTyp, Recht
 from app.models.recipe import RezeptDef, RezeptSchritt, feld_verweis, konstante
+from app.richtlinien import RichtlinienKatalog
 from app.validation import ValidierungsFehler, pruefe_wert_fuer_ziel, validiere_wert
 
 PROJEKT = Path(__file__).resolve().parent.parent
@@ -137,6 +138,10 @@ class Registry:
     vorlagen: dict[tuple[str, str, Ziel], Template] = field(default_factory=dict)
     variablen: dict[tuple[str, str, Ziel], frozenset[str]] = field(default_factory=dict)
     fortschritt: dict[str, Template] = field(default_factory=dict)
+    # Richtlinien-Katalog (ADMX) für Bausteine mit dynamischen Parametern; Index wird erst bei Bedarf gebaut
+    richtlinien: RichtlinienKatalog = field(default_factory=RichtlinienKatalog)
+    # Basis-URL, unter der die App Admin-Werkzeuge ausliefert (OKM_WERKZEUG_URL); leer = nicht eingerichtet
+    werkzeug_url: str = ""
 
     def kategorien(self) -> list[str]:
         return sorted({b.kategorie for b in self.bloecke.values()})

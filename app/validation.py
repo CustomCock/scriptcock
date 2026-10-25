@@ -14,7 +14,7 @@ from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
-from app import __version__
+from app import __version__, werkzeuge
 from app.escaping import UnsicherError, Ziel, pruefe_zeichen
 from app.ir import (
     Abbrechen,
@@ -58,6 +58,7 @@ from app.models.request import (
     WiederholeEingabe,
 )
 from app.regschutz import lade_schutz
+from app.richtlinien import ELEMENT_PRAEFIX, operationen, parameter_fuer
 
 if TYPE_CHECKING:
     from app.registry import Registry
@@ -535,6 +536,26 @@ def _registry_bereich(text: str, p: ParameterDef) -> str:
 
 
 MAX_REGISTRY_TEXT = 4096
+_WERTNAME = ParameterDef(id="wertname", label="Wertname", typ=ParamTyp.REGISTRY_WERTNAME)
+_RICHTLINIE_ID = re.compile(r"^[a-z0-9_]{1,40}:[A-Za-z0-9_.\-]{1,100}:[A-Za-z0-9_.\-]{1,200}$")
+
+
+def _registry_text(text: str, p: ParameterDef) -> str:
+    """Text für einen Registry-Wert (URLs, Pfade, %Variablen% …) – keine Steuerzeichen, ≤ 4096."""
+    if len(text) > MAX_REGISTRY_TEXT:
+        raise ValidierungsFehler(f"Der Text ist zu lang (höchstens {MAX_REGISTRY_TEXT} Zeichen).")
+    return text
+
+
+def _richtlinie(text: str, p: ParameterDef) -> str:
+    """Nur die Form – ob es die Richtlinie gibt, prüft der Baustein gegen den Katalog."""
+    if not _RICHTLINIE_ID.match(text):
+        raise ValidierungsFehler(
+            "Bitte eine Richtlinie aus dem Katalog wählen (z. B. edge:msedge:HomepageLocation)."
+        )
+    return text
+
+
 MAX_REGISTRY_BINAER = 4096
 
 
@@ -799,6 +820,8 @@ _TEXT_PRUEFER: dict[ParamTyp, Any] = {
     ParamTyp.REGISTRY_WERTNAME: _registry_wertname,
     ParamTyp.REGISTRY_TYP: _registry_typ,
     ParamTyp.REGISTRY_BEREICH: _registry_bereich,
+    ParamTyp.REGISTRY_TEXT: _registry_text,
+    ParamTyp.RICHTLINIE: _richtlinie,
     ParamTyp.DATEINAME: _dateiname,
     ParamTyp.RECHNERNAME: _rechnername,
     ParamTyp.DNSNAME: _dnsname,
@@ -828,6 +851,8 @@ def validiere_wert(p: ParameterDef, roh: Any, regtyp: str | None = None) -> Para
         roh = p.standard
 
     wert: str | int | bool | list[str | int]
+    if p.typ is ParamTyp.REGISTRY_ZEILEN:
+        return ParamValue(typ=p.typ, wert=[] if leer else registry_daten(roh, "REG_MULTI_SZ"))
     if p.typ is ParamTyp.REGISTRY_DATEN:
         if regtyp is None:
             regtyp = (
@@ -912,6 +937,8 @@ _OHNE_SCHLEIFENWERT = frozenset(
         ParamTyp.REGISTRY_TYP,
         ParamTyp.REGISTRY_DATEN,
         ParamTyp.REGISTRY_BEREICH,
+        ParamTyp.REGISTRY_ZEILEN,
+        ParamTyp.RICHTLINIE,
     }
 )
 MAX_WARTEN = 3600
@@ -946,6 +973,8 @@ class _BaumPruefer:
         self.bekannt: dict[int, tuple[BlockDef, tuple[int, ...]]] = {}
         # Werte der offenen „Für jeden Wert“-Schleifen (innerste zuletzt)
         self.schleifen: list[list[str]] = []
+        # Von „Admin-Werkzeug bereitstellen“ bisher bereitgestellt (z. B. "lgpo")
+        self.bereitgestellt: set[str] = set()
 
     def liste(self, eingaben: list[EingabeKnoten], tiefe: int) -> list[Knoten]:
         ergebnis: list[Knoten] = []
@@ -1112,7 +1141,10 @@ class _BaumPruefer:
             )
         if block.risiko is Risiko.ROT:
             self.hat_rot = True
-        for name in sorted(set(eingabe.parameter) - {p.id for p in block.parameter}):
+        bekannt = {p.id for p in block.parameter}
+        for name in sorted(set(eingabe.parameter) - bekannt):
+            if block.dynamisch == "richtlinie" and name.startswith(ELEMENT_PRAEFIX):
+                continue  # Elemente der Richtlinie – geprüft in richtlinie_pruefen
             self.fehler.append(Feldfehler(i, name, f"Unbekannter Parameter „{name}“."))
         werte: dict[str, ParamValue] = {}
         genutzt = self.registry.benutzte_parameter(block, self.ziel)
@@ -1141,11 +1173,148 @@ class _BaumPruefer:
             except ValidierungsFehler as e:
                 self.fehler.append(Feldfehler(i, p.id, f"{p.label}: {e}"))
         risiko: Risiko | None = None
-        if block.registry is not None:
+        stand: str | None = None
+        if block.dynamisch == "richtlinie":
+            risiko, stand = self.richtlinie_pruefen(i, block, eingabe, werte)
+        elif block.dynamisch == "werkzeug":
+            risiko = self.werkzeug_pruefen(i, werte)
+        elif block.registry is not None:
             risiko = self.registry_pruefen(i, block, werte)
-            if risiko is Risiko.ROT:
-                self.hat_rot = True
-        return BlockSchritt(block_id=block.id, block_version=block.version, parameter=werte, risiko=risiko)
+        if risiko is Risiko.ROT:
+            self.hat_rot = True
+        return BlockSchritt(
+            block_id=block.id,
+            block_version=block.version,
+            parameter=werte,
+            risiko=risiko,
+            katalog_stand=stand,
+        )
+
+    def werkzeug_pruefen(self, i: int, werte: dict[str, ParamValue]) -> Risiko | None:
+        """Ziel, Quelle und Paket für „Admin-Werkzeug bereitstellen“; Central Store = rot (ganze Domäne)."""
+        was = str(getattr(werte.get("was"), "wert", "lgpo"))
+        quelle = str(getattr(werte.get("quelle"), "wert", "intranet"))
+        pid = "lgpo" if was == "lgpo" else str(getattr(werte.get("paket"), "wert", ""))
+        if self.ziel is not Ziel.POWERSHELL:
+            self.fehler.append(Feldfehler(i, None, "Admin-Werkzeuge gehen nur mit PowerShell."))
+        if was != "software" and quelle == "intranet" and not self.registry.werkzeug_url:
+            self.fehler.append(
+                Feldfehler(
+                    i,
+                    "quelle",
+                    "Quelle: „Intranet“ ist auf diesem Server nicht eingerichtet (OKM_WERKZEUG_URL) – "
+                    "bitte „Hersteller“ wählen.",
+                )
+            )
+        if was == "vorlagen" and not werkzeuge.dateien(pid):
+            self.fehler.append(
+                Feldfehler(i, "paket", "Paket: Dafür gibt es keinen geprüften Download der Vorlagen.")
+            )
+        if was == "software" and not (werkzeuge.paket(pid) or {}).get("software"):
+            self.fehler.append(Feldfehler(i, "paket", "Paket: Dafür ist keine Software hinterlegt."))
+        self.bereitgestellt.add(was)
+        if was == "vorlagen" and getattr(werte.get("central_store"), "wert", False) is True:
+            return Risiko.ROT
+        return None
+
+    def richtlinie_pruefen(
+        self, i: int, block: BlockDef, eingabe: SchrittEingabe, werte: dict[str, ParamValue]
+    ) -> tuple[Risiko | None, str | None]:
+        """Richtlinie nachschlagen, Bereich zur Klasse passend machen, Elemente wie Parameter prüfen,
+        Schutzliste auf alle Registry-Operationen anwenden."""
+        rid = getattr(werte.get("richtlinie"), "wert", None)
+        if not isinstance(rid, str):
+            return None, None
+        r = self.registry.richtlinien.richtlinie(rid)
+        if r is None:
+            self.fehler.append(
+                Feldfehler(i, "richtlinie", "Diese Richtlinie gibt es im Katalog nicht (mehr).")
+            )
+            return None, None
+        if self.ziel is not Ziel.POWERSHELL:
+            self.fehler.append(Feldfehler(i, None, "Richtlinien gehen nur mit PowerShell."))
+        # Standardwerte fest eintragen – Generator, Kopfzeile und Prüfung sehen denselben Zustand
+        zustand = getattr(werte.get("zustand"), "wert", None) or "aktiviert"
+        methode = getattr(werte.get("methode"), "wert", None) or "registry_direkt"
+        werte["zustand"] = ParamValue(typ=ParamTyp.AUSWAHL, wert=zustand)
+        werte["methode"] = ParamValue(typ=ParamTyp.AUSWAHL, wert=methode)
+        bereich = getattr(werte.get("bereich"), "wert", None)
+        if r["klasse"] == "machine":
+            if bereich not in (None, "computer"):
+                self.fehler.append(
+                    Feldfehler(i, "bereich", "Bereich: Diese Richtlinie gilt nur für den Computer.")
+                )
+            bereich = "computer"
+        elif r["klasse"] == "user":
+            if bereich == "computer":
+                self.fehler.append(
+                    Feldfehler(
+                        i,
+                        "bereich",
+                        "Bereich: Diese Richtlinie gilt nur für Benutzer – bitte wählen, für wen.",
+                    )
+                )
+            bereich = bereich or "angemeldeter_benutzer"
+        else:
+            bereich = bereich or "computer"
+        werte["bereich"] = ParamValue(typ=ParamTyp.REGISTRY_BEREICH, wert=bereich)
+        if methode == "lokale_gruppenrichtlinie" and "lgpo" not in self.bereitgestellt:
+            self.fehler.append(
+                Feldfehler(
+                    i,
+                    "methode",
+                    "Methode: Für die lokale Gruppenrichtlinie muss davor „Admin-Werkzeug bereitstellen“ "
+                    "(LGPO.exe) stehen.",
+                )
+            )
+        element_werte: dict[str, Any] = {}
+        definiert = {p.id for p, _ in parameter_fuer(r)}
+        for name in sorted(
+            n for n in eingabe.parameter if n.startswith(ELEMENT_PRAEFIX) and n not in definiert
+        ):
+            self.fehler.append(Feldfehler(i, name, f"Unbekannter Parameter „{name}“."))
+        for p, e in parameter_fuer(r):
+            roh = eingabe.parameter.get(p.id)
+            if zustand != "aktiviert":
+                continue
+            try:
+                wert = validiere_wert(p, roh)
+                pruefe_wert_fuer_ziel(wert, self.ziel)
+                if isinstance(wert.wert, str) and len(wert.wert) > e.get("max_laenge", MAX_REGISTRY_TEXT):
+                    raise ValidierungsFehler(f"Höchstens {e['max_laenge']} Zeichen.")
+                if (
+                    isinstance(wert.wert, list)
+                    and e.get("max_eintraege")
+                    and len(wert.wert) > e["max_eintraege"]
+                ):
+                    raise ValidierungsFehler(f"Höchstens {e['max_eintraege']} Einträge.")
+                if isinstance(wert.wert, list) and e.get("expliziter_wert"):
+                    for n, eintrag in enumerate(wert.wert, 1):
+                        name, gleich, _ = str(eintrag).partition("=")
+                        if not gleich or not name.strip():
+                            raise ValidierungsFehler(f"Eintrag {n}: bitte als Name=Wert angeben.")
+                        validiere_wert(_WERTNAME, name.strip())
+                werte[p.id] = wert
+                element_werte[p.id] = wert.wert
+            except ValidierungsFehler as fehler:
+                self.fehler.append(Feldfehler(i, p.id, f"{p.label}: {fehler}"))
+        schutz = lade_schutz()
+        risiko: Risiko | None = None
+        wurzel = "HKLM" if bereich == "computer" else "HKCU"
+        for op in operationen(r, zustand, element_werte):
+            voll = f"{wurzel}\\{op.pfad}"
+            if schutz.gesperrt_fuer(voll):
+                self.fehler.append(
+                    Feldfehler(
+                        i, "richtlinie", f"Die Richtlinie schreibt in einen gesperrten Bereich ({voll})."
+                    )
+                )
+                break
+            # „Policies“ ist hier der Normalfall (dokumentierte Richtlinie) – zählt nicht als Rot-Grund
+            if schutz.rot_fuer(voll, ausser=frozenset({"policies"})) and block.risiko is not Risiko.ROT:
+                risiko = Risiko.ROT
+        paket = self.registry.richtlinien.paket(r["paket"]) or {}
+        return risiko, f"{r['paket']}@{paket.get('version', '')}"
 
     def registry_pruefen(self, i: int, block: BlockDef, werte: dict[str, ParamValue]) -> Risiko | None:
         """Registry-Bausteine: Pfad passend zum Bereich, Schutzliste, Risiko je Pfad.

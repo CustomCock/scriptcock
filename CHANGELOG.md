@@ -2,6 +2,39 @@
 
 ## Registry, Richtlinien-Katalog und Palette
 
+### Teil B: Richtlinien-Katalog (ADMX)
+
+- **Quellen** (`registry/admx-quellen.yaml`): offizielle Vorlagen für Windows 11 (25H2), Microsoft 365
+  Apps/Office, Edge, Chrome, Firefox – je mit URL und SHA-256; dazu LGPO.exe 3.0. OneDrive, Adobe Reader
+  und Zoom ohne verifizierbaren Direkt-Download → `format: manuell`.
+- **`tools/admx_holen.py`**: lädt nur per HTTPS, prüft jeden SHA-256 (Abweichung = Abbruch), entpackt
+  MSI/CAB/ZIP/Office-EXE sicher nach `registry/quellen/` (nicht im Git).
+- **Parser** (`app/admx.py`) + **`tools/admx_katalog.py`**: alle Element-Arten (boolean, decimal,
+  longDecimal, text, multiText, enum, list), enabled/disabled-Werte und -Listen, paketübergreifende
+  Kategorien, de-DE mit Rückfall en-US, Standardwerte aus der Presentation. Herstellerdaten laufen durch
+  dieselbe Validierung wie Benutzereingaben. Katalog als JSON Lines in `registry/katalog/` (im Git):
+  8120 Richtlinien, Statistik in `docs/richtlinien-katalog.md`.
+- **Suche** (`app/richtlinien.py`): SQLite-FTS5-Index neben der Datenbank, wird bei geändertem Katalog neu
+  gebaut; Normalisierung wie die Software-Katalog-Suche, Präfixsuche, Filter nach Paket/Klasse/Kategorie.
+- **Baustein `richtlinie_setzen`** (nur PowerShell): Zustand aktiviert/deaktiviert/nicht konfiguriert,
+  die Optionen der Richtlinie als dynamische, normal geprüfte Parameter (`e_…`), Bereich passend zur
+  Klasse (Computer/Benutzer). Methoden „Registry direkt“ (mit Rückgängig-Sicherung) und „Lokale
+  Gruppenrichtlinie“ über LGPO (mit `/b`-Sicherung). Computer-Richtlinien → einmal
+  `gpupdate /target:computer` am Ende, Benutzer-Richtlinien → Hinweis „neu anmelden“. Kopfzeile nennt
+  Richtlinie und Katalogstand (`BlockSchritt.katalog_stand`). Der Pfadteil `Policies` macht hier nicht rot.
+- **Baustein `admin_werkzeug_bereitstellen`**: LGPO.exe, Vorlagen eines Pakets (nach PolicyDefinitions,
+  neuere vorhandene bleiben) oder die Software selbst (winget, falls sie fehlt). SHA-256 aus der YAML wird
+  im Script geprüft, bei LGPO auch die EXE im ZIP. Quelle „Intranet“: die App spiegelt die Original-Dateien
+  unter `GET /werkzeuge/<id>/<datei>` (nur Einträge aus der YAML; Adresse über `OKM_WERKZEUG_URL`).
+  Central Store = roter Schritt.
+- **Häufige Einstellungen** (`registry/haeufig.yaml`): elf Schnellzugriffe, ausschließlich Verweise auf
+  Katalog-Richtlinien (Copilot, AutoPlay/AutoRun, Diagnosedaten, Edge/Chrome/Firefox …).
+- Richtlinien-/Werkzeug-Hilfen stehen in `hilfen/richtlinien.ps1` und kommen nur in Scripte mit diesen
+  Bausteinen – bestehende Registry-Scripte bleiben byte-gleich.
+- Tests: `tests/test_richtlinien.py` mit eigenen Vorlagen in `tests/daten/admx/` (alle Element-Arten,
+  UTF-16, ungültige Einträge) – Parser, Operationen je Zustand, Suche, Validierung, Code (direkt/LGPO/
+  Simulation), Werkzeug-URLs und Hashes, Intranet-Spiegel.
+
 ### Teil A: Registry-Bausteine
 
 - **Neue Parametertypen:** `registry_pfad` (neu normalisiert auf `HKLM\…`; akzeptiert `HKLM:\`,

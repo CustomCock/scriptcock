@@ -1,0 +1,10 @@
+# Test-Pakete für tests/test_richtlinien.py (keine echten Herstellerquellen)
+pakete:
+  - id: okmtest
+    name: Okm-Test
+    version: "1.0"
+    format: manuell
+  - id: zweit
+    name: Zweites Paket
+    version: "2.0"
+    format: manuell

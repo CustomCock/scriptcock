@@ -1,0 +1,57 @@
+id: richtlinie_setzen
+version: 1
+name: Richtlinie setzen (Administrative Vorlagen)
+kategorie: Registry
+beschreibung: Setzt eine Einstellung aus den Administrativen Vorlagen von Windows, Office, Edge, Chrome, Firefox … – aktiviert, deaktiviert oder nicht konfiguriert, mit allen Optionen der Richtlinie.
+hilfe: |
+  „Registry direkt“ wirkt sofort, erscheint aber nicht in gpedit.msc, und eine Domänen-Gruppenrichtlinie
+  überschreibt den Wert. „Lokale Gruppenrichtlinie“ schreibt über LGPO.exe in die lokale Richtlinie
+  (sichtbar in gpedit.msc) – davor muss „Admin-Werkzeug bereitstellen“ (LGPO) stehen.
+  Eine Domänen-Gruppenrichtlinie hat immer Vorrang.
+  „Nicht konfiguriert“ löscht alle Werte der Richtlinie (leere Schlüssel danach auch).
+  Nur PowerShell. Computer-Richtlinien werden am Ende mit gpupdate angewendet; bei Benutzer-Richtlinien
+  muss sich der Benutzer neu anmelden.
+risiko: gelb
+registry: schreiben
+dynamisch: richtlinie
+fortschritt: "Richtlinie {{ richtlinie }} wird {{ zustand }}"
+tipp: Gilt eine Domänen-Gruppenrichtlinie, die das überschreibt? „gpresult /h bericht.html“ zeigt, woher eine Einstellung kommt.
+rechte:
+  powershell: admin
+parameter:
+  - id: richtlinie
+    label: Richtlinie
+    typ: richtlinie
+    beispiel: edge:msedge:HomepageLocation
+    hilfe: Im Registry-Panel suchen und übernehmen.
+  - id: zustand
+    label: Zustand
+    typ: auswahl
+    standard: aktiviert
+    optionen:
+      - wert: aktiviert
+        label: Aktiviert
+      - wert: deaktiviert
+        label: Deaktiviert
+      - wert: nicht_konfiguriert
+        label: Nicht konfiguriert (Werte entfernen)
+  - id: bereich
+    label: Für wen? (nur bei Benutzer-Richtlinien)
+    typ: registry_bereich
+    pflicht: false
+    hilfe: Computer-Richtlinien gelten immer für den Computer. Benutzer-Richtlinien ohne Angabe für den angemeldeten Benutzer.
+  - id: methode
+    label: Methode
+    typ: auswahl
+    standard: registry_direkt
+    optionen:
+      - wert: registry_direkt
+        label: Registry direkt (wirkt sofort, nicht in gpedit sichtbar)
+      - wert: lokale_gruppenrichtlinie
+        label: Lokale Gruppenrichtlinie über LGPO (in gpedit sichtbar)
+ziele:
+  powershell: |
+    {{ richtlinie_code }}
+dry_run:
+  powershell: |
+    {{ richtlinie_code }}

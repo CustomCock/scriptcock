@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitionResources xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions" revision="1.0" schemaVersion="1.0">
+  <displayName>Second</displayName>
+  <description>Second</description>
+  <resources>
+    <stringTable>
+      <string id="ZweitWurzel">Second root</string>
+      <string id="Zahl">Number policy</string>
+      <string id="Zahl_Help">Sets a number.</string>
+    </stringTable>
+  </resources>
+</policyDefinitionResources>

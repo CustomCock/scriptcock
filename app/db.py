@@ -77,6 +77,14 @@ class Bewertung(Basis):
     erstellt_am: Mapped[datetime] = mapped_column(DateTime)
 
 
+def datenverzeichnis(url: str) -> Path:
+    """Ordner für Caches neben der SQLite-Datenbank (sonst ``./data``)."""
+    pfad = url.removeprefix("sqlite:///") if url.startswith("sqlite:///") else ""
+    if pfad and pfad != ":memory:":
+        return Path(pfad).resolve().parent
+    return Path("data").resolve()
+
+
 class Datenbank:
     def __init__(self, url: str) -> None:
         if url.startswith("sqlite:///"):

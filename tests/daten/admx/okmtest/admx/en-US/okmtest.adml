@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitionResources xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions" revision="1.0" schemaVersion="1.0">
+  <displayName>Okm test</displayName>
+  <description>Own test template</description>
+  <resources>
+    <stringTable>
+      <string id="SUPPORTED_Okm1">At least Okm 1</string>
+      <string id="Okm">Okm test</string>
+      <string id="Unter">Subcategory</string>
+      <string id="Fremd">Foreign anchored</string>
+      <string id="Einfach">Simple setting</string>
+      <string id="Einfach_Help">Simple.</string>
+      <string id="MitWerten">Mode with values</string>
+      <string id="MitWerten_Help">Sets the mode.</string>
+      <string id="Elemente">All elements</string>
+      <string id="Elemente_Help">Tests every element kind.</string>
+      <string id="Stufe_Aus">Off</string>
+      <string id="Stufe_Hoch">High</string>
+      <string id="NurEnglisch">English only</string>
+      <string id="NurEnglisch_Help">Only available in English.</string>
+    </stringTable>
+  </resources>
+</policyDefinitionResources>
