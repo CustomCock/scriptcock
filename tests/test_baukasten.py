@@ -93,7 +93,7 @@ def test_seite_und_palette(reg: Registry, tmp_path: Path) -> None:
     assert r.status_code == 200
     assert "Sortable.min.js" in r.text and "cdn" not in r.text.lower()
     # SetupDiag gibt es nur für PowerShell → in der Palette ausgegraut
-    zeile = re.search(r'<li class="palette-block([^"]*)" data-block="setupdiag"', r.text)
+    zeile = re.search(r'<li class="palette-block([^"]*)"[^>]*\sdata-block="setupdiag"', r.text)
     assert zeile and "nicht-verfuegbar" in zeile.group(1)
     assert "Unter macOS (zsh) nicht verfügbar" in r.text
     assert "Als Rezept speichern" not in r.text  # nur für Admins

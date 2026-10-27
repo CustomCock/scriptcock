@@ -54,7 +54,7 @@
             <li class="palette-block{% if not b.verfuegbar(ziel) %} nicht-verfuegbar{% endif %}" tabindex="-1" data-block="{{ b.id }}"
                 data-ziele="{{ b.ziele | map(attribute='value') | join(' ') }}" data-name="{{ b.name }}"
                 data-kategorie="{{ b.kategorie }}" data-beschreibung="{{ b.beschreibung }}"
-                title="{{ b.beschreibung }}" aria-describedby="bk-beschr-{{ b.id }}">
+                title="{% if b.verfuegbar(ziel) %}{{ b.beschreibung }}{% else %}Unter {{ ziel_anzeige[ziel] }} nicht verfügbar{% endif %}" aria-describedby="bk-beschr-{{ b.id }}">
               <span class="risiko risiko-{{ b.risiko.value }}" title="Risiko: {{ b.risiko.anzeige }}">{{ b.risiko.value }}</span>
               <span class="palette-name">{{ b.name }}</span>
               <button type="button" class="palette-stern" data-stern aria-pressed="false" aria-label="{{ b.name }} als Favorit merken" title="Favorit">☆</button>

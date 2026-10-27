@@ -69,10 +69,19 @@ function Get-RegPfad([string]$Pfad) {
     throw ('Unbekannte Wurzel: ' + $Pfad)
 }
 
-function Test-RegQuery([string]$RegPfad, [string]$Name) {
-    if ($Name) { $null = & reg.exe query $RegPfad /v $Name /reg:64 2>&1 } else { $null = & reg.exe query $RegPfad /ve /reg:64 2>&1 }
+function Invoke-Reg([string[]]$Argumente) {
+    # Windows PowerShell 5.1 macht aus stderr eines Programms bei 'Stop' + 2>&1 einen Abbruch
+    # (NativeCommandError) – hier zählt nur der Exit-Code von reg.exe.
+    $ErrorActionPreference = 'Continue'
+    $null = & reg.exe @Argumente 2>&1
     $code = $LASTEXITCODE
     $global:LASTEXITCODE = 0
+    return $code
+}
+
+function Test-RegQuery([string]$RegPfad, [string]$Name) {
+    if ($Name) { $code = Invoke-Reg @('query', $RegPfad, '/v', $Name, '/reg:64') }
+    else { $code = Invoke-Reg @('query', $RegPfad, '/ve', '/reg:64') }
     return ($code -eq 0)
 }
 
@@ -162,9 +171,8 @@ function Get-Sicherungsordner {
 
 # --- Aufräumen und Läufe ---------------------------------------------------------------------------
 function Clear-Testschluessel {
-    $null = & reg.exe delete 'HKLM\SOFTWARE\OkmTest' /f /reg:64 2>&1
-    if ($benutzerSid) { $null = & reg.exe delete ('HKU\' + $benutzerSid + '\Software\OkmTest') /f 2>&1 }
-    $global:LASTEXITCODE = 0
+    $null = Invoke-Reg @('delete', 'HKLM\SOFTWARE\OkmTest', '/f', '/reg:64')
+    if ($benutzerSid) { $null = Invoke-Reg @('delete', ('HKU\' + $benutzerSid + '\Software\OkmTest'), '/f') }
 }
 Clear-Testschluessel
 
@@ -183,8 +191,7 @@ foreach ($lauf in $manifest.laeufe) {
     }
     try {
         foreach ($argumente in $lauf.vorher) {
-            $null = & reg.exe @($argumente) 2>&1
-            if ($LASTEXITCODE -ne 0) { throw ('Vorbedingung fehlgeschlagen: reg ' + ($argumente -join ' ')) }
+            if ((Invoke-Reg @($argumente)) -ne 0) { throw ('Vorbedingung fehlgeschlagen: reg ' + ($argumente -join ' ')) }
         }
         $vorher = Get-Sicherungsordner
         $ja = ($lauf.PSObject.Properties.Name -contains 'ja') -and $lauf.ja
@@ -211,10 +218,8 @@ foreach ($lauf in $manifest.laeufe) {
             } else {
                 Write-Host ('Rückgängig aus ' + $neu[0])
                 foreach ($reg in @(Get-ChildItem -LiteralPath $neu[0] -Filter '*.reg' | Sort-Object Name -Descending)) {
-                    $null = & reg.exe import $reg.FullName /reg:64 2>&1
-                    if ($LASTEXITCODE -ne 0) { [void]$fehler.Add('reg import fehlgeschlagen: ' + $reg.Name) }
+                    if ((Invoke-Reg @('import', $reg.FullName, '/reg:64')) -ne 0) { [void]$fehler.Add('reg import fehlgeschlagen: ' + $reg.Name) }
                 }
-                $global:LASTEXITCODE = 0
                 foreach ($p in $lauf.rueckgaengig) {
                     $m = Test-Pruefung $p
                     if ($m) { [void]$fehler.Add('nach Rückgängig: ' + $m) }

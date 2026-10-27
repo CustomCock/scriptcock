@@ -134,6 +134,9 @@ def test_rote_bestaetigung(
 def test_admin_pruefung_ohne_root(registry: Registry, tmp_path: Path, shell: str, ziel: Ziel) -> None:
     if os.geteuid() == 0:
         pytest.skip("Test läuft als root – sudo wäre nicht nötig (siehe tests/test_rechte.py)")
+    sudo = shutil.which("sudo")
+    if sudo and subprocess.run([sudo, "-n", "true"], capture_output=True, check=False).returncode == 0:
+        pytest.skip("sudo braucht hier kein Passwort (z. B. GitHub-Runner) – Abbruch nicht nachstellbar")
     s = erzeuge(registry, ziel, [("dienst_neustarten", {"dienst": "cups"})])
     r = ausfuehren(shell, s.inhalt, tmp_path)
     # Ohne Terminal kann sudo kein Passwort abfragen → verständlicher Abbruch statt stillem Ende
