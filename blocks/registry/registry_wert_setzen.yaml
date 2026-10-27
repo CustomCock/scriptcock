@@ -101,7 +101,7 @@ ziele:
     {% else %}
     if not exist "%OKM_REG_SICHERUNG%\" mkdir "%OKM_REG_SICHERUNG%"
     {{ benutzer_anfang }}
-      reg query {{ pfad_reg }} {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %} >nul 2>&1 && reg export {{ pfad_reg }} "%OKM_REG_SICHERUNG%\%RANDOM%.reg" /y {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %} >nul
+      reg query {{ pfad_reg }} {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %} >nul 2>&1 && if not exist "%OKM_REG_SICHERUNG%\%OKM_SCHRITT%.reg" reg export {{ pfad_reg }} "%OKM_REG_SICHERUNG%\%OKM_SCHRITT%.reg" /y {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %} >nul
       reg query {{ pfad_reg }} {% if wertname %}/v {{ wertname }}{% else %}/ve{% endif %} {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %} >nul 2>&1
       if errorlevel 1 (
         echo vorher: nicht vorhanden

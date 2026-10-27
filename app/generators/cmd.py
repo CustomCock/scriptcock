@@ -60,7 +60,8 @@ class CmdGenerator(Generator):
             *(
                 [
                     "rem Registry: Rückgängig-Dateien (reg export) landen hier",
-                    'set "OKM_REG_SICHERUNG=%TEMP%\\okm-registry-backup-%OKM_TS%"',
+                    # eigener Ordner je Lauf: zwei Scripte in derselben Sekunde dürfen sich nicht mischen
+                    'set "OKM_REG_SICHERUNG=%TEMP%\\okm-registry-backup-%OKM_TS%-%RANDOM%"',
                     "rem Registry: was nötig ist, damit Änderungen wirken (Rang, siehe Zusammenfassung)",
                     'set "OKM_WIRKUNG=0"',
                     'set "OKM_WIRKUNG_UNBEKANNT="',
@@ -192,7 +193,7 @@ class CmdGenerator(Generator):
         if self.mit_registry:
             zeilen += [
                 'if exist "%OKM_REG_SICHERUNG%\\" echo( Rückgängig machen: die .reg-Dateien in '
-                "%OKM_REG_SICHERUNG% doppelklicken.",
+                "%OKM_REG_SICHERUNG% doppelklicken (höchste Nummer zuerst).",
                 *[
                     f'if "%OKM_WIRKUNG%"=="{rang}" echo( Damit die Änderungen wirken: {text}'
                     for rang, text in (

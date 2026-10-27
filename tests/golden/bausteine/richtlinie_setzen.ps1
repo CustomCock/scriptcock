@@ -144,6 +144,16 @@ $script:OkmRegArten = @{
     'REG_BINARY'    = [Microsoft.Win32.RegistryValueKind]::Binary
 }
 
+function Invoke-OkmProgramm {
+    # Programm starten, Ausgabe (stdout + stderr) als Text zurück, Exit-Code in $LASTEXITCODE.
+    # Windows PowerShell 5.1 macht bei 'Stop' aus jeder stderr-Zeile mit 2>&1 einen Abbruch –
+    # reg.exe meldet sogar „Der Vorgang wurde erfolgreich beendet.“ auf stderr.
+    $ErrorActionPreference = 'Continue'
+    $programm = $args[0]
+    $argumente = @($args | Select-Object -Skip 1)
+    & $programm @argumente 2>&1 | ForEach-Object { [string]$_ }
+}
+
 function Add-OkmWirkung([string]$Wirkung) {
     if ($Wirkung -eq 'unbekannt') { $script:OkmWirkungUnbekannt = $true; return }
     $rang = $script:OkmWirkungRang[$Wirkung]
@@ -234,14 +244,14 @@ function Get-OkmRegistryZiele([string]$Bereich, [string]$Pfad) {
     $ziele = @()
     if (-not $Bereich -or $Bereich -eq 'computer') {
         $teile = $Pfad -split '\\', 2
-        return , @(New-OkmRegistryZiel 'Computer' $teile[0] $teile[1] $null)
+        return (New-OkmRegistryZiel 'Computer' $teile[0] $teile[1] $null)
     }
     if ($Bereich -eq 'angemeldeter_benutzer') {
         $benutzer = Get-OkmKonsolenBenutzer
         if (-not (Test-Path -LiteralPath ('Registry::HKEY_USERS\' + $benutzer.Sid))) {
             throw ('Das Profil von ' + $benutzer.Name + ' ist nicht geladen.')
         }
-        return , @(New-OkmRegistryZiel ('Benutzer ' + $benutzer.Name) 'HKU' ($benutzer.Sid + '\' + $Pfad) $null)
+        return (New-OkmRegistryZiel ('Benutzer ' + $benutzer.Name) 'HKU' ($benutzer.Sid + '\' + $Pfad) $null)
     }
     if ($Bereich -eq 'alle_benutzer' -or $Bereich -eq 'alle_benutzer_und_standardprofil') {
         foreach ($eintrag in @(Get-ChildItem -LiteralPath $profilListe | Where-Object { $_.PSChildName -match '^S-1-5-21-[0-9-]+$' })) {
@@ -262,7 +272,7 @@ function Get-OkmRegistryZiele([string]$Bereich, [string]$Pfad) {
         $ziele += New-OkmRegistryZiel 'Standardprofil (neue Benutzer)' 'HKU' $Pfad (Join-Path $standard 'NTUSER.DAT')
     }
     if ($ziele.Count -eq 0) { throw 'Kein Benutzerprofil gefunden.' }
-    return , $ziele
+    return $ziele  # ausgerollt: Aufrufer sammeln mit @(…), „, “ ergäbe ein Feld im Feld
 }
 
 # Öffnet die Wurzel (lädt eine NTUSER.DAT bei Bedarf unter HKU\OkmTemp_<n>)
@@ -270,7 +280,7 @@ function Mount-OkmRegistryZiel($Ziel, [string]$Ansicht) {
     if ($Ziel.Datei) {
         $script:OkmRegNr++
         $Ziel.Geladen = 'OkmTemp_' + $PID + '_' + $script:OkmRegNr
-        $null = & reg.exe load ('HKU\' + $Ziel.Geladen) $Ziel.Datei 2>&1
+        $null = Invoke-OkmProgramm reg.exe load ('HKU\' + $Ziel.Geladen) $Ziel.Datei
         if ($LASTEXITCODE -ne 0) {
             $Ziel.Geladen = $null
             throw ($Ziel.Anzeige + ': Profil konnte nicht geladen werden (wird es gerade benutzt?).')
@@ -291,7 +301,7 @@ function Dismount-OkmRegistryZiel($Ziel) {
             [gc]::Collect()
             [gc]::WaitForPendingFinalizers()
             Start-Sleep -Milliseconds 500
-            $null = & reg.exe unload ('HKU\' + $Ziel.Geladen) 2>&1
+            $null = Invoke-OkmProgramm reg.exe unload ('HKU\' + $Ziel.Geladen)
             $ok = ($LASTEXITCODE -eq 0)
         }
         if (-not $ok) { Write-OkmWarnung ($Ziel.Anzeige + ': Profil konnte nicht entladen werden (HKU\' + $Ziel.Geladen + ').') }
@@ -319,12 +329,12 @@ function Backup-OkmRegistrySchluessel($Ziel, [string]$Unterpfad, [string]$Ansich
     $merker = $regpfad.ToUpperInvariant() + '|' + $Ansicht
     if ($script:OkmRegGesichert.ContainsKey($merker)) { return }
     if (-not $script:OkmRegSicherung) {
-        $script:OkmRegSicherung = Join-Path $env:TEMP ('okm-registry-backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+        $script:OkmRegSicherung = Join-Path $env:TEMP ('okm-registry-backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + $PID)
         $null = New-Item -ItemType Directory -Path $script:OkmRegSicherung -Force
     }
     $datei = Join-Path $script:OkmRegSicherung (('{0:D3}' -f ($script:OkmRegGesichert.Count + 1)) + '.reg')
     if ($Vorhanden) {
-        $null = & reg.exe export $regpfad $datei /y ('/reg:' + $Ansicht) 2>&1
+        $null = Invoke-OkmProgramm reg.exe export $regpfad $datei /y ('/reg:' + $Ansicht)
         if ($LASTEXITCODE -ne 0) { throw ('Sicherung fehlgeschlagen: ' + $regpfad) }
     } else {
         $zeilen = @('Windows Registry Editor Version 5.00', '', ('[-' + $script:OkmRegLangform[$Ziel.Wurzel] + '\' + $Unterpfad + ']'), '')
@@ -342,7 +352,7 @@ function Add-OkmRueckgaengigNeuerWert($Ziel, [string]$Unterpfad, [string]$Name, 
     $merker = 'NEU|' + (Get-OkmRegistryAnzeigepfad $Ziel $Unterpfad).ToUpperInvariant() + '|' + $Name.ToUpperInvariant() + '|' + $Ansicht
     if ($script:OkmRegGesichert.ContainsKey($merker)) { return }
     if (-not $script:OkmRegSicherung) {
-        $script:OkmRegSicherung = Join-Path $env:TEMP ('okm-registry-backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+        $script:OkmRegSicherung = Join-Path $env:TEMP ('okm-registry-backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + $PID)
         $null = New-Item -ItemType Directory -Path $script:OkmRegSicherung -Force
     }
     $datei = Join-Path $script:OkmRegSicherung (('{0:D3}' -f ($script:OkmRegGesichert.Count + 1)) + '.reg')
@@ -480,7 +490,7 @@ function Get-OkmRegistryWert([string]$Bereich, [string]$Pfad, [string]$Name, [st
             Dismount-OkmRegistryZiel $ziel
         }
     }
-    return , $ergebnisse
+    return $ergebnisse
 }
 
 function Show-OkmRegistrySchluessel([string]$Bereich, [string]$Pfad, [string]$Ansicht = '64') {
@@ -635,7 +645,7 @@ function Export-OkmRegistrySchluessel([string]$Bereich, [string]$Pfad, [string]$
             $zielDatei = $Datei
             if ($nr -gt 1) { $zielDatei = [System.IO.Path]::ChangeExtension($Datei, $null) + '-' + $nr + '.reg' }
             $regpfad = Get-OkmRegistryAnzeigepfad $ziel $ziel.Unterpfad
-            $null = & reg.exe export $regpfad $zielDatei /y ('/reg:' + $Ansicht) 2>&1
+            $null = Invoke-OkmProgramm reg.exe export $regpfad $zielDatei /y ('/reg:' + $Ansicht)
             if ($LASTEXITCODE -ne 0) { throw ($ziel.Anzeige + ': Export fehlgeschlagen – gibt es den Schlüssel ' + $regpfad + '?') }
             Write-OkmInfo ($ziel.Anzeige + ': gesichert nach ' + $zielDatei)
         } finally {
@@ -715,7 +725,7 @@ function Import-OkmRegistryDatei([string]$Datei, [string]$Ansicht = '64', [switc
             Dismount-OkmRegistryZiel $ziel
         }
     }
-    $null = & reg.exe import $Datei ('/reg:' + $Ansicht) 2>&1
+    $null = Invoke-OkmProgramm reg.exe import $Datei ('/reg:' + $Ansicht)
     if ($LASTEXITCODE -ne 0) { throw ('reg import ist fehlgeschlagen (Exit-Code ' + $LASTEXITCODE + ').') }
     $global:LASTEXITCODE = 0
     Write-OkmInfo 'Importiert.'
@@ -779,7 +789,7 @@ function Register-OkmGpupdate([string]$Ziel) {
 function Invoke-OkmGpupdate {
     if (-not $script:OkmGpupdate) { return }
     Write-OkmInfo 'Gruppenrichtlinien werden aktualisiert (gpupdate /target:computer) …'
-    $ausgabe = & gpupdate.exe /target:computer 2>&1
+    $ausgabe = Invoke-OkmProgramm gpupdate.exe /target:computer
     if ($LASTEXITCODE -ne 0) {
         $ausgabe | Out-Host
         Add-OkmWirkung 'gpupdate'
@@ -799,16 +809,16 @@ function Invoke-OkmLgpo([string[]]$Zeilen, [switch]$Simulation) {
         throw 'LGPO.exe ist nicht bereitgestellt – davor den Baustein „Admin-Werkzeug bereitstellen“ (LGPO) setzen.'
     }
     if (-not $script:OkmLgpoSicherung) {
-        $script:OkmLgpoSicherung = Join-Path $env:TEMP ('okm-lgpo-backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+        $script:OkmLgpoSicherung = Join-Path $env:TEMP ('okm-lgpo-backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + $PID)
         $null = New-Item -ItemType Directory -Path $script:OkmLgpoSicherung -Force
-        $null = & $exe /b $script:OkmLgpoSicherung 2>&1
+        $null = Invoke-OkmProgramm $exe /b $script:OkmLgpoSicherung
         if ($LASTEXITCODE -ne 0) { throw 'Die lokale Gruppenrichtlinie konnte nicht gesichert werden (LGPO /b).' }
         Write-OkmInfo ('Sicherung der lokalen Gruppenrichtlinie: ' + $script:OkmLgpoSicherung)
     }
     $datei = Join-Path $env:TEMP ('okm-lgpo-' + $PID + '-' + (Get-Random) + '.txt')
     [System.IO.File]::WriteAllLines($datei, $Zeilen, [System.Text.Encoding]::Unicode)
     try {
-        $ausgabe = & $exe /t $datei 2>&1
+        $ausgabe = Invoke-OkmProgramm $exe /t $datei
         if ($LASTEXITCODE -ne 0) { $ausgabe | Out-Host; throw ('LGPO.exe endete mit Code ' + $LASTEXITCODE) }
     } finally {
         Remove-Item -LiteralPath $datei -Force -ErrorAction SilentlyContinue
@@ -879,7 +889,7 @@ function Get-OkmAdmxRevision([string]$Datei) {
 # ADMX/ADML aus einem entpackten Paket nach PolicyDefinitions (bzw. Central Store) kopieren.
 # Neuere vorhandene Vorlagen (revision) bleiben, ältere werden vorher gesichert.
 function Copy-OkmVorlagen([string]$Quelle, [string[]]$Admx, [string]$Ziel) {
-    $sicherung = Join-Path $env:TEMP ('okm-admx-backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    $sicherung = Join-Path $env:TEMP ('okm-admx-backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + $PID)
     $alle = @(Get-ChildItem -LiteralPath $Quelle -Recurse -File)
     foreach ($name in $Admx) {
         $neu = $alle | Where-Object { $_.Name -eq $name } | Select-Object -First 1
@@ -928,7 +938,7 @@ function Install-OkmVorlagen {
             'zip' { Expand-Archive -LiteralPath $erste -DestinationPath $entpackt -Force }
             'cab' {
                 $null = New-Item -ItemType Directory -Path $entpackt -Force
-                $null = & expand.exe $erste '-F:*' $entpackt 2>&1
+                $null = Invoke-OkmProgramm expand.exe $erste '-F:*' $entpackt
                 foreach ($inner in @(Get-ChildItem -LiteralPath $entpackt -Filter *.zip -Recurse)) {
                     Expand-Archive -LiteralPath $inner.FullName -DestinationPath (Join-Path $entpackt $inner.BaseName) -Force
                 }
@@ -951,7 +961,7 @@ function Install-OkmVorlagen {
 }
 
 function Install-OkmSoftwareFallsFehlt([string]$WingetId) {
-    $null = & winget.exe list --id $WingetId -e --accept-source-agreements 2>&1
+    $null = Invoke-OkmProgramm winget.exe list --id $WingetId -e --accept-source-agreements
     if ($LASTEXITCODE -eq 0) { Write-OkmInfo ($WingetId + ' ist installiert.'); $global:LASTEXITCODE = 0; return }
     Write-OkmInfo ($WingetId + ' fehlt – wird installiert.')
     & winget.exe install --id $WingetId -e --source winget --silent --accept-package-agreements --accept-source-agreements

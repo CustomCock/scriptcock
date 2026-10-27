@@ -21,6 +21,26 @@
   MULTI_SZ, `"` abgelehnt, Unicode, PowerShell-Round-Trip); `tests/test_validation.py`: `registry_text`,
   `registry_zeilen`, `richtlinie`, `kb_nummer`; `tests/test_windows_ci.py`: Manifest, Syntax der erzeugten
   Scripte, `lauf.ps1` (BOM, Parser), CI-Job.
+- **Fehler, die erst der Windows-Job gefunden hat** (unter Linux/pwsh 7 nicht sichtbar):
+  - PowerShell: `Get-OkmRegistryZiele`/`Get-OkmRegistryWert` gaben mit `return , @(…)` ein Feld im Feld
+    zurück – jeder Registry-Baustein brach mit „The property 'Basis' cannot be found“ ab.
+  - Windows PowerShell 5.1 macht bei `$ErrorActionPreference = 'Stop'` aus jeder stderr-Zeile mit `2>&1`
+    einen Abbruch (reg.exe meldet sogar Erfolg auf stderr). Programme laufen jetzt über
+    `Invoke-OkmProgramm` (reg.exe, LGPO, gpupdate, expand, winget); `shutdown /a` und `query user` in
+    eigenem Bereich (Bausteine `neustart_abbrechen`, `incident_erstsicherung` → Version 2).
+  - Templates: Stand am Zeilenende ein Block-Tag hinter Code (`reg add … {% endif %}`), verschluckte
+    `trim_blocks` den Umbruch und die nächste Zeile klebte daran (`… /reg:64    reg add …`, `… /reg:64  )`).
+    Betraf 26 Zeilen, auch ältere Bausteine (`net use`, `nslookup`, `msiexec`, `brew upgrade` …). Die
+    Code-Umgebung (`app/codeenv.py`) behält den Umbruch jetzt automatisch; Golden-Files bewusst neu erzeugt.
+  - CMD, Bereich „Angemeldeter Benutzer“: `HKU\%%s\"Software\…"` las reg.exe als `\"` → „Ungültige
+    Syntax“; jetzt `"HKU\%%s\Software\…"`.
+  - CMD: `)` in einem `echo`-Text schloss den Block des Schritts („: was unexpected at this time“) – Text
+    geändert, die Registry lehnt das jetzt ab.
+  - Rückgängig: Sicherungsordner je Lauf eindeutig (Sekunde + PID bzw. `%RANDOM%`), CMD-Dateien nach
+    Schrittnummer (`<Schritt>.reg`, erste Sicherung je Schritt bleibt) statt `%RANDOM%.reg` – sonst war die
+    Reihenfolge beim Zurückspielen zufällig. Hinweis „höchste Nummer zuerst“ jetzt auch unter CMD.
+- CI unter Linux: Palette zeigt wieder „Unter <Ziel> nicht verfügbar“ (fiel in Teil E weg);
+  `test_admin_pruefung_ohne_root` wird übersprungen, wenn `sudo` kein Passwort braucht (GitHub-Runner).
 
 ### Teil E: Baustein-Palette und Blockly-Suche
 

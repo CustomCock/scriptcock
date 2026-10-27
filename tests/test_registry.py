@@ -79,6 +79,7 @@ def test_kaputte_bloecke_brechen_ab(tmp_path: Path, ersetzen: str, durch: str, m
         ("call foo {{ wert }}", "'call'"),
         ("if x ( echo {{ wert }}", "Klammern"),
         ("exit /b 1", "'exit'"),
+        ("echo Schlüssel (samt Unterschlüsseln): {{ wert }}", "echo-Text"),  # schließt den Schritt-Block
     ],
 )
 def test_cmd_regeln(tmp_path: Path, vorlage: str, meldung: str) -> None:

@@ -27,7 +27,7 @@ rem /nopause: am Ende nicht auf eine Taste warten (Fernwartung/RMM)
 if /i "%~1"=="/nopause" set "OKM_KEINE_PAUSE=1"
 set "OKM_TIPP="
 rem Registry: Rückgängig-Dateien (reg export) landen hier
-set "OKM_REG_SICHERUNG=%TEMP%\okm-registry-backup-%OKM_TS%"
+set "OKM_REG_SICHERUNG=%TEMP%\okm-registry-backup-%OKM_TS%-%RANDOM%"
 rem Registry: was nötig ist, damit Änderungen wirken (Rang, siehe Zusammenfassung)
 set "OKM_WIRKUNG=0"
 set "OKM_WIRKUNG_UNBEKANNT="
@@ -107,9 +107,10 @@ if not errorlevel 1 (
 if not errorlevel 1 (
   if not exist "%OKM_REG_SICHERUNG%\" mkdir "%OKM_REG_SICHERUNG%"
   type "\\fileserver\IT\Einstellungen\app.reg" | findstr /n /b /c:"[" > "%TEMP%\okm-import-%OKM_TS%.txt"
-  for /f "usebackq tokens=1* delims=:" %%a in ("%TEMP%\okm-import-%OKM_TS%.txt") do for /f "tokens=* delims=[-" %%c in ("%%b") do for /f "delims=]" %%d in ("%%c") do reg export "%%d" "%OKM_REG_SICHERUNG%\import-%%a.reg" /y /reg:64 >nul 2>&1
+  for /f "usebackq tokens=1* delims=:" %%a in ("%TEMP%\okm-import-%OKM_TS%.txt") do for /f "tokens=* delims=[-" %%c in ("%%b") do for /f "delims=]" %%d in ("%%c") do reg export "%%d" "%OKM_REG_SICHERUNG%\%OKM_SCHRITT%-%%a.reg" /y /reg:64 >nul 2>&1
   del "%TEMP%\okm-import-%OKM_TS%.txt" >nul 2>&1
-  reg import "\\fileserver\IT\Einstellungen\app.reg" /reg:64)
+  reg import "\\fileserver\IT\Einstellungen\app.reg" /reg:64
+)
 if not errorlevel 1 if 0 GTR %OKM_WIRKUNG% set OKM_WIRKUNG=0
 ) >"%OKM_TMP%" 2>&1
 set "OKM_RC=%ERRORLEVEL%"
@@ -124,7 +125,7 @@ echo(----------------------------------------------
 >>"%OKM_LOG%" echo(----------------------------------------------
 echo( Fertig: %OKM_OK% von %OKM_GESAMT% Schritten erfolgreich.
 >>"%OKM_LOG%" echo( Fertig: %OKM_OK% von %OKM_GESAMT% Schritten erfolgreich.
-if exist "%OKM_REG_SICHERUNG%\" echo( Rückgängig machen: die .reg-Dateien in %OKM_REG_SICHERUNG% doppelklicken.
+if exist "%OKM_REG_SICHERUNG%\" echo( Rückgängig machen: die .reg-Dateien in %OKM_REG_SICHERUNG% doppelklicken (höchste Nummer zuerst).
 if "%OKM_WIRKUNG%"=="1" echo( Damit die Änderungen wirken: Explorer neu starten
 if "%OKM_WIRKUNG%"=="2" echo( Damit die Änderungen wirken: Gruppenrichtlinien aktualisieren (gpupdate)
 if "%OKM_WIRKUNG%"=="3" echo( Damit die Änderungen wirken: neu anmelden
@@ -150,7 +151,7 @@ echo( Abgebrochen bei Schritt %OKM_SCHRITT% von %OKM_GESAMT%.
 >>"%OKM_LOG%" echo( Abgebrochen bei Schritt %OKM_SCHRITT% von %OKM_GESAMT%.
 echo( Erfolgreich bis dahin: %OKM_OK% von %OKM_GESAMT% Schritten.
 >>"%OKM_LOG%" echo( Erfolgreich bis dahin: %OKM_OK% von %OKM_GESAMT% Schritten.
-if exist "%OKM_REG_SICHERUNG%\" echo( Rückgängig machen: die .reg-Dateien in %OKM_REG_SICHERUNG% doppelklicken.
+if exist "%OKM_REG_SICHERUNG%\" echo( Rückgängig machen: die .reg-Dateien in %OKM_REG_SICHERUNG% doppelklicken (höchste Nummer zuerst).
 if "%OKM_WIRKUNG%"=="1" echo( Damit die Änderungen wirken: Explorer neu starten
 if "%OKM_WIRKUNG%"=="2" echo( Damit die Änderungen wirken: Gruppenrichtlinien aktualisieren (gpupdate)
 if "%OKM_WIRKUNG%"=="3" echo( Damit die Änderungen wirken: neu anmelden
@@ -170,7 +171,7 @@ echo(----------------------------------------------
 >>"%OKM_LOG%" echo(----------------------------------------------
 echo( Abgebrochen durch Benutzer. Es wurde nichts weiter ausgeführt.
 >>"%OKM_LOG%" echo( Abgebrochen durch Benutzer. Es wurde nichts weiter ausgeführt.
-if exist "%OKM_REG_SICHERUNG%\" echo( Rückgängig machen: die .reg-Dateien in %OKM_REG_SICHERUNG% doppelklicken.
+if exist "%OKM_REG_SICHERUNG%\" echo( Rückgängig machen: die .reg-Dateien in %OKM_REG_SICHERUNG% doppelklicken (höchste Nummer zuerst).
 if "%OKM_WIRKUNG%"=="1" echo( Damit die Änderungen wirken: Explorer neu starten
 if "%OKM_WIRKUNG%"=="2" echo( Damit die Änderungen wirken: Gruppenrichtlinien aktualisieren (gpupdate)
 if "%OKM_WIRKUNG%"=="3" echo( Damit die Änderungen wirken: neu anmelden
@@ -205,7 +206,7 @@ echo(----------------------------------------------
 >>"%OKM_LOG%" echo(----------------------------------------------
 echo( Abgebrochen: fehlende Administratorrechte.
 >>"%OKM_LOG%" echo( Abgebrochen: fehlende Administratorrechte.
-if exist "%OKM_REG_SICHERUNG%\" echo( Rückgängig machen: die .reg-Dateien in %OKM_REG_SICHERUNG% doppelklicken.
+if exist "%OKM_REG_SICHERUNG%\" echo( Rückgängig machen: die .reg-Dateien in %OKM_REG_SICHERUNG% doppelklicken (höchste Nummer zuerst).
 if "%OKM_WIRKUNG%"=="1" echo( Damit die Änderungen wirken: Explorer neu starten
 if "%OKM_WIRKUNG%"=="2" echo( Damit die Änderungen wirken: Gruppenrichtlinien aktualisieren (gpupdate)
 if "%OKM_WIRKUNG%"=="3" echo( Damit die Änderungen wirken: neu anmelden

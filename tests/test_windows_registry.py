@@ -229,7 +229,7 @@ def test_hkcu_wird_nie_benutzt(registry: Registry) -> None:
     assert not any("HKCU:" in z or "Registry::HKEY_CURRENT_USER" in z for z in code)
     cmd = text(registry, Ziel.CMD, [setzen(bereich="angemeldeter_benutzer", pfad="Software\\OkmTest")])
     assert 'for /f "usebackq delims=" %%s in (`powershell' in cmd
-    assert 'reg add HKU\\%%s\\"Software\\OkmTest" /v "Wert"' in cmd
+    assert 'reg add "HKU\\%%s\\Software\\OkmTest" /v "Wert"' in cmd
     assert "HKCU" not in cmd.split("rem ----", 1)[1]
 
 
@@ -241,7 +241,7 @@ def test_hilfen_nur_mit_registry_baustein(registry: Registry) -> None:
     ohne = text(registry, Ziel.POWERSHELL, [blk("meldung", text="x", pause=False)])
     assert "Set-OkmRegistryWert" not in ohne and "Sysnative" not in ohne and "OkmReg" not in ohne
     cmd = text(registry, Ziel.CMD, [setzen()])
-    assert 'set "OKM_REG_SICHERUNG=%TEMP%\\okm-registry-backup-%OKM_TS%"' in cmd
+    assert 'set "OKM_REG_SICHERUNG=%TEMP%\\okm-registry-backup-%OKM_TS%-%RANDOM%"' in cmd
     assert "OKM_REG_SICHERUNG" not in text(registry, Ziel.CMD, [blk("meldung", text="x", pause=False)])
 
 

@@ -57,7 +57,7 @@ function Register-OkmGpupdate([string]$Ziel) {
 function Invoke-OkmGpupdate {
     if (-not $script:OkmGpupdate) { return }
     Write-OkmInfo 'Gruppenrichtlinien werden aktualisiert (gpupdate /target:computer) …'
-    $ausgabe = & gpupdate.exe /target:computer 2>&1
+    $ausgabe = Invoke-OkmProgramm gpupdate.exe /target:computer
     if ($LASTEXITCODE -ne 0) {
         $ausgabe | Out-Host
         Add-OkmWirkung 'gpupdate'
@@ -77,16 +77,16 @@ function Invoke-OkmLgpo([string[]]$Zeilen, [switch]$Simulation) {
         throw 'LGPO.exe ist nicht bereitgestellt – davor den Baustein „Admin-Werkzeug bereitstellen“ (LGPO) setzen.'
     }
     if (-not $script:OkmLgpoSicherung) {
-        $script:OkmLgpoSicherung = Join-Path $env:TEMP ('okm-lgpo-backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+        $script:OkmLgpoSicherung = Join-Path $env:TEMP ('okm-lgpo-backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + $PID)
         $null = New-Item -ItemType Directory -Path $script:OkmLgpoSicherung -Force
-        $null = & $exe /b $script:OkmLgpoSicherung 2>&1
+        $null = Invoke-OkmProgramm $exe /b $script:OkmLgpoSicherung
         if ($LASTEXITCODE -ne 0) { throw 'Die lokale Gruppenrichtlinie konnte nicht gesichert werden (LGPO /b).' }
         Write-OkmInfo ('Sicherung der lokalen Gruppenrichtlinie: ' + $script:OkmLgpoSicherung)
     }
     $datei = Join-Path $env:TEMP ('okm-lgpo-' + $PID + '-' + (Get-Random) + '.txt')
     [System.IO.File]::WriteAllLines($datei, $Zeilen, [System.Text.Encoding]::Unicode)
     try {
-        $ausgabe = & $exe /t $datei 2>&1
+        $ausgabe = Invoke-OkmProgramm $exe /t $datei
         if ($LASTEXITCODE -ne 0) { $ausgabe | Out-Host; throw ('LGPO.exe endete mit Code ' + $LASTEXITCODE) }
     } finally {
         Remove-Item -LiteralPath $datei -Force -ErrorAction SilentlyContinue
@@ -157,7 +157,7 @@ function Get-OkmAdmxRevision([string]$Datei) {
 # ADMX/ADML aus einem entpackten Paket nach PolicyDefinitions (bzw. Central Store) kopieren.
 # Neuere vorhandene Vorlagen (revision) bleiben, ältere werden vorher gesichert.
 function Copy-OkmVorlagen([string]$Quelle, [string[]]$Admx, [string]$Ziel) {
-    $sicherung = Join-Path $env:TEMP ('okm-admx-backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    $sicherung = Join-Path $env:TEMP ('okm-admx-backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + $PID)
     $alle = @(Get-ChildItem -LiteralPath $Quelle -Recurse -File)
     foreach ($name in $Admx) {
         $neu = $alle | Where-Object { $_.Name -eq $name } | Select-Object -First 1
@@ -206,7 +206,7 @@ function Install-OkmVorlagen {
             'zip' { Expand-Archive -LiteralPath $erste -DestinationPath $entpackt -Force }
             'cab' {
                 $null = New-Item -ItemType Directory -Path $entpackt -Force
-                $null = & expand.exe $erste '-F:*' $entpackt 2>&1
+                $null = Invoke-OkmProgramm expand.exe $erste '-F:*' $entpackt
                 foreach ($inner in @(Get-ChildItem -LiteralPath $entpackt -Filter *.zip -Recurse)) {
                     Expand-Archive -LiteralPath $inner.FullName -DestinationPath (Join-Path $entpackt $inner.BaseName) -Force
                 }
@@ -229,7 +229,7 @@ function Install-OkmVorlagen {
 }
 
 function Install-OkmSoftwareFallsFehlt([string]$WingetId) {
-    $null = & winget.exe list --id $WingetId -e --accept-source-agreements 2>&1
+    $null = Invoke-OkmProgramm winget.exe list --id $WingetId -e --accept-source-agreements
     if ($LASTEXITCODE -eq 0) { Write-OkmInfo ($WingetId + ' ist installiert.'); $global:LASTEXITCODE = 0; return }
     Write-OkmInfo ($WingetId + ' fehlt – wird installiert.')
     & winget.exe install --id $WingetId -e --source winget --silent --accept-package-agreements --accept-source-agreements

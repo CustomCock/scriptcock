@@ -158,6 +158,7 @@ OKM_SCHRITT='2/4 (Netzwerkadapter neu starten)'
 OKM_TIPP='Stimmt der Adaptername? Bei WLAN danach ggf. kurz warten, bis die Verbindung wieder steht.'
 okm_info '[2/4] Netzwerkadapter Ethernet wird neu gestartet ...'
 okm_adapter='Ethernet'
+
 okm_sudo ifconfig "$okm_adapter" down
 sleep 2
 okm_sudo ifconfig "$okm_adapter" up

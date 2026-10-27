@@ -77,7 +77,7 @@ ziele:
         echo Nicht vorhanden - nichts zu tun.
         cmd /c exit 0
       ) else (
-        reg export {{ pfad_reg }} "%OKM_REG_SICHERUNG%\%RANDOM%.reg" /y {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %} >nul
+        if not exist "%OKM_REG_SICHERUNG%\%OKM_SCHRITT%.reg" reg export {{ pfad_reg }} "%OKM_REG_SICHERUNG%\%OKM_SCHRITT%.reg" /y {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %} >nul
         reg delete {{ pfad_reg }} {% if wertname %}/v {{ wertname }}{% else %}/ve{% endif %} /f {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %}
       )
     {{ benutzer_ende }}

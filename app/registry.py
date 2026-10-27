@@ -55,6 +55,10 @@ _VERBOTE: dict[Ziel, list[tuple[re.Pattern[str], str]]] = {
         (re.compile(r"\bgoto\b", re.I), "'goto' ist verboten – der Generator steuert den Ablauf"),
         (re.compile(r"(?<!cmd /c )\bexit\b", re.I), "'exit' ist verboten ('cmd /c exit N' ist erlaubt)"),
         (re.compile(r"^\s*call\b.*\{\{", re.I | re.M), "'call' mit Platzhaltern ist verboten"),
+        (
+            re.compile(r"^\s*echo\b[^\n]*(?<!\^)\)", re.I | re.M),
+            "')' in echo-Text schließt den ( … )-Block des Schritts – '^)' schreiben oder umformulieren",
+        ),
     ],
     Ziel.BASH: [
         (re.compile(r"\beval\b"), "'eval' ist verboten"),

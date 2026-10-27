@@ -57,7 +57,7 @@ vorschau:
   powershell: |
     Show-OkmRegistryLoeschVorschau -Bereich {{ bereich }} -Pfad {{ pfad }} -Ansicht {{ ansicht }}
   cmd: |
-    echo Schlüssel, die gelöscht werden (mit Unterschlüsseln):
+    echo Schlüssel, die gelöscht werden, samt Unterschlüsseln:
     {{ benutzer_anfang }}
       reg query {{ pfad_reg }} /s {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %} 2>nul | find /c "HKEY_"
     {{ benutzer_ende }}
@@ -76,7 +76,7 @@ ziele:
         echo Schlüssel nicht vorhanden - nichts zu tun.
         cmd /c exit 0
       ) else (
-        reg export {{ pfad_reg }} "%OKM_REG_SICHERUNG%\%RANDOM%.reg" /y {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %} >nul
+        if not exist "%OKM_REG_SICHERUNG%\%OKM_SCHRITT%.reg" reg export {{ pfad_reg }} "%OKM_REG_SICHERUNG%\%OKM_SCHRITT%.reg" /y {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %} >nul
         reg delete {{ pfad_reg }} /f {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %}
       )
     {{ benutzer_ende }}

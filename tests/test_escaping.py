@@ -252,10 +252,10 @@ def test_registry_abfrage_cmd_findstr() -> None:
 
 
 def test_registry_pfad_benutzer_cmd() -> None:
-    # %%s = SID aus der for-/f-Schleife, der Rest normal escaped
+    # %%s = SID aus der for-/f-Schleife, der Rest normal escaped; das Quote steht vor HKU (kein \" für reg.exe)
     assert (
         str(escaping.registry_pfad_benutzer_cmd("Software\\Firma 100%"))
-        == 'HKU\\%%s\\"Software\\Firma 100%%"'
+        == '"HKU\\%%s\\Software\\Firma 100%%"'
     )
     with pytest.raises(UnsicherError):
         escaping.registry_pfad_benutzer_cmd('Software\\"x')

@@ -217,7 +217,9 @@ foreach ($lauf in $manifest.laeufe) {
                 [void]$fehler.Add('Sicherungsordner: ' + $neu.Count + ' neue gefunden, erwartet 1')
             } else {
                 Write-Host ('Rückgängig aus ' + $neu[0])
-                foreach ($reg in @(Get-ChildItem -LiteralPath $neu[0] -Filter '*.reg' | Sort-Object Name -Descending)) {
+                # Wie ein Mensch im Explorer: höchste Nummer zuerst (numerisch, „10“ vor „9“; PS 001.reg, CMD <Schritt>[-n].reg)
+                $nummer = { $t = $_.BaseName -split '-'; [int]$t[0] * 1000 + $(if ($t.Count -gt 1) { [int]$t[1] } else { 0 }) }
+                foreach ($reg in @(Get-ChildItem -LiteralPath $neu[0] -Filter '*.reg' | Sort-Object $nummer -Descending)) {
                     if ((Invoke-Reg @('import', $reg.FullName, '/reg:64')) -ne 0) { [void]$fehler.Add('reg import fehlgeschlagen: ' + $reg.Name) }
                 }
                 foreach ($p in $lauf.rueckgaengig) {

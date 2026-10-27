@@ -240,9 +240,13 @@ def registry_abfrage(ziel: Ziel, regtyp: str, wert: str | int | list[str | int])
 
 
 def registry_pfad_benutzer_cmd(rest: str) -> Escaped:
-    """CMD, Bereich „angemeldeter Benutzer“: ``HKU\\%%s\"Software\\…"`` – ``%%s`` ist die SID aus der
-    ``for /f``-Schleife (``benutzer_anfang``), der Rest ein normales CMD-Literal."""
-    return Escaped("HKU\\%%s\\" + cmd_literal(rest), rest)
+    """CMD, Bereich „angemeldeter Benutzer“: ``"HKU\\%%s\\Software\\…"`` – ``%%s`` ist die SID aus der
+    ``for /f``-Schleife (``benutzer_anfang``), der Rest ein normales CMD-Literal.
+
+    Das Anführungszeichen muss vor ``HKU`` stehen: ``HKU\\%%s\\"Software…"`` liest reg.exe (MSVCRT-Regeln)
+    als ``\\"`` = wörtliches Anführungszeichen im Pfad → „Ungültige Syntax“."""
+    innen = str(cmd_literal(rest))
+    return Escaped('"HKU\\%%s\\' + innen[1:], rest)
 
 
 def echo_powershell(text: str) -> str:

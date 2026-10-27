@@ -1,5 +1,5 @@
 id: neustart_abbrechen
-version: 1
+version: 2
 name: Geplanten Neustart abbrechen
 kategorie: System
 beschreibung: Bricht einen geplanten Neustart oder ein geplantes Herunterfahren ab. Ist nichts geplant, wird das nur gemeldet.
@@ -14,7 +14,8 @@ rechte:
   zsh: root
 ziele:
   powershell: |
-    $okmAusgabe = shutdown.exe /a 2>&1
+    # & { … }: eigener Bereich, sonst bricht Windows PowerShell 5.1 an der stderr-Meldung ab
+    $okmAusgabe = & { $ErrorActionPreference = 'Continue'; shutdown.exe /a 2>&1 }
     if ($LASTEXITCODE -eq 0) {
         Write-OkmOk 'Geplanter Neustart abgebrochen.'
     } elseif ($LASTEXITCODE -eq 1116) {

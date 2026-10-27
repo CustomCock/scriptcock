@@ -129,7 +129,7 @@ try {
         Get-DnsClientCache -ErrorAction SilentlyContinue | Export-Csv -Path (Join-Path $okmZiel 'dns-cache.csv') -NoTypeInformation -Encoding UTF8
         arp.exe -a | Out-File -FilePath (Join-Path $okmZiel 'arp.txt') -Encoding UTF8
         ipconfig.exe /all | Out-File -FilePath (Join-Path $okmZiel 'ipconfig.txt') -Encoding UTF8
-        query.exe user 2>&1 | Out-File -FilePath (Join-Path $okmZiel 'angemeldete-benutzer.txt') -Encoding UTF8
+        & { $ErrorActionPreference = 'Continue'; query.exe user 2>&1 } | Out-File -FilePath (Join-Path $okmZiel 'angemeldete-benutzer.txt') -Encoding UTF8
         Get-CimInstance -ClassName Win32_StartupCommand | Export-Csv -Path (Join-Path $okmZiel 'autostart.csv') -NoTypeInformation -Encoding UTF8
         Get-ScheduledTask | Select-Object TaskPath, TaskName, State, @{ Name = 'Aktion'; Expression = { ($_.Actions | ForEach-Object { $_.Execute + ' ' + $_.Arguments }) -join ' | ' } } | Export-Csv -Path (Join-Path $okmZiel 'geplante-aufgaben.csv') -NoTypeInformation -Encoding UTF8
         Get-CimInstance -ClassName Win32_Service | Select-Object Name, State, StartMode, PathName | Export-Csv -Path (Join-Path $okmZiel 'dienste.csv') -NoTypeInformation -Encoding UTF8

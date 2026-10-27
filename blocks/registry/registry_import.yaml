@@ -91,7 +91,7 @@ ziele:
     if not errorlevel 1 (
       if not exist "%OKM_REG_SICHERUNG%\" mkdir "%OKM_REG_SICHERUNG%"
       type {{ datei }} | findstr /n /b /c:"[" > "%TEMP%\okm-import-%OKM_TS%.txt"
-      for /f "usebackq tokens=1* delims=:" %%a in ("%TEMP%\okm-import-%OKM_TS%.txt") do for /f "tokens=* delims=[-" %%c in ("%%b") do for /f "delims=]" %%d in ("%%c") do reg export "%%d" "%OKM_REG_SICHERUNG%\import-%%a.reg" /y {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %} >nul 2>&1
+      for /f "usebackq tokens=1* delims=:" %%a in ("%TEMP%\okm-import-%OKM_TS%.txt") do for /f "tokens=* delims=[-" %%c in ("%%b") do for /f "delims=]" %%d in ("%%c") do reg export "%%d" "%OKM_REG_SICHERUNG%\%OKM_SCHRITT%-%%a.reg" /y {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %} >nul 2>&1
       del "%TEMP%\okm-import-%OKM_TS%.txt" >nul 2>&1
       reg import {{ datei }} {% if ansicht.wert == '32' %}/reg:32{% else %}/reg:64{% endif %}
     )
