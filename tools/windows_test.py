@@ -160,26 +160,45 @@ def szenarien(ziel: Ziel, ordner: PureWindowsPath) -> list[dict[str, Any]]:
             ],
         },
         {
-            "name": "loeschen",
-            "beschreibung": "Wert und Schlüssel löschen (rote Schritte, JA über die Eingabe)",
+            # Je Lauf nur ein roter Schritt: CMD-„set /p“ liest aus einer Pipe den ganzen Puffer,
+            # die erste Abfrage schluckt also alle „JA“-Zeilen (interaktiv kein Problem).
+            "name": "loeschen_wert",
+            "beschreibung": "Wert löschen (roter Schritt, JA über die Eingabe), Nachbarwert bleibt",
             "vorher": [
                 reg_add(f"{hklm}\\Loeschen", "Weg", "REG_SZ", "x"),
                 reg_add(f"{hklm}\\Loeschen", "Bleibt", "REG_SZ", "y"),
-                reg_add(f"{hklm}\\Loeschen\\Unter\\Tief", "Z", "REG_SZ", "z"),
             ],
             "schritte": [
                 (
                     "registry_wert_loeschen",
                     {"bereich": "computer", "pfad": f"{hklm}\\Loeschen", "wertname": "Weg"},
                 ),
-                ("registry_schluessel_loeschen", {"bereich": "computer", "pfad": f"{hklm}\\Loeschen\\Unter"}),
             ],
             "ja": True,
             "exit": 0,
             "pruefungen": [
                 kein_wert(f"{hklm}\\Loeschen", "Weg"),
                 wert(f"{hklm}\\Loeschen", "Bleibt", "REG_SZ", "y"),
-                {"art": "kein_schluessel", "pfad": f"{hklm}\\Loeschen\\Unter"},
+            ],
+        },
+        {
+            "name": "loeschen_schluessel",
+            "beschreibung": "Schlüssel samt Unterschlüsseln löschen (roter Schritt), Elternschlüssel bleibt",
+            "vorher": [
+                reg_add(f"{hklm}\\Loeschen2", "Bleibt", "REG_SZ", "y"),
+                reg_add(f"{hklm}\\Loeschen2\\Unter\\Tief", "Z", "REG_SZ", "z"),
+            ],
+            "schritte": [
+                (
+                    "registry_schluessel_loeschen",
+                    {"bereich": "computer", "pfad": f"{hklm}\\Loeschen2\\Unter"},
+                ),
+            ],
+            "ja": True,
+            "exit": 0,
+            "pruefungen": [
+                wert(f"{hklm}\\Loeschen2", "Bleibt", "REG_SZ", "y"),
+                {"art": "kein_schluessel", "pfad": f"{hklm}\\Loeschen2\\Unter"},
             ],
         },
         {

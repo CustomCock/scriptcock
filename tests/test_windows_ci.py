@@ -33,10 +33,22 @@ def test_manifest_vollstaendig(erzeugt: tuple[Path, dict[str, Any]]) -> None:
     ordner, manifest = erzeugt
     laeufe = manifest["laeufe"]
     namen = {(lauf["name"], lauf["ziel"]) for lauf in laeufe}
-    for name in ("typen", "nur_wenn_fehlt", "rueckgaengig", "loeschen", "import", "benutzer", "checkliste"):
+    for name in (
+        "typen",
+        "nur_wenn_fehlt",
+        "rueckgaengig",
+        "loeschen_wert",
+        "loeschen_schluessel",
+        "import",
+        "benutzer",
+        "checkliste",
+    ):
         assert (name, "powershell") in namen and (name, "cmd") in namen, name
     for lauf in laeufe:
         assert (ordner / lauf["datei"]).is_file()
+        if lauf["ziel"] == "cmd" and lauf.get("ja"):
+            # set /p liest aus der Pipe alles auf einmal → höchstens eine JA-Abfrage je CMD-Lauf
+            assert (ordner / lauf["datei"]).read_bytes().count(b"set /p") <= 1, lauf["name"]
         assert lauf["exit"] in (0, 1, "ungleich0")
         for p in lauf["pruefungen"] + lauf.get("rueckgaengig", []):
             assert p["art"] in ("wert", "kein_wert", "kein_schluessel", "datei_enthaelt")
