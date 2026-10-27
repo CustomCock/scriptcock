@@ -17,12 +17,16 @@
 #   adml_de     Glob der deutschen .adml-Dateien, adml_en dasselbe für en-US (Rückfall)
 #   software    winget-ID im Software-Katalog (für „Software installieren, falls sie fehlt“)
 #   hinweis     Besonderheiten
+#   aktualitaet wie tools/admx_pruefen.py (monatlicher Workflow) neuere Versionen erkennt:
+#               ms_download (+ seitenversion = Version, die die Downloadseite nennt) | edge_api |
+#               github_release (+ repo) | hash | manuell
 
 pakete:
   - id: windows
     name: Windows 11
     version: "25H2 (Sep 2025 Update)"
     seite: https://www.microsoft.com/en-us/download/details.aspx?id=108394
+    aktualitaet: ms_download  # neue Windows-Versionen bekommen eine neue Seite → Hinweis in der Doku
     format: msi
     dateien:
       - url: "https://download.microsoft.com/download/f35d3000-b6c9-4ca6-bedc-5e4ec15a6b7a/Administrative Templates (admx) for Windows 11 Sep 2025 Update.msi"
@@ -35,6 +39,8 @@ pakete:
     name: Microsoft 365 Apps / Office
     version: "5568.1000"
     seite: https://www.microsoft.com/en-us/download/details.aspx?id=49030
+    aktualitaet: ms_download
+    seitenversion: "5568.1000"
     format: office
     dateien:
       - url: https://download.microsoft.com/download/cd208613-5ca8-445f-9855-5081666d124e/admintemplates_x64_5568_1000_en-us.exe
@@ -49,6 +55,7 @@ pakete:
     name: Microsoft Edge
     version: "158.0.4344.0"
     seite: https://www.microsoft.com/en-us/edge/business/download
+    aktualitaet: edge_api
     format: cab
     dateien:
       # Link und SHA-256 aus der offiziellen Produktliste: https://edgeupdates.microsoft.com/api/products?view=enterprise
@@ -63,6 +70,7 @@ pakete:
     name: Google Chrome
     version: "Stand 23.10.2026"
     seite: https://support.google.com/chrome/a/answer/187202
+    aktualitaet: hash
     format: zip
     dateien:
       # Google veröffentlicht nur diese „immer aktuelle“ URL – bei jeder Aktualisierung Hash neu eintragen
@@ -77,6 +85,8 @@ pakete:
     name: Mozilla Firefox
     version: "8.4"
     seite: https://github.com/mozilla/policy-templates/releases
+    aktualitaet: github_release
+    repo: mozilla/policy-templates
     format: dateien
     dateien:
       - url: https://raw.githubusercontent.com/mozilla/policy-templates/v8.4/windows/firefox.admx
@@ -148,6 +158,8 @@ werkzeuge:
     name: LGPO.exe (Microsoft Security Compliance Toolkit)
     version: "3.0"
     seite: https://www.microsoft.com/en-us/download/details.aspx?id=55319
+    aktualitaet: ms_download
+    seitenversion: "1.0"  # Version des ganzen Security Compliance Toolkit, nicht von LGPO
     url: https://download.microsoft.com/download/8/5/c/85c25433-a1b0-4ffa-9429-7e023e7da8d8/LGPO.zip
     sha256: cb7159d134a0a1e7b1ed2ada9a3ce8ce8f4de391d14403d55438af824247cc55
     datei: LGPO_30/LGPO.exe

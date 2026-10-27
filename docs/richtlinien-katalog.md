@@ -130,6 +130,25 @@ Einstellungen in gpedit.msc erscheinen) oder installiert die **Software**, falls
 
 ## Aktualisieren (monatlich oder bei neuer Version)
 
+**Automatische Prüfung:** `.github/workflows/admx-pruefen.yml` läuft am 2. jedes Monats (und per Hand)
+`python tools/admx_pruefen.py` und legt bei Bedarf ein Issue „Administrative Vorlagen: neue Versionen“ an
+bzw. kommentiert das offene. Das Tool ändert nichts. Wie es je Paket prüft, steht im Feld `aktualitaet`
+in `registry/admx-quellen.yaml`:
+
+| `aktualitaet` | Pakete | Prüfung |
+|---|---|---|
+| `ms_download` | Windows, Office, LGPO | Steht unsere URL noch auf der Microsoft-Downloadseite, nennt sie noch `seitenversion`? |
+| `edge_api` | Edge | Version in der offiziellen Produktliste (Produkt „Policy“), dazu URL und SHA-256 der neuen CAB |
+| `github_release` | Firefox | neuestes Release von `repo` gegenüber `version` |
+| `hash` | Chrome | nur SHA-256 der „immer aktuellen“ Datei |
+| `manuell` | OneDrive, Adobe Reader, Zoom | nichts – erscheint im Bericht als „von Hand prüfen“ |
+
+Zusätzlich lädt es jede eingetragene Datei und vergleicht den SHA-256. So fällt eine Datei auf, die der
+Hersteller unter derselben URL austauscht. Grenzen: Eine **neue Windows-Version** bekommt bei Microsoft
+eine neue Downloadseite. Die alte Seite bleibt gültig, und das Tool sieht nichts davon. Beim
+Feature-Update (jährlich im Herbst) deshalb von Hand nachsehen. `--ohne-hash` überspringt die
+Downloads, `<id> …` prüft nur einzelne Pakete.
+
 1. Herstellerseite (`seite` in `registry/admx-quellen.yaml`) öffnen, neue Version suchen.
    Bei Edge liefert die offizielle Produktliste `https://edgeupdates.microsoft.com/api/products?view=enterprise`
    URL **und** SHA-256 der Policy-CAB.

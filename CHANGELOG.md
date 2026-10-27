@@ -2,6 +2,25 @@
 
 ## Registry, Richtlinien-Katalog und Palette
 
+### Teil G: Doku und monatliche ADMX-Prüfung
+
+- **`docs/registry.md`** (neu): alle Registry-Bausteine, Bereiche mit der HKCU-Falle (UAC-Neustart mit
+  fremdem Admin-Konto), `wenn_vorhanden`, Rückgängig-Dateien (Reihenfolge, Grenzen unter CMD), Wirkung,
+  Registry direkt vs. lokale Gruppenrichtlinie (LGPO), Domänen-Vorrang, Schutzliste.
+- **`tools/admx_pruefen.py`** + Workflow **`.github/workflows/admx-pruefen.yml`** (monatlich, per Hand
+  startbar): prüft je Paket laut neuem Feld `aktualitaet` in `registry/admx-quellen.yaml` die
+  Microsoft-Downloadseite (URL noch da, `seitenversion`), die Edge-Produktliste, GitHub-Releases (Firefox)
+  und den SHA-256 jeder eingetragenen Datei; bei neuen Versionen, geänderten Dateien oder nicht
+  erreichbaren Quellen legt der Workflow ein Issue an bzw. kommentiert das offene. Ändert nichts selbst.
+- `docs/richtlinien-katalog.md`: automatische Prüfung und ihre Grenze (neue Windows-Version = neue Seite).
+- `docs/neuen-block-anlegen.md`: Typen `registry_text`, `registry_zeilen`, `registry_soll_liste`,
+  `richtlinie`, dynamische Bausteine; `tests/test_doku.py` prüft, dass jeder Parametertyp und jeder
+  Registry-Baustein dokumentiert ist.
+- `docs/offene-punkte.md`: was nur auf echter VM bzw. in einer Test-Domäne geht (fremdes Admin-Konto, Hives
+  nicht angemeldeter Benutzer, Central Store, Domänen-Vorrang), Lehren aus dem Windows-Job (stderr unter
+  Windows PowerShell 5.1, `set /p` aus Pipes), Grenze der ADMX-Prüfung.
+- `CLAUDE.md`: neue Module, Befehle und Konventionen (Registry, Richtlinien, PS-5.1-Fallen, Templates).
+
 ### Teil F: Tests inkl. echtem Windows
 
 - **Windows-CI-Job** (`.github/workflows/ci.yml`, Job `windows` auf `windows-latest`):

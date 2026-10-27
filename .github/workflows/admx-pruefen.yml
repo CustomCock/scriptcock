@@ -1,0 +1,53 @@
+name: Administrative Vorlagen prüfen
+
+# Prüft, ob es neuere ADMX-Pakete oder Werkzeuge gibt als in registry/admx-quellen.yaml
+# (Microsoft-Downloadseiten, Edge-Produktliste, GitHub-Releases, SHA-256 der eingetragenen Dateien).
+# Braucht Netz, deshalb nicht im normalen CI, sondern monatlich bzw. per Hand. Aktualisiert wird von Hand
+# (docs/richtlinien-katalog.md) – der Workflow legt nur ein Issue an.
+on:
+  schedule:
+    - cron: "43 4 2 * *"  # am 2. jedes Monats
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python-Abhängigkeiten
+        run: pip install -e .
+
+      - name: Quellen prüfen
+        id: pruefen
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # nur für die GitHub-API (Firefox-Releases)
+        run: python tools/admx_pruefen.py --bericht bericht.md
+
+      - name: Issue anlegen oder ergänzen
+        if: steps.pruefen.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LAUF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          titel="Administrative Vorlagen: neue Versionen"
+          if [ ! -f bericht.md ]; then
+            printf 'Die Prüfung ist abgebrochen – Details im Lauf: %s\n' "$LAUF" > bericht.md
+          else
+            printf '\nLauf: %s\n' "$LAUF" >> bericht.md
+          fi
+          nummer="$(gh issue list --state open --search "\"$titel\" in:title" --json number --jq '.[0].number')"
+          if [ -n "$nummer" ]; then
+            gh issue comment "$nummer" --body-file bericht.md
+          else
+            gh issue create --title "$titel" --body-file bericht.md
+          fi

@@ -16,6 +16,10 @@ mypy app                                   # Typprüfung (strict)
 python tools/katalog_pruefen.py            # Paket-IDs des Software-Katalogs online prüfen (braucht Netz)
 python tools/screenshots.py [katalog rezepte]   # Screenshots in 4 Breiten nach docs/screenshots/
 python tools/checkliste_scripte.py checkliste/  # Test-Scripte für die VM-Checkliste (docs/test-vms.md)
+python tools/admx_holen.py [paket …]       # ADMX-Vorlagen laden (SHA-256!) → registry/quellen/ (nicht im Git)
+python tools/admx_katalog.py               # Richtlinien-Katalog registry/katalog/*.jsonl + Statistik neu bauen
+python tools/admx_pruefen.py [--ohne-hash] # neuere ADMX-Versionen? (braucht Netz, monatlich per Workflow)
+python tools/windows_test.py C:\okm-ci     # Scripte für den Windows-CI-Job (tests/windows/lauf.ps1)
 ```
 
 Syntax-Checks in den Tests brauchen `bash`, `zsh`, `shellcheck`, `pwsh` (+ Modul
@@ -54,6 +58,14 @@ UI-Formular / JSON ──► ScriptRequest ──► validation.py ──► Scr
 | `static/js/katalog-suche.js`, `software-katalog.js` | Suche (rein, auch unter Node getestet) bzw. **eine** Katalog-Komponente `SoftwareKatalog.mount` |
 | `tools/katalog_pruefen.py` | Prüft alle Paket-IDs online (monatlich per `.github/workflows/katalog-pruefen.yml`) |
 | `app/auth.py` | OIDC (Keycloak), Rollen `nutzer`/`admin`, `AUTH_DISABLED` |
+| `app/generators/hilfen/registry.ps1`, `richtlinien.ps1`, `registry_benutzer.cmd` | Registry-Hilfen fürs Script (nur eingebunden, wenn ein Registry- bzw. Richtlinien-Baustein vorkommt) |
+| `app/regschutz.py` + `registry/schutz.yaml` | Schutzliste: gesperrt / rot / Mindesttiefe beim Löschen |
+| `app/regdatei.py` | `.reg`-Parser (5.00/REGEDIT4, UTF-16) für Import-Vorschau und „.reg übernehmen“ |
+| `app/admx.py`, `app/richtlinien.py` | ADMX-Parser; Katalog (`registry/katalog/*.jsonl`) + FTS5-Suchindex, `registry/haeufig.yaml` |
+| `app/generators/richtlinie_ps.py`, `app/werkzeuge.py` | Code für die dynamischen Bausteine `richtlinie_setzen`/`admin_werkzeug_bereitstellen` (URLs + SHA-256 aus `registry/admx-quellen.yaml`) |
+| `app/routes/registry.py`, `_registry.html`, `static/js/registry-katalog.js` | Seite `/registry`, API `/api/registry/*`, Registry-Panel in allen Modi (`RegistryKatalog.mount`) |
+| `static/js/baustein-suche.js` | Suche der Baustein-Palette und der Blockly-Toolbox (rein, unter Node getestet) |
+| `tools/windows_test.py`, `tests/windows/lauf.ps1` | Job `windows` (windows-latest): Registry-Scripte und Checkliste wirklich ausführen und prüfen |
 
 ## Konventionen
 
@@ -82,9 +94,15 @@ UI-Formular / JSON ──► ScriptRequest ──► validation.py ──► Scr
 - Jedes Script endet mit Zusammenfassung (bash/zsh `trap okm_ende EXIT`, PS `trap`/`Exit-OkmScript`,
   CMD Sprungmarken) und hält das Fenster offen, außer mit `--nopause`/`-NoPause`/`/nopause`.
 - In CMD-Templates verboten: `%ERRORLEVEL%`, `goto`, `exit` (außer `cmd /c exit N`),
-  `EnableDelayedExpansion`, `call` mit Platzhaltern, unausgeglichene Klammern.
+  `EnableDelayedExpansion`, `call` mit Platzhaltern, unausgeglichene Klammern, `)` in `echo`-Text
+  (schließt den `( … )`-Block des Schritts – `^)` oder umformulieren).
   In bash/zsh: `eval`, Backticks, `exit`, `sudo`. In PowerShell: `Invoke-Expression`/`iex`, Here-Strings, `exit`.
-- PowerShell-Code muss **5.1-kompatibel** sein (kein `??`, `?.`, Ternary, `-Parallel`).
+- PowerShell-Code muss **5.1-kompatibel** sein (kein `??`, `?.`, Ternary, `-Parallel`). Programme mit
+  `2>&1`: Windows PowerShell 5.1 bricht bei `'Stop'` an jeder stderr-Zeile ab (pwsh 7 nicht!) – in Hilfen
+  `Invoke-OkmProgramm`, in Bausteinen `& { $ErrorActionPreference = 'Continue'; prog 2>&1 }`. Kein
+  `return , @(…)` in Funktionen, die Aufrufer mit `@(…)` sammeln (Feld im Feld).
+- Code-Templates: Ein Block-Tag am Zeilenende hinter Code (`reg add … {% endif %}`) behält seinen
+  Zeilenumbruch (`codeenv._ZeilenendeBehalten`) – Zeilen nur aus einem Tag verschwinden wie gewohnt.
 - Interne Variablen in generierten Scripten: Präfix `Okm`/`OKM_`/`okm_`.
 - Unsichere Befehle für ein Zielsystem lieber weglassen und in `docs/offene-punkte.md` notieren.
 - Platzhalter-Implementierungen nur mit `TODO` + Eintrag in `docs/offene-punkte.md`.
@@ -159,6 +177,26 @@ sonst wird `tests/test_browser.py` übersprungen.
 - Im Rezept füllt „＋“ das Feld `data-typ=paketname`; gibt es ein Listenfeld `data-listen-typ=paketname`,
   hängen „＋“ und Mehrfachauswahl Tags an (Ereignis `okm:tags` am Quellfeld des Tag-Felds).
 - Daten nur über Textknoten ins DOM (kein `innerHTML`), JSON per `tojson` eingebettet.
+
+## Registry und Richtlinien (Details: `docs/registry.md`, `docs/richtlinien-katalog.md`)
+
+- **HKCU nie im Script** (nach dem UAC-Neustart mit fremdem Admin-Konto wäre das dessen Profil).
+  Benutzer-Einstellungen über `registry_bereich`: `angemeldeter_benutzer` → `HKU\<SID>` (Besitzer von
+  explorer.exe), `alle_benutzer`/`standardprofil` → geladene `NTUSER.DAT` (immer entladen). CMD kennt nur
+  `computer` und `angemeldeter_benutzer`; Pfad dann `"HKU\%%s\…"` (Quote **vor** HKU).
+- Block-Feld `registry: lesen|schreiben|wert_loeschen|schluessel_loeschen|import` schaltet Bereich,
+  Schutzliste und Hilfen ein. PS-Templates rufen nur die Hilfen (`Set-OkmRegistryWert` …), CMD nutzt
+  `{{ benutzer_anfang }}`/`{{ benutzer_ende }}`, `{{ <pfad>_reg }}`, `{{ wirkung_rang }}`.
+- Vor jeder Änderung `.reg`-Sicherung in `%TEMP%\okm-registry-backup-<Zeit>-<PID|RANDOM>\`
+  (PS `001.reg` …, CMD `<Schritt>.reg`); Zurückspielen „höchste Nummer zuerst“. Keine Besitzübernahme.
+- ADMX: nur offizielle Herstellerquellen mit SHA-256 in `registry/admx-quellen.yaml` (Feld `aktualitaet`
+  für den monatlichen Check `.github/workflows/admx-pruefen.yml`). Rohdateien in `registry/quellen/` (nicht
+  im Git), Katalog `registry/katalog/*.jsonl` im Git. `registry/haeufig.yaml` nur mit belegter Quelle.
+- Dynamische Bausteine (`dynamisch: richtlinie|werkzeug`): Code aus dem Generator, Element-Parameter
+  `e_<element>` über `Registry.param_mit_elementen`/`element_parameter`.
+- Rezeptschritte können `nur_wenn: {feld: wert|[werte]}` haben.
+- Palette (Listen-Modus): `<details>` je Kategorie, `localStorage` `okm.palette.*`, `okm.bausteine.zuletzt`
+  (mit Blockly geteilt); `/` fokussiert die Palettensuche.
 
 ## Rechte
 

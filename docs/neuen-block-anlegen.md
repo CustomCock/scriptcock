@@ -159,6 +159,10 @@ Weitere Regeln, die beim Start geprüft werden:
 | `registry_typ` | feste Auswahl `REG_SZ`, `REG_EXPAND_SZ`, `REG_DWORD`, `REG_QWORD`, `REG_MULTI_SZ`, `REG_BINARY` | `REG_DWORD` |
 | `registry_daten` | je nach Typ (Parameter `bezug`, Standard `typ`): DWORD/QWORD 0 … 2³²−1 bzw. 2⁶⁴−1 (auch `0x…`), Text ≤ 4096, MULTI_SZ eine Zeile pro Eintrag (kein `\0`), BINARY Hex-Bytes | `1` |
 | `registry_bereich` | feste Auswahl: `computer`, `angemeldeter_benutzer`, `alle_benutzer`, `standardprofil`, `alle_benutzer_und_standardprofil` | `computer` |
+| `registry_text` | freier Text für einen Registry-Wert (URLs, Pfade, `%Variablen%`, Sonderzeichen), ≤ 4096, keine Steuerzeichen – Typ der Richtlinien-Elemente `text` | `https://intranet.okm.local` |
+| `registry_zeilen` | eine Zeile pro Eintrag wie `REG_MULTI_SZ` (≤ 4096 je Zeile, 16384 gesamt, kein `\0`, leere Zeilen fallen weg); Wert = Liste – Typ der Elemente `multiText`/`list` | `eins` ⏎ `zwei` |
+| `registry_soll_liste` | Zeilen `Pfad ; Wertname ; Typ ; Soll` (max. 50), siehe unten | `HKLM\SOFTWARE\Firma ; Aktiv ; REG_DWORD ; 1` |
+| `richtlinie` | ID aus dem Richtlinien-Katalog `<paket>:<admx>:<name>` (nur die Form; ob es sie gibt, prüft der Baustein) | `edge:msedge:HomepageLocation` |
 | `dateiname` | ein Name ohne Ordner; nicht `.`/`..`, kein Punkt am Ende, keine Windows-Gerätenamen (`CON`, `nul.txt`) | `Bericht 2026.docx` |
 | `rechnername` | 1–15 Zeichen, Buchstaben/Ziffern/`-`, nicht nur Ziffern; wird großgeschrieben | `PC-EMPFANG-01` |
 | `dnsname` | Name für DNS-Abfragen; ein Teil darf mit `_` beginnen (SRV), wird kleingeschrieben | `_ldap._tcp.okm.local` |
@@ -225,6 +229,16 @@ Das schaltet ein:
   (Blockly: Einträge mit `|` getrennt). Jeder Teil wird wie im Einzelbaustein geprüft, die Pfade gegen den
   Bereich des Blocks. Im Template ist der Wert ein PowerShell-Array mit Einträgen `Pfad|Wertname|Typ|Soll`
   (Beispiel: `blocks/registry/registry_soll_ist_liste.yaml`). REG_MULTI_SZ geht dort nicht.
+
+### Dynamische Bausteine (`dynamisch:`)
+
+`richtlinie_setzen` und `admin_werkzeug_bereitstellen` haben **kein** Template. Mit
+`dynamisch: richtlinie` bzw. `dynamisch: werkzeug` erzeugt der Generator den Code selbst
+(`app/generators/richtlinie_ps.py`) aus geprüften Daten: dem Richtlinien-Katalog bzw.
+`registry/admx-quellen.yaml` (URL + SHA-256). Die Felder einer Richtlinie (`e_<element>`) entstehen erst,
+wenn eine Richtlinie gewählt ist (`Registry.element_parameter`), und laufen durch dieselben Typen wie oben
+(`zahl`, `ja_nein`, `auswahl`, `registry_text`, `registry_zeilen`). Neue Bausteine dieser Art sind Code im
+Generator, nicht YAML – für alles andere gilt weiter: nur YAML.
 
 ### Listen (`typ: liste`)
 
