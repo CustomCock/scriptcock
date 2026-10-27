@@ -346,6 +346,22 @@ function Backup-OkmRegistrySchluessel($Ziel, [string]$Unterpfad, [string]$Ansich
     if ($Ziel.Geladen) { Write-OkmWarnung ('Zum Zurückspielen muss das Profil wieder als HKU\' + $Ziel.Geladen + ' geladen sein.') }
 }
 
+# Neuer Wert in einem vorhandenen Schlüssel: die Sicherung (reg export) kennt ihn nicht – eine eigene
+# .reg-Datei löscht ihn beim Zurückspielen wieder („Name“=- bzw. @=- für den Standardwert).
+function Add-OkmRueckgaengigNeuerWert($Ziel, [string]$Unterpfad, [string]$Name, [string]$Ansicht) {
+    $merker = 'NEU|' + (Get-OkmRegistryAnzeigepfad $Ziel $Unterpfad).ToUpperInvariant() + '|' + $Name.ToUpperInvariant() + '|' + $Ansicht
+    if ($script:OkmRegGesichert.ContainsKey($merker)) { return }
+    if (-not $script:OkmRegSicherung) {
+        $script:OkmRegSicherung = Join-Path $env:TEMP ('okm-registry-backup-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+        $null = New-Item -ItemType Directory -Path $script:OkmRegSicherung -Force
+    }
+    $datei = Join-Path $script:OkmRegSicherung (('{0:D3}' -f ($script:OkmRegGesichert.Count + 1)) + '.reg')
+    if ($Name) { $zeile = '"' + $Name.Replace('\', '\\') + '"=-' } else { $zeile = '@=-' }
+    $zeilen = @('Windows Registry Editor Version 5.00', '', ('[' + $script:OkmRegLangform[$Ziel.Wurzel] + '\' + $Unterpfad + ']'), $zeile, '')
+    [System.IO.File]::WriteAllLines($datei, [string[]]$zeilen, [System.Text.Encoding]::Unicode)
+    $script:OkmRegGesichert[$merker] = $datei
+}
+
 # Obersten fehlenden Schlüssel finden (für die Rückgängig-Datei eines neu angelegten Pfads)
 function Get-OkmFehlenderSchluessel($Ziel) {
     $teile = $Ziel.Unterpfad -split '\\'
@@ -422,7 +438,10 @@ function Set-OkmRegistryWert {
                     if ($Simulation) {
                         Write-OkmInfo ('[SIMULATION] ' + $titel + ' würde gesetzt: ' + $neuAnzeige)
                     } else {
-                        if (-not $neuerPfad) { Backup-OkmRegistrySchluessel $ziel $ziel.Unterpfad $Ansicht $true }
+                        if (-not $neuerPfad) {
+                            Backup-OkmRegistrySchluessel $ziel $ziel.Unterpfad $Ansicht $true
+                            if (-not $alt) { Add-OkmRueckgaengigNeuerWert $ziel $ziel.Unterpfad $Name $Ansicht }
+                        }
                         if ($alt -and $alt.Art -ne $neuArt) {
                             Write-OkmWarnung ($titel + ': Typ geändert: ' + (Get-OkmRegistryTypname $alt.Art) + ' → ' + $Typ)
                             $schluessel.DeleteValue($Name)

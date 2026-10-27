@@ -424,6 +424,10 @@ def test_registry_daten_ungueltig(regtyp: str, roh: Any) -> None:
         (ParamTyp.REGISTRY_TYP, "dword", "REG_DWORD"),
         (ParamTyp.REGISTRY_TYP, "reg_multi_sz", "REG_MULTI_SZ"),
         (ParamTyp.REGISTRY_BEREICH, "alle_benutzer", "alle_benutzer"),
+        (ParamTyp.REGISTRY_TEXT, "https://intra.okm/?a=1&b=%20", "https://intra.okm/?a=1&b=%20"),
+        (ParamTyp.REGISTRY_ZEILEN, "a;b\nc d\n\n", ["a;b", "c d"]),
+        (ParamTyp.RICHTLINIE, "edge:msedge:HomepageLocation", "edge:msedge:HomepageLocation"),
+        (ParamTyp.KB_NUMMER, "kb5034441", "5034441"),
     ],
 )
 def test_registry_typen_gueltig(typ: ParamTyp, roh: str, erwartet: Any) -> None:
@@ -444,6 +448,12 @@ def test_registry_typen_gueltig(typ: ParamTyp, roh: str, erwartet: Any) -> None:
         (ParamTyp.REGISTRY_WERTNAME, "x" * 256),
         (ParamTyp.REGISTRY_TYP, "REG_LINK"),
         (ParamTyp.REGISTRY_BEREICH, "hkcu"),
+        (ParamTyp.REGISTRY_TEXT, "x" * 4097),
+        (ParamTyp.REGISTRY_TEXT, "a\nb"),
+        (ParamTyp.REGISTRY_ZEILEN, "a\\0b"),
+        (ParamTyp.RICHTLINIE, "edge:msedge"),
+        (ParamTyp.RICHTLINIE, "edge:msedge:Home page"),
+        (ParamTyp.KB_NUMMER, "KB12"),
     ],
 )
 def test_registry_typen_ungueltig(typ: ParamTyp, roh: str) -> None:

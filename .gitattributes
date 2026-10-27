@@ -1,2 +1,4 @@
 # Golden-Files byte-genau einchecken (CRLF/BOM sind Teil des Tests)
 tests/golden/** -text
+# Prüfscript für den Windows-Job: UTF-8 mit BOM + CRLF (Windows PowerShell 5.1)
+tests/windows/*.ps1 -text

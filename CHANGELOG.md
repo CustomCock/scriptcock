@@ -2,6 +2,26 @@
 
 ## Registry, Richtlinien-Katalog und Palette
 
+### Teil F: Tests inkl. echtem Windows
+
+- **Windows-CI-Job** (`.github/workflows/ci.yml`, Job `windows` auf `windows-latest`):
+  `tools/windows_test.py` erzeugt mit dem echten Generator PowerShell- und CMD-Scripte für die
+  Registry-Bausteine gegen `HKLM\SOFTWARE\OkmTest` und `HKCU\Software\OkmTest` (Bereich „Angemeldeter
+  Benutzer“) plus die Checkliste-Scripte; `tests/windows/lauf.ps1` (Windows PowerShell 5.1) setzt
+  Vorbedingungen, startet jedes Script mit `-NoPause` bzw. `/nopause` (rote Schritte bekommen „JA“ über die
+  Eingabe), prüft Exit-Code und Ausgabe, prüft die Registry (`reg query` + exakter Vergleich von Typ und
+  Daten: DWORD > 0x7FFFFFFF, QWORD, EXPAND_SZ unaufgelöst, MULTI_SZ, BINARY, Standardwert, Umlaute),
+  „nur wenn fehlt“, die New-Item-Falle (Nachbarwerte bleiben), Löschen, Import, Export, Soll/Ist und spielt
+  die Rückgängig-Dateien zurück. Ergebnis als Tabelle in der Job-Zusammenfassung, Scripte und Protokolle
+  als Artefakt.
+- **Fix (PowerShell):** Die Rückgängig-Dateien entfernen jetzt auch Werte, die das Script in einem
+  vorhandenen Schlüssel neu angelegt hat (eigene .reg-Datei mit `"Name"=-`). Vorher blieben sie stehen.
+- Golden-Files für jeden neuen Baustein (`tests/golden/bausteine/`, Beispielwerte aus dem YAML, je Ziel).
+- `tests/test_escaping.py`: Registry-Daten je Ziel (`\` am Ende unter CMD, `%` bei EXPAND_SZ, `\0` bei
+  MULTI_SZ, `"` abgelehnt, Unicode, PowerShell-Round-Trip); `tests/test_validation.py`: `registry_text`,
+  `registry_zeilen`, `richtlinie`, `kb_nummer`; `tests/test_windows_ci.py`: Manifest, Syntax der erzeugten
+  Scripte, `lauf.ps1` (BOM, Parser), CI-Job.
+
 ### Teil E: Baustein-Palette und Blockly-Suche
 
 - **Palette im Baukasten als Akkordeon:** jede Kategorie mit Icon und Anzahl der Bausteine für das Zielsystem,

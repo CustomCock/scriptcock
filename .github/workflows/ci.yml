@@ -38,3 +38,32 @@ jobs:
 
       - name: pytest (inkl. bash -n, shellcheck, zsh -n, pwsh-Parser, PSScriptAnalyzer)
         run: pytest -q -rs
+
+  # Echte Windows PowerShell 5.1 + echte Registry: die erzeugten Scripte laufen wirklich
+  # (Registry-Bausteine gegen HKLM\SOFTWARE\OkmTest und HKCU\Software\OkmTest, Checkliste-Scripte).
+  # Was der Runner nicht kann (UAC-Dialog, Doppelklick, mehrere Benutzerprofile): docs/test-vms.md.
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Python-Abhängigkeiten
+        run: pip install -e .
+
+      - name: Testscripte erzeugen
+        run: python tools/windows_test.py C:\okm-ci
+
+      - name: Scripte ausführen und Registry prüfen (Windows PowerShell 5.1)
+        shell: powershell
+        run: .\tests\windows\lauf.ps1 -Ordner C:\okm-ci
+
+      - name: Scripte und Protokolle aufheben
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-testscripte
+          path: C:\okm-ci

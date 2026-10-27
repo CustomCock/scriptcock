@@ -197,3 +197,81 @@ def test_echo_sh_roundtrip(shell: str) -> None:
     for text in PAYLOADS:
         r = subprocess.run([_shell(shell), "-c", escaping.echo_sh(text)], capture_output=True)
         assert r.stdout.decode("utf-8") == text + "\n"
+
+
+# --- Registry (Teil A/F): Daten je Ziel ---------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("regtyp", "wert", "cmd"),
+    [
+        # CMD: ein \ am Ende würde das schließende " escapen (MSVCRT) → verdoppelt
+        ("REG_SZ", "C:\\Pfad\\", '"C:\\Pfad\\\\"'),
+        # %Variablen% bleiben unaufgelöst: in der Batch-Datei als %% geschrieben
+        ("REG_EXPAND_SZ", "%SystemRoot%\\okm", '"%%SystemRoot%%\\okm"'),
+        # MULTI_SZ: \0 ist der Trenner von reg.exe
+        ("REG_MULTI_SZ", ["eins", "zwei drei"], '"eins\\0zwei drei"'),
+        ("REG_DWORD", 4294967295, "0xFFFFFFFF"),
+        ("REG_QWORD", 2**63, "0x8000000000000000"),
+        ("REG_BINARY", "0a1bff", "0a1bff"),
+        ("REG_SZ", "Größe € 日本", '"Größe € 日本"'),
+    ],
+)
+def test_registry_daten_cmd(regtyp: str, wert: object, cmd: str) -> None:
+    assert str(escaping.registry_daten(Ziel.CMD, regtyp, wert)) == cmd  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("ziel", "regtyp", "wert"),
+    [
+        (Ziel.CMD, "REG_SZ", 'mit "Quote"'),  # " wird unter CMD abgelehnt
+        (Ziel.CMD, "REG_SZ", 5),  # Zahl nur bei DWORD/QWORD
+        (Ziel.CMD, "REG_BINARY", "0a zz"),
+        (Ziel.CMD, "REG_SZ", "a\nb"),
+        (Ziel.POWERSHELL, "REG_SZ", "a\u202eb"),  # Bidi
+        (Ziel.BASH, "REG_SZ", "x"),  # Registry gibt es nur unter Windows
+    ],
+)
+def test_registry_daten_abgelehnt(ziel: Ziel, regtyp: str, wert: object) -> None:
+    with pytest.raises(UnsicherError):
+        escaping.registry_daten(ziel, regtyp, wert)  # type: ignore[arg-type]
+
+
+def test_registry_daten_powershell_aufbau() -> None:
+    # Zahlen als Text (PS 5.1 würde große Int64-Literale als Double lesen), MULTI_SZ als Array
+    assert str(escaping.registry_daten(Ziel.POWERSHELL, "REG_DWORD", 4294967295)) == "'4294967295'"
+    assert str(escaping.registry_daten(Ziel.POWERSHELL, "REG_MULTI_SZ", ["a", "it's"])) == "@('a', 'it''s')"
+    assert str(escaping.registry_daten(Ziel.POWERSHELL, "REG_EXPAND_SZ", "%TEMP%")) == "'%TEMP%'"
+
+
+def test_registry_abfrage_cmd_findstr() -> None:
+    # findstr liest \ auch mit /l als Escape → verdoppelt; erwartete reg-query-Ausgabe
+    assert str(escaping.registry_abfrage(Ziel.CMD, "REG_SZ", "C:\\x")) == '"REG_SZ    C:\\\\x"'
+    assert str(escaping.registry_abfrage(Ziel.CMD, "REG_DWORD", 31)) == '"REG_DWORD    0x1f"'
+    assert str(escaping.registry_abfrage(Ziel.CMD, "REG_BINARY", "0a1b")) == '"REG_BINARY    0A1B"'
+
+
+def test_registry_pfad_benutzer_cmd() -> None:
+    # %%s = SID aus der for-/f-Schleife, der Rest normal escaped
+    assert (
+        str(escaping.registry_pfad_benutzer_cmd("Software\\Firma 100%"))
+        == 'HKU\\%%s\\"Software\\Firma 100%%"'
+    )
+    with pytest.raises(UnsicherError):
+        escaping.registry_pfad_benutzer_cmd('Software\\"x')
+
+
+def test_registry_daten_powershell_roundtrip(tmp_path: Path) -> None:
+    pwsh = _shell("pwsh")
+    werte = ["C:\\Pfad\\", "%SystemRoot%\\okm", "it's ‘x’", "Größe € 日本", "$env:USERNAME `whoami`"]
+    zeilen = ["[Console]::OutputEncoding = [System.Text.Encoding]::UTF8"]
+    for w in werte:
+        lit = escaping.registry_daten(Ziel.POWERSHELL, "REG_SZ", w)
+        zeilen.append(f"[Console]::Out.Write({lit}); [Console]::Out.Write([char]0)")
+    multi = escaping.registry_daten(Ziel.POWERSHELL, "REG_MULTI_SZ", werte)
+    zeilen.append(f"[Console]::Out.Write((@({multi}) -join '|')); [Console]::Out.Write([char]0)")
+    datei = tmp_path / "rt.ps1"
+    datei.write_bytes(b"\xef\xbb\xbf" + "\r\n".join(zeilen).encode("utf-8"))
+    r = subprocess.run([pwsh, "-NoProfile", "-NonInteractive", "-File", str(datei)], capture_output=True)
+    assert r.returncode == 0, r.stderr.decode()
+    assert r.stdout.decode("utf-8").split("\0")[:-1] == [*werte, "|".join(werte)]
