@@ -59,9 +59,8 @@ class CmdGenerator(Generator):
             'set "OKM_TIPP="',
             *(
                 [
-                    "rem Registry: Rückgängig-Dateien (reg export) landen hier",
-                    # eigener Ordner je Lauf: zwei Scripte in derselben Sekunde dürfen sich nicht mischen
-                    'set "OKM_REG_SICHERUNG=%TEMP%\\okm-registry-backup-%OKM_TS%-%RANDOM%"',
+                    "rem Registry: Ordner für Rückgängig-Dateien, angelegt nach der Rechteprüfung",
+                    'set "OKM_REG_SICHERUNG="',
                     "rem Registry: was nötig ist, damit Änderungen wirken (Rang, siehe Zusammenfassung)",
                     'set "OKM_WIRKUNG=0"',
                     'set "OKM_WIRKUNG_UNBEKANNT="',
@@ -83,6 +82,18 @@ class CmdGenerator(Generator):
             ]
         else:
             zeilen += [*_echo_beides("Rechte: ohne erhöhte Rechte"), ""]
+        if self.mit_registry:
+            # Eigener Ordner je Lauf. %RANDOM% reicht nicht (cmd.exe startet es mit der Uhrzeit in
+            # Sekunden – zwei Scripte in derselben Sekunde bekämen denselben Wert); mkdir schlägt bei
+            # vorhandenem Ordner fehl und ist damit ein sicherer „belegt?“-Test.
+            ordner = "%TEMP%\\okm-registry-backup-%OKM_TS%-%%i"
+            zeilen += [
+                "for /l %%i in (1,1,99) do if not defined OKM_REG_SICHERUNG "
+                f'mkdir "{ordner}" >nul 2>&1 && set "OKM_REG_SICHERUNG={ordner}"',
+                "if not defined OKM_REG_SICHERUNG "
+                'set "OKM_REG_SICHERUNG=%TEMP%\\okm-registry-backup-%OKM_TS%-%RANDOM%"',
+                "",
+            ]
         return zeilen
 
     @property
@@ -192,8 +203,10 @@ class CmdGenerator(Generator):
             zeilen += self._beides(text)
         if self.mit_registry:
             zeilen += [
-                'if exist "%OKM_REG_SICHERUNG%\\" echo( Rückgängig machen: die .reg-Dateien in '
+                'if exist "%OKM_REG_SICHERUNG%\\*.reg" echo( Rückgängig machen: die .reg-Dateien in '
                 "%OKM_REG_SICHERUNG% doppelklicken (höchste Nummer zuerst).",
+                # leerer Ordner (nichts geändert) verschwindet wieder; rd ohne /s löscht nur leere
+                'rd "%OKM_REG_SICHERUNG%" >nul 2>&1',
                 *[
                     f'if "%OKM_WIRKUNG%"=="{rang}" echo( Damit die Änderungen wirken: {text}'
                     for rang, text in (

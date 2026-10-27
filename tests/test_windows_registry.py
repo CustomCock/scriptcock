@@ -241,7 +241,11 @@ def test_hilfen_nur_mit_registry_baustein(registry: Registry) -> None:
     ohne = text(registry, Ziel.POWERSHELL, [blk("meldung", text="x", pause=False)])
     assert "Set-OkmRegistryWert" not in ohne and "Sysnative" not in ohne and "OkmReg" not in ohne
     cmd = text(registry, Ziel.CMD, [setzen()])
-    assert 'set "OKM_REG_SICHERUNG=%TEMP%\\okm-registry-backup-%OKM_TS%-%RANDOM%"' in cmd
+    # eindeutiger Ordner per mkdir (schlägt fehl, wenn belegt) – nach der Rechteprüfung, leer am Ende wieder weg
+    assert 'mkdir "%TEMP%\\okm-registry-backup-%OKM_TS%-%%i" >nul 2>&1 && set "OKM_REG_SICHERUNG=' in cmd
+    assert cmd.index("net session") < cmd.index("for /l %%i in (1,1,99)")
+    assert 'if exist "%OKM_REG_SICHERUNG%\\*.reg" echo( Rückgängig machen' in cmd
+    assert 'rd "%OKM_REG_SICHERUNG%" >nul 2>&1' in cmd
     assert "OKM_REG_SICHERUNG" not in text(registry, Ziel.CMD, [blk("meldung", text="x", pause=False)])
 
 

@@ -55,7 +55,8 @@
     Syntax“; jetzt `"HKU\%%s\Software\…"`.
   - CMD: `)` in einem `echo`-Text schloss den Block des Schritts („: was unexpected at this time“) – Text
     geändert, die Registry lehnt das jetzt ab.
-  - Rückgängig: Sicherungsordner je Lauf eindeutig (Sekunde + PID bzw. `%RANDOM%`), CMD-Dateien nach
+  - Rückgängig: Sicherungsordner je Lauf eindeutig (PowerShell Sekunde + PID; CMD erste freie Nummer per
+    `mkdir` nach der Rechteprüfung – `%RANDOM%` ist in derselben Sekunde gleich – leer am Ende wieder weg), CMD-Dateien nach
     Schrittnummer (`<Schritt>.reg`, erste Sicherung je Schritt bleibt) statt `%RANDOM%.reg` – sonst war die
     Reihenfolge beim Zurückspielen zufällig. Hinweis „höchste Nummer zuerst“ jetzt auch unter CMD.
 - CI unter Linux: Palette zeigt wieder „Unter <Ziel> nicht verfügbar“ (fiel in Teil E weg);

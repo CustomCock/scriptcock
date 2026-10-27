@@ -187,7 +187,7 @@ sonst wird `tests/test_browser.py` übersprungen.
 - Block-Feld `registry: lesen|schreiben|wert_loeschen|schluessel_loeschen|import` schaltet Bereich,
   Schutzliste und Hilfen ein. PS-Templates rufen nur die Hilfen (`Set-OkmRegistryWert` …), CMD nutzt
   `{{ benutzer_anfang }}`/`{{ benutzer_ende }}`, `{{ <pfad>_reg }}`, `{{ wirkung_rang }}`.
-- Vor jeder Änderung `.reg`-Sicherung in `%TEMP%\okm-registry-backup-<Zeit>-<PID|RANDOM>\`
+- Vor jeder Änderung `.reg`-Sicherung in `%TEMP%\okm-registry-backup-<Zeit>-<PID bzw. erste freie Nummer>\`
   (PS `001.reg` …, CMD `<Schritt>.reg`); Zurückspielen „höchste Nummer zuerst“. Keine Besitzübernahme.
 - ADMX: nur offizielle Herstellerquellen mit SHA-256 in `registry/admx-quellen.yaml` (Feld `aktualitaet`
   für den monatlichen Check `.github/workflows/admx-pruefen.yml`). Rohdateien in `registry/quellen/` (nicht
